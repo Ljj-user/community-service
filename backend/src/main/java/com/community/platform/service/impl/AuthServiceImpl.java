@@ -176,6 +176,8 @@ public class AuthServiceImpl implements AuthService {
             SysRegion region = sysRegionMapper.selectById(user.getCommunityId());
             if (region != null) {
                 userInfo.setCommunityName(region.getName());
+                userInfo.setProvince(region.getProvince());
+                userInfo.setCity(region.getCity());
             }
         }
         return userInfo;

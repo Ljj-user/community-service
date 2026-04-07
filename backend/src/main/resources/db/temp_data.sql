@@ -7,15 +7,17 @@ USE community_service;
 -- 0) 网格化区域（sys_region）演示数据：1个区 + 1个街道 + 2个社区
 -- 说明：用于 community_id 绑定与数据隔离联调
 -- ============================================
-INSERT INTO sys_region (id, name, level, parent_id) VALUES
-(100, '示例区', 1, NULL),
-(110, '示例街道', 2, 100),
-(3001, '幸福社区', 3, 110),
-(3002, '阳光社区', 3, 110)
+INSERT INTO sys_region (id, name, level, parent_id, province, city) VALUES
+(100, '示例区', 1, NULL, '浙江省', '杭州市'),
+(110, '示例街道', 2, 100, '浙江省', '杭州市'),
+(3001, '幸福社区', 3, 110, '浙江省', '杭州市'),
+(3002, '阳光社区', 3, 110, '浙江省', '杭州市')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   level = VALUES(level),
-  parent_id = VALUES(parent_id);
+  parent_id = VALUES(parent_id),
+  province = VALUES(province),
+  city = VALUES(city);
 
 -- ============================================
 -- 1) 系统配置默认值

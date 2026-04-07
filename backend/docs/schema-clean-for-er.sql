@@ -1,19 +1,13 @@
--- 社区公益服务对接管理平台 - 表结构（MySQL 8.0）
--- 只包含 DDL：CREATE TABLE / INDEX 等，不包含任何 INSERT 数据
+-- 社区公益服务对接管理平台 — 精简 DDL（用于 ER 工具导入 / 论文附录）
+-- 与 src/main/resources/db/schema.sql 结构一致，区别：
+--   1) 无 DROP TABLE，请在空库 community_service 中执行
+--   2) 待办相关索引改为普通 CREATE INDEX（无动态 SQL），便于 Navicat/部分工具解析
+--
+-- 使用：CREATE DATABASE community_service ...; USE community_service; SOURCE 本文件;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS service_evaluation;
-DROP TABLE IF EXISTS service_claim;
-DROP TABLE IF EXISTS service_request;
-DROP TABLE IF EXISTS sys_user;
-DROP TABLE IF EXISTS sys_region;
-
--- ----------------------------
--- 区域/网格表（sys_user.community_id、需求与公告的社区维度均引用本表 id）
--- level：1区 2街道 3社区
--- ----------------------------
 CREATE TABLE sys_region (
   id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   name              VARCHAR(100)     NOT NULL COMMENT '区域名称（社区等由管理员录入）',
@@ -26,12 +20,6 @@ CREATE TABLE sys_region (
   KEY idx_region_parent (parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='区域/网格表';
 
--- ----------------------------
--- 用户表（含角色/身份）
--- 角色：1超级管理员 2社区管理员 3普通用户
--- 普通用户身份：1居民老人 2志愿者（仅 role=3，互斥）
--- community_id：绑定社区时，与 sys_region.id 对应（应用层关联；也可后续加外键）
--- ----------------------------
 CREATE TABLE sys_user (
   id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   username          VARCHAR(50)      NOT NULL COMMENT '用户名（登录名）',
@@ -62,11 +50,6 @@ CREATE TABLE sys_user (
   KEY idx_sys_user_community (community_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户表（含角色/身份）';
 
--- ----------------------------
--- 需求表（居民发布 -> 社区管理员审核 -> 发布/驳回 -> 认领 -> 完成）
--- 状态：0待审核 1已发布 2已认领 3已完成 4已驳回
--- 紧急程度：1低 2中 3高 4紧急
--- ----------------------------
 CREATE TABLE service_request (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   requester_user_id   BIGINT UNSIGNED NOT NULL COMMENT '需求发起人（居民）用户ID',
@@ -81,17 +64,12 @@ CREATE TABLE service_request (
   emergency_contact_relation VARCHAR(32)   NULL COMMENT '与服务对象关系（子女/邻居等）',
   special_tags        JSON             NULL COMMENT '特殊人群/需求标签（JSON数组，如独居老人、残障等）',
   status              TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '状态：0待审核 1已发布 2已认领 3已完成 4已驳回',
-
-  -- 审核信息（社区管理员）
   audit_by_user_id    BIGINT UNSIGNED NULL COMMENT '审核人（社区管理员）用户ID',
   audit_at            DATETIME(3)     NULL COMMENT '审核时间',
   reject_reason       VARCHAR(255)    NULL COMMENT '驳回原因（status=4时必填）',
-
-  -- 流转时间（便于统计/异常监管）
   published_at        DATETIME(3)     NULL COMMENT '发布公开时间（status=1）',
   claimed_at          DATETIME(3)     NULL COMMENT '被认领时间（status=2）',
   completed_at        DATETIME(3)     NULL COMMENT '完成时间（status=3）',
-
   created_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
   updated_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
   is_deleted          TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否 1是',
@@ -107,21 +85,15 @@ CREATE TABLE service_request (
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='公益服务需求表';
 
--- ----------------------------
--- 服务认领记录表（志愿者认领 -> 完成后提交时长）
--- claim_status：1已认领 2已完成 3已取消
--- ----------------------------
 CREATE TABLE service_claim (
   id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   request_id         BIGINT UNSIGNED NOT NULL COMMENT '需求ID',
   volunteer_user_id  BIGINT UNSIGNED NOT NULL COMMENT '志愿者用户ID',
   claim_at          DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '认领时间',
   claim_status      TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '状态：1已认领 2已完成 3已取消',
-
   service_hours     DECIMAL(6,2)    NULL COMMENT '服务时长（小时，完成后提交）',
   hours_submitted_at DATETIME(3)    NULL COMMENT '时长提交时间',
   completion_note   VARCHAR(255)    NULL COMMENT '完成说明/备注（可用于异常记录）',
-
   created_at        DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
   updated_at        DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
   is_deleted        TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否 1是',
@@ -135,10 +107,6 @@ CREATE TABLE service_claim (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='服务认领记录表';
 
--- ----------------------------
--- 评价表（居民在服务完成后评价）
--- 一个认领记录只能评价一次（uk_eval_claim）
--- ----------------------------
 CREATE TABLE service_evaluation (
   id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   claim_id         BIGINT UNSIGNED NOT NULL COMMENT '认领记录ID',
@@ -165,10 +133,6 @@ CREATE TABLE service_evaluation (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='服务评价表';
 
--- ----------------------------
--- 社区公告表
--- ----------------------------
-DROP TABLE IF EXISTS announcement;
 CREATE TABLE announcement (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
   title VARCHAR(200) NOT NULL COMMENT '公告标题',
@@ -190,10 +154,7 @@ CREATE TABLE announcement (
   KEY idx_top (is_top, top_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='社区公告表';
 
--- ----------------------------
--- 备份/恢复/导出记录表
--- ----------------------------
-CREATE TABLE IF NOT EXISTS backup_record (
+CREATE TABLE backup_record (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   record_type VARCHAR(16) NOT NULL COMMENT '类型 BACKUP/RESTORE/EXPORT',
   module VARCHAR(64) DEFAULT NULL COMMENT '导出模块 service_request/users/audit 等',
@@ -212,20 +173,14 @@ CREATE TABLE IF NOT EXISTS backup_record (
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='备份/恢复/导出记录表';
 
--- ----------------------------
--- 全局点赞计数表
--- ----------------------------
-CREATE TABLE IF NOT EXISTS support_like (
+CREATE TABLE support_like (
     id           BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     total_count  BIGINT      NOT NULL DEFAULT 0 COMMENT '点赞总数',
     created_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全局点赞计数表';
 
--- ----------------------------
--- 系统配置表（key-value）
--- ----------------------------
-CREATE TABLE IF NOT EXISTS sys_config (
+CREATE TABLE sys_config (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   config_key VARCHAR(64) NOT NULL UNIQUE COMMENT '配置键: basic/notice/alert',
   config_value JSON NOT NULL COMMENT '配置值 JSON',
@@ -233,10 +188,7 @@ CREATE TABLE IF NOT EXISTS sys_config (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
 
--- ----------------------------
--- 待办事项表
--- ----------------------------
-CREATE TABLE IF NOT EXISTS todo_group (
+CREATE TABLE todo_group (
     id           BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     user_id      BIGINT      NOT NULL COMMENT '所属用户ID',
     title        VARCHAR(100) NOT NULL COMMENT '分组标题',
@@ -247,23 +199,9 @@ CREATE TABLE IF NOT EXISTS todo_group (
     updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='待办事项分组表';
 
--- 防止重复初始化时报 Duplicate key name
-SET @__idx_exists := (
-  SELECT COUNT(1)
-  FROM information_schema.statistics
-  WHERE table_schema = DATABASE()
-    AND table_name = 'todo_group'
-    AND index_name = 'idx_todo_group_user'
-);
-SET @__sql := IF(@__idx_exists > 0,
-  'SELECT 1',
-  'CREATE INDEX idx_todo_group_user ON todo_group (user_id)'
-);
-PREPARE __stmt FROM @__sql;
-EXECUTE __stmt;
-DEALLOCATE PREPARE __stmt;
+CREATE INDEX idx_todo_group_user ON todo_group (user_id);
 
-CREATE TABLE IF NOT EXISTS todo_task (
+CREATE TABLE todo_task (
     id           BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
     user_id      BIGINT      NOT NULL COMMENT '所属用户ID（冗余，便于按用户查询）',
     group_id     BIGINT      NOT NULL COMMENT '所属分组ID',
@@ -277,41 +215,10 @@ CREATE TABLE IF NOT EXISTS todo_task (
     updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='待办事项任务表';
 
--- 防止重复初始化时报 Duplicate key name
-SET @__idx_exists := (
-  SELECT COUNT(1)
-  FROM information_schema.statistics
-  WHERE table_schema = DATABASE()
-    AND table_name = 'todo_task'
-    AND index_name = 'idx_todo_task_group'
-);
-SET @__sql := IF(@__idx_exists > 0,
-  'SELECT 1',
-  'CREATE INDEX idx_todo_task_group ON todo_task (group_id)'
-);
-PREPARE __stmt FROM @__sql;
-EXECUTE __stmt;
-DEALLOCATE PREPARE __stmt;
+CREATE INDEX idx_todo_task_group ON todo_task (group_id);
+CREATE INDEX idx_todo_task_user ON todo_task (user_id);
 
-SET @__idx_exists := (
-  SELECT COUNT(1)
-  FROM information_schema.statistics
-  WHERE table_schema = DATABASE()
-    AND table_name = 'todo_task'
-    AND index_name = 'idx_todo_task_user'
-);
-SET @__sql := IF(@__idx_exists > 0,
-  'SELECT 1',
-  'CREATE INDEX idx_todo_task_user ON todo_task (user_id)'
-);
-PREPARE __stmt FROM @__sql;
-EXECUTE __stmt;
-DEALLOCATE PREPARE __stmt;
-
--- ----------------------------
--- 审计日志表
--- ----------------------------
-CREATE TABLE IF NOT EXISTS audit_log (
+CREATE TABLE audit_log (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT DEFAULT NULL COMMENT '操作人ID',
   username VARCHAR(64) DEFAULT NULL COMMENT '操作人用户名',

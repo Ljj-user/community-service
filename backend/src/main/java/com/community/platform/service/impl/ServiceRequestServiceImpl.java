@@ -440,11 +440,16 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         if (ids.isEmpty()) {
             return;
         }
-        Map<Long, String> communityMap = sysRegionMapper.selectBatchIds(ids).stream()
-                .collect(Collectors.toMap(SysRegion::getId, SysRegion::getName, (a, b) -> a));
+        Map<Long, SysRegion> regionMap = sysRegionMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(SysRegion::getId, r -> r, (a, b) -> a));
         for (ServiceRequestVO vo : voList) {
             if (vo.getCommunityId() != null) {
-                vo.setCommunityName(communityMap.get(vo.getCommunityId()));
+                SysRegion r = regionMap.get(vo.getCommunityId());
+                if (r != null) {
+                    vo.setCommunityName(r.getName());
+                    vo.setProvince(r.getProvince());
+                    vo.setCity(r.getCity());
+                }
             }
         }
     }

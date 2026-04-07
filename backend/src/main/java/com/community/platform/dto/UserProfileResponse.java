@@ -21,6 +21,10 @@ public class UserProfileResponse {
     private Long communityId;
     /** 所属社区名称（与 community_id 对应 sys_region.id） */
     private String communityName;
+    /** 省（展示用） */
+    private String province;
+    /** 市（展示用） */
+    private String city;
     /** 当前可用时间币 */
     private Long timeCoins;
     /** 累计积分/经验值 */

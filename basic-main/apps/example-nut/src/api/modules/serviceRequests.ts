@@ -25,6 +25,8 @@ export interface ServiceRequestVO {
   createdAt?: string
   description?: string
   communityName?: string
+  province?: string
+  city?: string
 }
 
 export function getPublishedRequests(current = 1, size = 10, serviceType?: string) {

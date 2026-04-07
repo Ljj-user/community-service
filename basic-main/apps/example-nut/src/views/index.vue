@@ -43,6 +43,17 @@ const bannerList = [
 const displayName = computed(() => appAuthStore.user?.realName || appAuthStore.user?.username || appAuthStore.account || '邻里用户')
 /** 后端 sys_region 名称，未绑定则提示文案 */
 const resolvedCommunityName = computed(() => appAuthStore.user?.communityName || '未绑定社区')
+/** 省、市 + 社区名（横幅展示：浙江省 杭州市 · 幸福社区） */
+const bannerLocationSubtitle = computed(() => {
+  const u = appAuthStore.user
+  const name = u?.communityName || '未绑定社区'
+  const p = u?.province?.trim()
+  const c = u?.city?.trim()
+  if (p && c) return `${p} ${c} · ${name}`
+  if (p) return `${p} · ${name}`
+  if (c) return `${c} · ${name}`
+  return name
+})
 const bannerUserName = computed(() => displayName.value || '邻里用户')
 /** 与 sys_user.time_coins 一致，由 /auth/me 刷新 */
 const coins = computed(() => {
@@ -215,7 +226,7 @@ onMounted(loadData)
                 {{ b.sub }}
               </div>
               <div class="hero-user">
-                你好，{{ bannerUserName }} · {{ resolvedCommunityName }}
+                你好，{{ bannerUserName }} · {{ bannerLocationSubtitle }}
               </div>
             </div>
           </NutSwiperItem>

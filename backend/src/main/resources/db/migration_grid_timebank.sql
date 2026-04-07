@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS sys_region (
   name       VARCHAR(100) NOT NULL COMMENT '区域名称',
   level      TINYINT UNSIGNED NOT NULL COMMENT '区域层级：1区 2街道 3社区',
   parent_id  BIGINT UNSIGNED NULL COMMENT '父级区域ID',
+  province   VARCHAR(64) NULL COMMENT '省（展示用）',
+  city       VARCHAR(64) NULL COMMENT '市（展示用）',
   PRIMARY KEY (id),
   KEY idx_region_level (level),
   KEY idx_region_parent (parent_id)

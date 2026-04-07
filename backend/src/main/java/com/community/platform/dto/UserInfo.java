@@ -19,6 +19,10 @@ public class UserInfo {
     private Long communityId;
     /** 绑定社区名称（由 community_id 关联 sys_region 查询） */
     private String communityName;
+    /** 省（展示用，来自 sys_region） */
+    private String province;
+    /** 市（展示用，来自 sys_region） */
+    private String city;
     /** 当前可用时间币 */
     private Long timeCoins;
     /** 累计积分 */

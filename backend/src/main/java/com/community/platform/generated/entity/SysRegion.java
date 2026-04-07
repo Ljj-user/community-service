@@ -40,5 +40,13 @@ public class SysRegion implements Serializable {
 
     @TableField("parent_id")
     private Long parentId;
+
+    /** 省（展示用，如 浙江省） */
+    @TableField("province")
+    private String province;
+
+    /** 市（展示用，如 杭州市） */
+    @TableField("city")
+    private String city;
 }
 

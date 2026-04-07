@@ -15,6 +15,10 @@ public class ServiceRequestVO {
     private String requesterName;
     private Long communityId;
     private String communityName;
+    /** 省（展示用，来自 sys_region） */
+    private String province;
+    /** 市（展示用，来自 sys_region） */
+    private String city;
     private String serviceType;
     private String description;
     private String serviceAddress;

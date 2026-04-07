@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="Generator" content="毕设文档导出" />
+<title>社区公益服务对接管理平台 — 数据库设计说明</title>
+<style>
+body { font-family: "Microsoft YaHei", SimSun, sans-serif; font-size: 11pt; line-height: 1.5; max-width: 900px; margin: 24px auto; color: #111; }
+h1 { font-size: 18pt; border-bottom: 1px solid #333; padding-bottom: 6px; }
+h2 { font-size: 14pt; margin-top: 1.2em; }
+blockquote { border-left: 3px solid #ccc; margin-left: 0; padding-left: 12px; color: #444; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #333; padding: 5px 8px; vertical-align: top; }
+th { background: #f0f0f0; }
+pre { font-family: Consolas, monospace; font-size: 8.5pt; background: #f5f5f5; padding: 10px; overflow-x: auto; white-space: pre-wrap; }
+.note { background: #fffde7; padding: 10px; margin: 16px 0; border: 1px solid #e0d080; }
+hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
+ol { padding-left: 1.4em; }
+</style>
+</head>
+<body>
+
+<p class="note"><strong>使用说明：</strong> 请用 <strong>Microsoft Word</strong> 打开本文件 →「文件」→「另存为」→ <strong>Word 文档 (*.docx)</strong> 或 <strong>Word 97-2003 (*.doc)</strong>。</p>
+
+<h1>社区公益服务对接管理平台 — 数据库设计说明</h1>
+
+<blockquote>
+数据库名建议：<code>community_service</code><br />
+引擎：MySQL 8.0，字符集 <code>utf8mb4</code><br />
+主 DDL：<code>src/main/resources/db/schema.sql</code><br />
+补丁脚本：同目录 <code>service_request_emergency.sql</code>、<code>sys_region_province_city.sql</code> 等
+</blockquote>
+
+<hr />
+
+<h2>一、表清单与业务含义</h2>
+<table>
+<tr><th>表名</th><th>说明</th></tr>
+<tr><td>sys_region</td><td>区域/网格树（区→街道→社区）；含省、市展示；parent_id 自关联</td></tr>
+<tr><td>sys_user</td><td>用户；community_id 逻辑关联 sys_region</td></tr>
+<tr><td>service_request</td><td>公益服务需求（发布、审核、状态流转）</td></tr>
+<tr><td>service_claim</td><td>志愿者认领记录及时长</td></tr>
+<tr><td>service_evaluation</td><td>评价（与认领记录一对一）</td></tr>
+<tr><td>announcement</td><td>社区公告</td></tr>
+<tr><td>sys_config</td><td>系统参数 JSON</td></tr>
+<tr><td>backup_record</td><td>备份/导出记录</td></tr>
+<tr><td>support_like</td><td>全局点赞计数</td></tr>
+<tr><td>todo_group / todo_task</td><td>待办分组与任务</td></tr>
+<tr><td>audit_log</td><td>审计日志</td></tr>
+</table>
+
+<hr />
+
+<h2>二、外键关系（schema.sql 已声明）</h2>
+<table>
+<tr><th>子表</th><th>外键列</th><th>引用表</th><th>引用列</th></tr>
+<tr><td>service_request</td><td>requester_user_id</td><td>sys_user</td><td>id</td></tr>
+<tr><td>service_request</td><td>audit_by_user_id</td><td>sys_user</td><td>id</td></tr>
+<tr><td>service_claim</td><td>request_id</td><td>service_request</td><td>id</td></tr>
+<tr><td>service_claim</td><td>volunteer_user_id</td><td>sys_user</td><td>id</td></tr>
+<tr><td>service_evaluation</td><td>claim_id</td><td>service_claim</td><td>id</td></tr>
+<tr><td>service_evaluation</td><td>request_id</td><td>service_request</td><td>id</td></tr>
+<tr><td>service_evaluation</td><td>resident_user_id</td><td>sys_user</td><td>id</td></tr>
+<tr><td>service_evaluation</td><td>volunteer_user_id</td><td>sys_user</td><td>id</td></tr>
+</table>
+
+<h2>三、逻辑关联（未建外键，ER 中建议画出）</h2>
+<table>
+<tr><th>来源</th><th>含义</th><th>关联目标</th></tr>
+<tr><td>sys_user.community_id</td><td>用户绑定社区</td><td>sys_region.id</td></tr>
+<tr><td>service_request.community_id</td><td>需求所属社区</td><td>sys_region.id</td></tr>
+<tr><td>announcement.target_community_id</td><td>公告推送社区</td><td>sys_region.id</td></tr>
+<tr><td>announcement.publisher_user_id</td><td>发布人</td><td>sys_user.id</td></tr>
+<tr><td>sys_region.parent_id</td><td>上级区域</td><td>sys_region.id</td></tr>
+<tr><td>todo_group.user_id</td><td>分组所属用户</td><td>sys_user.id</td></tr>
+<tr><td>todo_task</td><td>任务归属</td><td>sys_user.id / todo_group.id</td></tr>
+<tr><td>audit_log.user_id</td><td>操作人</td><td>sys_user.id（可空）</td></tr>
+</table>
+
+<hr />
+
+<h2>四、核心业务流程与表协作（文字版）</h2>
+<ol>
+<li>居民（sys_user）在 service_request 发布需求。</li>
+<li>社区管理员审核：audit_by_user_id、status、驳回原因等。</li>
+<li>志愿者在 service_claim 认领，完成后填写 service_hours。</li>
+<li>居民在 service_evaluation 对 claim_id 评价（唯一约束：一条认领一条评价）。</li>
+<li>网格展示：community_id 与 sys_region 对应；province / city 仅展示。</li>
+</ol>
+
+<hr />
+
+<h2>五、Mermaid ER 图源码（导出图片请用 mermaid.live）</h2>
+<pre>erDiagram
+  sys_region ||--o| sys_region : "parent_id"
+  sys_region ||--o{ sys_user : "community_id"
+  sys_region ||--o{ service_request : "community_id"
+  sys_user ||--o{ service_request : "requester_user_id"
+  sys_user ||--o{ service_request : "audit_by_user_id"
+  sys_user ||--o{ service_claim : "volunteer_user_id"
+  sys_user ||--o{ service_evaluation : "resident_user_id"
+  sys_user ||--o{ service_evaluation : "volunteer_user_id"
+  sys_user ||--o{ todo_group : "user_id"
+  sys_user ||--o{ todo_task : "user_id"
+  sys_user ||--o{ announcement : "publisher_user_id"
+  sys_user ||--o{ audit_log : "user_id"
+  service_request ||--o{ service_claim : "request_id"
+  service_claim ||--o| service_evaluation : "claim_id"
+  service_request ||--o{ service_evaluation : "request_id"
+  todo_group ||--o{ todo_task : "group_id"</pre>
+
+<hr />
+
+<h2>六、生成正式 ER 图（工具建议）</h2>
+<ol>
+<li><strong>MySQL Workbench：</strong> Reverse Engineer 连接库 community_service。</li>
+<li><strong>Navicat / DataGrip：</strong> 逆向数据库到模型，导出 PDF/图片。</li>
+<li><strong>dbdiagram.io：</strong> 粘贴项目内 <code>schema-for-er.dbml</code>。</li>
+<li><strong>SQL 导入：</strong> 空库执行 <code>schema-clean-for-er.sql</code> 后再逆向。</li>
+</ol>
+
+<hr />
+
+<h2>七、文件索引</h2>
+<table>
+<tr><th>文件</th><th>用途</th></tr>
+<tr><td>src/main/resources/db/schema.sql</td><td>完整建表（权威）</td></tr>
+<tr><td>docs/schema-for-er.dbml</td><td>在线 ER</td></tr>
+<tr><td>docs/schema-clean-for-er.sql</td><td>精简 DDL 便于逆向</td></tr>
+<tr><td>docs/database-design.md</td><td>Markdown 版说明</td></tr>
+</table>
+
+</body>
+</html>

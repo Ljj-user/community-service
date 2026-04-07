@@ -16,6 +16,9 @@ export interface UserInfo {
   communityId?: number
   /** 绑定社区名称（后端由 sys_user.community_id 关联 sys_region） */
   communityName?: string
+  /** 省、市（展示用，来自 sys_region） */
+  province?: string
+  city?: string
   timeCoins?: number
   points?: number
 }

@@ -58,6 +58,8 @@ public class UserProfileServiceImpl implements UserProfileService {
             SysRegion region = sysRegionMapper.selectById(user.getCommunityId());
             if (region != null) {
                 resp.setCommunityName(region.getName());
+                resp.setProvince(region.getProvince());
+                resp.setCity(region.getCity());
             }
         }
         resp.setTimeCoins(user.getTimeCoins());
