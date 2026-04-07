@@ -1,0 +1,718 @@
+<script setup lang="ts">
+import { getUserAnnouncementDetail, listUserAnnouncements, type AnnouncementVO } from '@/api/modules/announcements'
+import { getPublishedRequests, type ServiceRequestVO } from '@/api/modules/serviceRequests'
+
+definePage({
+  meta: {
+    title: '大厅',
+    auth: true,
+  },
+})
+
+const appAuthStore = useAppAuthStore()
+const router = useRouter()
+
+const loading = ref(false)
+const error = ref('')
+const rows = ref<ServiceRequestVO[]>([])
+const activeCategory = ref('全部需求')
+const showPublishModal = ref(false)
+const publishLoading = ref(false)
+const publishForm = reactive({
+  serviceType: '助老',
+  urgencyLevel: 2,
+  expectedHours: 2,
+})
+
+const categories = ['全部需求', '助老', '代买跑腿', '清洁', '陪诊', '维修']
+const communityOptions = ['幸福里社区', '阳光社区', '和谐社区']
+/** 仅用于公告区/弹窗切换演示数据；顶部与账户卡片展示以后端绑定社区为准 */
+const noticeCommunity = ref(communityOptions[0])
+const showCommunityModal = ref(false)
+const communityDistanceMap: Record<string, string> = {
+  幸福里社区: '0.8km',
+  阳光社区: '1.6km',
+  和谐社区: '2.4km',
+}
+const bannerList = [
+  { id: 1, title: '春季互助行动', sub: '邻里协作让生活更轻松' },
+  { id: 2, title: '积分激励周', sub: '完成服务可获额外时币奖励' },
+  { id: 3, title: '社区关怀日', sub: '优先帮助独居老人和行动不便居民' },
+]
+
+const displayName = computed(() => appAuthStore.user?.realName || appAuthStore.user?.username || appAuthStore.account || '邻里用户')
+/** 后端 sys_region 名称，未绑定则提示文案 */
+const resolvedCommunityName = computed(() => appAuthStore.user?.communityName || '未绑定社区')
+const bannerUserName = computed(() => displayName.value || '邻里用户')
+/** 与 sys_user.time_coins 一致，由 /auth/me 刷新 */
+const coins = computed(() => {
+  const t = appAuthStore.user?.timeCoins
+  return Number(t ?? 0).toFixed(2)
+})
+/** 与 sys_user.points 一致（信用分/积分） */
+const creditScore = computed(() => Number(appAuthStore.user?.points ?? 0))
+const headerDistance = computed(() => communityDistanceMap[resolvedCommunityName.value] ?? '—')
+/** 需求卡片上展示的距离仍跟公告切换社区（演示）一致 */
+const listDistance = computed(() => communityDistanceMap[noticeCommunity.value] ?? '—')
+const announcementRows = ref<AnnouncementVO[]>([])
+/** 附近需求列表单页条数 */
+const LIST_PAGE_SIZE = 10
+
+const showAnnouncementModal = ref(false)
+const announcementDetailLoading = ref(false)
+const announcementDetailError = ref('')
+const announcementDetail = ref<AnnouncementVO | null>(null)
+/** 点击列表时暂存，用于详情加载前展示标题 */
+const announcementListItem = ref<AnnouncementVO | null>(null)
+
+function fmtAnnounceTime(v?: string) {
+  if (!v) return ''
+  return v.replace('T', ' ').slice(0, 16)
+}
+
+function urgencyText(v: number) {
+  if (v >= 4) return '极紧急'
+  if (v === 3) return '紧急'
+  if (v === 2) return '中等'
+  return '普通'
+}
+
+function urgencyClass(v: number) {
+  if (v >= 4) return 'urgent-high'
+  if (v >= 2) return 'urgent-mid'
+  return 'urgent-low'
+}
+
+function tagClass(type: string) {
+  if (type.includes('陪')) return 'tag-red'
+  if (type.includes('买') || type.includes('跑腿')) return 'tag-orange'
+  if (type.includes('维修')) return 'tag-blue'
+  if (type.includes('助老')) return 'tag-purple'
+  return 'tag-green'
+}
+
+async function loadData() {
+  loading.value = true
+  error.value = ''
+  try {
+    await appAuthStore.hydrateUser()
+    const bound = appAuthStore.user?.communityName
+    if (bound && communityOptions.includes(bound))
+      noticeCommunity.value = bound
+    const [annRes, reqRes] = await Promise.all([
+      listUserAnnouncements(1, 30),
+      getPublishedRequests(1, LIST_PAGE_SIZE, activeCategory.value),
+    ])
+    if (annRes.code === 200)
+      announcementRows.value = annRes.data.records || []
+    else
+      announcementRows.value = []
+    if (reqRes.code !== 200) throw new Error(reqRes.message || '加载失败')
+    rows.value = reqRes.data.records || []
+  }
+  catch (e: any) {
+    error.value = e?.message || '加载失败'
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function onSwitchCategory(category: string) {
+  activeCategory.value = category
+  loadData()
+}
+
+function onRobOrder(item: ServiceRequestVO) {
+  window.alert(`已发起抢单：${item.serviceType}`)
+}
+
+function onGotoMe() {
+  router.push('/user/')
+}
+
+function onScan() {
+  router.push('/scan')
+}
+
+function onSelectCommunity(name: string) {
+  noticeCommunity.value = name
+  showCommunityModal.value = false
+  loadData()
+}
+
+function onViewAllAnnouncements() {
+  router.push({ path: '/notices' })
+}
+
+async function openAnnouncementDetail(n: AnnouncementVO) {
+  announcementListItem.value = n
+  showAnnouncementModal.value = true
+  announcementDetail.value = null
+  announcementDetailError.value = ''
+  announcementDetailLoading.value = true
+  try {
+    const res = await getUserAnnouncementDetail(n.id)
+    if (res.code !== 200 || !res.data)
+      throw new Error(res.message || '加载失败')
+    announcementDetail.value = res.data
+  }
+  catch (e: any) {
+    announcementDetailError.value = e?.message || '加载失败'
+  }
+  finally {
+    announcementDetailLoading.value = false
+  }
+}
+
+watch(showAnnouncementModal, (open) => {
+  if (!open) {
+    announcementDetail.value = null
+    announcementListItem.value = null
+    announcementDetailError.value = ''
+    announcementDetailLoading.value = false
+  }
+})
+
+async function onPublish() {
+  publishLoading.value = true
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    showPublishModal.value = false
+    window.alert('发布成功（演示）')
+  }
+  finally {
+    publishLoading.value = false
+  }
+}
+
+onMounted(loadData)
+</script>
+
+<template>
+  <AppPageLayout :navbar="false" tabbar>
+    <div class="home-page">
+      <header class="biz-header">
+        <button class="community-switch" @click="showCommunityModal = true">
+          <FmIcon name="i-carbon:location-filled" class="community-icon" />
+          <span>{{ resolvedCommunityName }}</span>
+          <span class="distance">{{ headerDistance }}</span>
+          <FmIcon name="i-carbon:chevron-down" />
+        </button>
+        <button type="button" class="scan-btn" aria-label="扫一扫" @click="onScan">
+          <FmIcon name="i-carbon:qr-code" />
+        </button>
+      </header>
+
+      <main class="content-scroll">
+        <NutSwiper :auto-play="3000" :pagination-visible="true" class="hero-swiper">
+          <NutSwiperItem v-for="b in bannerList" :key="b.id">
+            <div class="hero-item">
+              <div class="hero-title">
+                {{ b.title }}
+              </div>
+              <div class="hero-sub">
+                {{ b.sub }}
+              </div>
+              <div class="hero-user">
+                你好，{{ bannerUserName }} · {{ resolvedCommunityName }}
+              </div>
+            </div>
+          </NutSwiperItem>
+        </NutSwiper>
+
+        <button class="account-card" @click="onGotoMe">
+          <div class="avatar-wrap">
+            <FmIcon name="i-carbon:user-avatar-filled-alt" />
+          </div>
+          <div class="account-left">
+            <div class="mini-label">
+              当前账户
+            </div>
+            <div class="account-name">
+              {{ displayName }}
+            </div>
+            <div class="account-sub">
+              {{ resolvedCommunityName }} · 信用分 {{ creditScore }}
+            </div>
+          </div>
+          <div class="account-right">
+            <div class="mini-label">
+              可用时币
+            </div>
+            <div class="account-coins">
+              {{ coins }}
+            </div>
+            <div class="to-me">
+              查看我的 >
+            </div>
+          </div>
+        </button>
+
+        <section class="notice-card">
+          <div class="notice-head">
+            <h3>社区公告</h3>
+            <button @click="onViewAllAnnouncements">
+              查看全部
+            </button>
+          </div>
+          <div class="notice-list">
+            <div v-if="announcementRows.length === 0" class="notice-empty">
+              暂无公告（数据来自后台，已发布且您所在社区可见时显示）
+            </div>
+            <button
+              v-for="n in announcementRows"
+              :key="n.id"
+              type="button"
+              class="notice-item"
+              @click="openAnnouncementDetail(n)"
+            >
+              <div class="dot" />
+              <div class="text">
+                {{ n.title }}
+              </div>
+              <div class="time">
+                {{ fmtAnnounceTime(n.publishedAt || n.createdAt) }}
+              </div>
+              <FmIcon name="i-carbon:chevron-right" class="notice-chevron" aria-hidden="true" />
+            </button>
+          </div>
+        </section>
+
+        <div class="category-tabs">
+          <button
+            v-for="c in categories"
+            :key="c"
+            class="tab-item"
+            :class="{ 'tab-active': activeCategory === c }"
+            @click="onSwitchCategory(c)"
+          >
+            {{ c }}
+          </button>
+        </div>
+
+        <div class="section-head">
+          <h3>附近需求</h3>
+          <button class="refresh-btn" @click="loadData">
+            刷新
+          </button>
+        </div>
+
+        <div v-if="loading" class="status-text">
+          加载中...
+        </div>
+        <div v-else-if="error" class="status-text error">
+          {{ error }}
+        </div>
+        <div v-else class="card-list">
+          <article v-for="r in rows" :key="r.id" class="req-card">
+            <div class="urgency-corner" :class="urgencyClass(r.urgencyLevel)">
+              {{ urgencyText(r.urgencyLevel) }}
+            </div>
+
+            <div class="row-1">
+              <div class="left">
+                <span class="biz-tag" :class="tagClass(r.serviceType)">{{ r.serviceType }}</span>
+                <span class="title">{{ r.requesterName || `${r.serviceType}需求` }}</span>
+              </div>
+              <div class="reward">
+                +{{ Math.max(1, r.urgencyLevel) * 0.5 }} 时币
+              </div>
+            </div>
+
+            <div class="row-2">
+              {{ r.description || '需要邻里协助，欢迎认领' }}
+            </div>
+
+            <div class="row-3">
+              <div class="meta">
+                <span><FmIcon name="i-carbon:time" />预计 {{ publishForm.expectedHours }}小时</span>
+                <span><FmIcon name="i-carbon:pedestrian" />距离 {{ listDistance }}</span>
+              </div>
+              <NutButton type="primary" size="small" @click="onRobOrder(r)">
+                立即抢单
+              </NutButton>
+            </div>
+          </article>
+        </div>
+        <div class="safe-space" />
+      </main>
+
+      <button class="fab-publish" @click="showPublishModal = true">
+        <FmIcon name="i-carbon:add" />
+        <span>发布</span>
+      </button>
+
+      <NutPopup v-model:visible="showPublishModal" position="bottom" round>
+        <div id="publishModal" class="publish-drawer">
+          <div class="drawer-handle" />
+          <h3>发布互助需求</h3>
+
+          <div class="form-block">
+            <div class="label">
+              服务类型
+            </div>
+            <NutRadioGroup v-model="publishForm.serviceType" direction="horizontal">
+              <NutRadio label="助老">
+                助老
+              </NutRadio>
+              <NutRadio label="代买跑腿">
+                代买跑腿
+              </NutRadio>
+              <NutRadio label="清洁">
+                清洁
+              </NutRadio>
+            </NutRadioGroup>
+          </div>
+
+          <div class="form-block">
+            <div class="label">
+              紧急程度
+            </div>
+            <div class="urgency-choose">
+              <button :class="{ active: publishForm.urgencyLevel === 1 }" @click="publishForm.urgencyLevel = 1">
+                普通
+              </button>
+              <button :class="{ active: publishForm.urgencyLevel === 2 }" @click="publishForm.urgencyLevel = 2">
+                中等
+              </button>
+              <button :class="{ active: publishForm.urgencyLevel >= 3 }" @click="publishForm.urgencyLevel = 4">
+                极紧急
+              </button>
+            </div>
+          </div>
+
+          <div class="form-block">
+            <div class="label">
+              预计时长（小时）
+            </div>
+            <NutInputNumber v-model="publishForm.expectedHours" :min="1" :max="12" />
+          </div>
+
+          <NutButton block type="primary" :loading="publishLoading" @click="onPublish">
+            立即发布
+          </NutButton>
+        </div>
+      </NutPopup>
+
+      <NutPopup v-model:visible="showCommunityModal" position="bottom" round>
+        <div class="community-drawer">
+          <div class="drawer-handle" />
+          <h3>切换社区</h3>
+          <div class="community-list">
+            <button
+              v-for="name in communityOptions"
+              :key="name"
+              class="community-item"
+              :class="{ active: noticeCommunity === name }"
+              @click="onSelectCommunity(name)"
+            >
+              <span class="left">
+                <FmIcon name="i-carbon:location-filled" />
+                {{ name }}
+              </span>
+              <span class="right">{{ communityDistanceMap[name] }}</span>
+            </button>
+          </div>
+        </div>
+      </NutPopup>
+
+      <NutPopup
+        v-model:visible="showAnnouncementModal"
+        position="center"
+        round
+        closeable
+        :close-on-click-overlay="true"
+        class="announce-popup-wrap"
+        :style="{ width: 'min(92vw, 420px)', padding: 0 }"
+      >
+        <div class="announce-modal">
+          <div class="announce-modal-hero">
+            <div class="announce-modal-badge">
+              <FmIcon name="i-carbon:notification-filled" />
+              社区公告
+            </div>
+            <h3 class="announce-modal-title">
+              {{ announcementDetail?.title || announcementListItem?.title || '公告详情' }}
+            </h3>
+            <div
+              v-if="announcementDetail || announcementListItem"
+              class="announce-modal-meta"
+            >
+              <span>{{
+                fmtAnnounceTime(
+                  (announcementDetail || announcementListItem)?.publishedAt
+                    || (announcementDetail || announcementListItem)?.createdAt,
+                )
+              }}</span>
+              <span v-if="(announcementDetail || announcementListItem)?.publisherName">
+                · {{ (announcementDetail || announcementListItem)?.publisherName }}
+              </span>
+            </div>
+          </div>
+          <div class="announce-modal-body">
+            <div v-if="announcementDetailLoading" class="announce-modal-status">
+              加载中…
+            </div>
+            <div v-else-if="announcementDetailError" class="announce-modal-status err">
+              {{ announcementDetailError }}
+            </div>
+            <template v-else-if="announcementDetail">
+              <div
+                v-if="announcementDetail.contentHtml"
+                class="announce-html"
+                v-html="announcementDetail.contentHtml"
+              />
+              <div
+                v-else-if="announcementDetail.contentText"
+                class="announce-text"
+              >
+                {{ announcementDetail.contentText }}
+              </div>
+              <p v-else class="announce-modal-status muted">
+                暂无正文
+              </p>
+            </template>
+          </div>
+        </div>
+      </NutPopup>
+    </div>
+  </AppPageLayout>
+</template>
+
+<style scoped>
+.home-page { position: relative; height: 100%; background: #f4f6f8; }
+.biz-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 12px 8px; background: #fff; }
+.community-switch { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; font-weight: 700; padding: 0; margin: 0; min-width: 0; flex: 1; }
+.scan-btn { flex-shrink: 0; width: 40px; height: 40px; border: 0; border-radius: 999px; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.scan-btn :deep(svg) { font-size: 22px; }
+.scan-btn:active { transform: scale(0.96); }
+.community-icon { color: #059669; font-size: 18px; }
+.distance { font-size: 12px; color: #9ca3af; margin-left: 2px; }
+
+.content-scroll { overflow-y: auto; height: calc(100% - 56px); padding: 10px 12px 0; }
+.hero-swiper { border-radius: 16px; overflow: hidden; height: 148px; }
+.hero-swiper :deep(.nut-swiper-inner) { height: 148px; }
+.hero-swiper :deep(.nut-swiper-item) { height: 148px; }
+.hero-item { height: 148px; padding: 16px; color: #fff; background: linear-gradient(135deg, #047857, #10b981); display: flex; flex-direction: column; }
+.hero-title { font-size: 20px; font-weight: 900; }
+.hero-sub { margin-top: 6px; opacity: .95; font-size: 14px; }
+.hero-user { margin-top: auto; opacity: .92; font-size: 12px; }
+
+.account-card { margin-top: 10px; border-radius: 14px; background: #fff; border: 1px solid #e5e7eb; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.avatar-wrap { width: 46px; height: 46px; border-radius: 999px; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
+.account-left { min-width: 0; }
+.mini-label { font-size: 12px; color: #6b7280; }
+.account-name { margin-top: 2px; font-size: 16px; font-weight: 900; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-sub { margin-top: 3px; font-size: 12px; color: #9ca3af; }
+.account-right { text-align: right; }
+.account-coins { margin-top: 2px; font-size: 20px; font-weight: 900; color: #047857; }
+.to-me { margin-top: 2px; font-size: 12px; color: #10b981; font-weight: 700; }
+
+.notice-card { margin-top: 10px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; padding: 12px; }
+.notice-head { display: flex; align-items: center; justify-content: space-between; }
+.notice-head h3 { margin: 0; font-size: 15px; font-weight: 900; }
+.notice-head button { border: 0; background: transparent; color: #10b981; font-size: 13px; font-weight: 700; }
+.notice-list { margin-top: 8px; max-height: 114px; overflow-y: auto; display: grid; gap: 6px; padding-right: 2px; }
+.notice-empty { font-size: 12px; color: #9ca3af; padding: 6px 0; text-align: center; }
+.notice-item {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 6px 4px;
+  margin: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease;
+}
+.notice-item:active { background: #f0fdf4; }
+.dot { width: 6px; height: 6px; border-radius: 999px; background: #10b981; }
+.notice-item .text { font-size: 13px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notice-item .time { font-size: 11px; color: #9ca3af; padding-left: 4px; white-space: nowrap; }
+.notice-chevron { color: #cbd5e1; font-size: 15px; justify-self: end; }
+
+.announce-popup-wrap :deep(.nut-popup-content) { padding: 0; overflow: hidden; border-radius: 18px; }
+.announce-modal { background: #fff; max-height: min(78vh, 640px); display: flex; flex-direction: column; }
+.announce-modal-hero {
+  padding: 18px 18px 14px;
+  background: linear-gradient(135deg, #047857 0%, #10b981 55%, #34d399 100%);
+  color: #fff;
+}
+.announce-modal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+.announce-modal-badge :deep(svg) { font-size: 14px; }
+.announce-modal-title {
+  margin: 10px 0 0;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+.announce-modal-meta {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.92;
+  line-height: 1.4;
+}
+.announce-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.announce-modal-status {
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  padding: 12px 0;
+}
+.announce-modal-status.err { color: #dc2626; }
+.announce-modal-status.muted { color: #9ca3af; }
+.announce-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.announce-html {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #374151;
+  word-break: break-word;
+}
+.announce-html :deep(p) { margin: 0.5em 0; }
+.announce-html :deep(p:first-child) { margin-top: 0; }
+.announce-html :deep(p:last-child) { margin-bottom: 0; }
+.announce-html :deep(img) { max-width: 100%; height: auto; border-radius: 8px; }
+.announce-html :deep(a) { color: #059669; }
+
+.category-tabs { margin-top: 12px; display: flex; overflow-x: auto; white-space: nowrap; gap: 8px; padding-bottom: 2px; }
+.tab-item { border: 0; background: #fff; padding: 8px 10px; border-radius: 10px; color: #6b7280; border-bottom: 2px solid transparent; }
+.tab-active { color: #059669; border-bottom-color: #059669; font-weight: 800; }
+
+.section-head { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+.section-head h3 { margin: 0; font-size: 16px; font-weight: 900; }
+.refresh-btn { border: 0; background: transparent; color: #059669; font-weight: 700; }
+.status-text { margin-top: 10px; color: #6b7280; font-size: 13px; }
+.status-text.error { color: #dc2626; }
+.card-list { margin-top: 10px; display: grid; gap: 10px; }
+
+.req-card { position: relative; background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 1px 8px rgba(15, 23, 42, .05); border: 1px solid #f3f4f6; overflow: hidden; }
+.urgency-corner { position: absolute; top: 0; right: 0; padding: 5px 10px; font-size: 12px; color: #fff; border-bottom-left-radius: 12px; border-top-right-radius: 16px; }
+.urgent-high { background: linear-gradient(135deg, #dc2626, #f97316); }
+.urgent-mid { background: linear-gradient(135deg, #d97706, #f59e0b); }
+.urgent-low { background: linear-gradient(135deg, #059669, #10b981); }
+
+.row-1 { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-right: 60px; margin-bottom: 2px; }
+.row-1 .left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.biz-tag { font-size: 10px; padding: 3px 8px; border-radius: 999px; font-weight: 800; white-space: nowrap; }
+.tag-red { background: #fef2f2; color: #dc2626; }
+.tag-orange { background: #fff7ed; color: #ea580c; }
+.tag-blue { background: #eff6ff; color: #2563eb; }
+.tag-purple { background: #faf5ff; color: #9333ea; }
+.tag-green { background: #ecfdf5; color: #059669; }
+.title { font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reward { font-weight: 900; color: #047857; white-space: nowrap; }
+.row-2 { margin-top: 6px; color: #6b7280; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-3 { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.meta { color: #9ca3af; font-size: 11px; display: inline-flex; gap: 10px; align-items: center; }
+.meta span { display: inline-flex; align-items: center; gap: 3px; }
+
+/* 相对视口悬浮：内容区滚动时按钮不随内部列表移动，始终浮在底栏上方 */
+.fab-publish {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--g-tabbar-height, 60px) + 16px);
+  z-index: 50;
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  border: 0;
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(52, 211, 153, .42), 0 2px 8px rgba(15, 23, 42, .08);
+  transition: transform .12s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.fab-publish :deep(svg) { font-size: 24px; }
+.fab-publish span { font-size: 14px; font-weight: 800; line-height: 1; }
+.fab-publish:hover { transform: scale(1.05); }
+.fab-publish:active { transform: scale(0.96); }
+
+.publish-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
+.drawer-handle { width: 42px; height: 4px; border-radius: 4px; background: #d1d5db; margin: 0 auto 10px; }
+.publish-drawer h3 { margin: 0 0 10px; font-size: 18px; font-weight: 900; }
+.community-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
+.community-drawer h3 { margin: 0 0 10px; font-size: 18px; font-weight: 900; }
+.community-list { display: grid; gap: 8px; }
+.community-item { border: 1px solid #e5e7eb; background: #fff; border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+.community-item .left { display: inline-flex; align-items: center; gap: 6px; color: #111827; font-weight: 700; }
+.community-item .right { font-size: 12px; color: #6b7280; }
+.community-item.active { border-color: #10b981; background: #ecfdf5; }
+.form-block { margin-top: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f9fafb; }
+.label { margin-bottom: 8px; font-size: 13px; color: #6b7280; }
+.urgency-choose { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.urgency-choose button { border: 1px solid #d1d5db; background: #fff; border-radius: 10px; padding: 8px 0; }
+.urgency-choose button.active { border-color: #10b981; color: #047857; background: #ecfdf5; font-weight: 800; }
+.safe-space { height: 100px; }
+
+:global(.dark) .home-page { background: #111827; }
+:global(.dark) .biz-header { background: #1f2937; border-bottom: 1px solid #374151; }
+:global(.dark) .community-switch { color: #f3f4f6; }
+:global(.dark) .scan-btn { background: #064e3b; color: #6ee7b7; }
+:global(.dark) .distance { color: #9ca3af; }
+:global(.dark) .account-card,
+:global(.dark) .notice-card,
+:global(.dark) .tab-item,
+:global(.dark) .req-card,
+:global(.dark) .community-item,
+:global(.dark) .form-block,
+:global(.dark) .publish-drawer,
+:global(.dark) .community-drawer { background: #1f2937; border-color: #374151; }
+:global(.dark) .notice-empty { color: #6b7280; }
+:global(.dark) .notice-item:active { background: rgba(16, 185, 129, 0.12); }
+:global(.dark) .notice-item .text { color: #e5e7eb; }
+:global(.dark) .notice-chevron { color: #4b5563; }
+:global(.dark) .announce-modal { background: #1f2937; }
+:global(.dark) .announce-modal-body { background: #1f2937; }
+:global(.dark) .announce-text,
+:global(.dark) .announce-html { color: #e5e7eb; }
+:global(.dark) .announce-modal-status { color: #9ca3af; }
+:global(.dark) .announce-html :deep(a) { color: #34d399; }
+:global(.dark) .mini-label,
+:global(.dark) .account-sub,
+:global(.dark) .notice-item .time,
+:global(.dark) .row-2,
+:global(.dark) .meta,
+:global(.dark) .label { color: #9ca3af; }
+:global(.dark) .account-name,
+:global(.dark) .notice-head h3,
+:global(.dark) .title,
+:global(.dark) .community-item .left,
+:global(.dark) .publish-drawer h3,
+:global(.dark) .community-drawer h3 { color: #f3f4f6; }
+:global(.dark) .tab-item { color: #d1d5db; }
+:global(.dark) .section-head h3 { color: #f3f4f6; }
+:global(.dark) .urgency-choose button { background: #111827; border-color: #4b5563; color: #d1d5db; }
+</style>

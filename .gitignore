@@ -1,0 +1,40 @@
+# 依赖与构建产物
+node_modules/
+**/node_modules/
+dist/
+dist-*/
+dist-ssr/
+target/
+*.tsbuildinfo
+
+# 日志与缓存
+*.log
+.npm-cache/
+.eslintcache
+.stylelintcache
+.vite/
+.vite-ssg-dist/
+.vite-ssg-temp/
+
+# 环境变量（勿把密码提交到 Git）
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# 后端本地上传（若存在）
+uploads/
+**/uploads/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 本机解压的工具链（勿提交）
+tools/

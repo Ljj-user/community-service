@@ -1,0 +1,105 @@
+:root {
+  color-scheme: light;
+
+  --g-navbar-min-height: 50px;
+  --g-tabbar-min-height: 60px;
+
+  &.dark {
+    color-scheme: dark;
+  }
+}
+
+.disable-color-scheme-transition-duration *,
+.disable-color-scheme-transition-duration *::before,
+.disable-color-scheme-transition-duration *::after {
+  transition-duration: 0ms !important;
+}
+
+html {
+  overscroll-behavior: none;
+}
+
+body {
+  box-sizing: border-box;
+  margin: 0;
+  text-autospace: normal;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 全局样式 */
+#app {
+  overflow: hidden auto;
+  font-size: 14px;
+  background-color: var(--g-bg);
+}
+
+/* ---- Custom pages dark-mode fallback ----
+   Some business pages use hardcoded light colors.
+   Force a consistent dark palette when html.dark is enabled.
+*/
+html.dark .home-page,
+html.dark .hall-page,
+html.dark .notice-page,
+html.dark .profile-page {
+  background: #0b0b0b !important;
+}
+
+html.dark .biz-header,
+html.dark .head,
+html.dark .account-card,
+html.dark .notice-card,
+html.dark .req-card,
+html.dark .item,
+html.dark .tab,
+html.dark .tab-item,
+html.dark .community-item,
+html.dark .publish-drawer,
+html.dark .community-drawer,
+html.dark .settings-drawer,
+html.dark .form-block,
+html.dark .back-btn,
+html.dark .setting-btn {
+  background: #0b0b0b !important;
+  border-color: #232323 !important;
+}
+
+html.dark .title,
+html.dark .title2,
+html.dark .account-name,
+html.dark .notice-head h3,
+html.dark .community-item .left,
+html.dark .publish-drawer h3,
+html.dark .community-drawer h3,
+html.dark .settings-drawer h3,
+html.dark .top h2,
+html.dark .top-header h2,
+html.dark .section-head h3 {
+  color: #f3f4f6 !important;
+}
+
+html.dark .mini-label,
+html.dark .account-sub,
+html.dark .notice-item .time,
+html.dark .row-2,
+html.dark .meta,
+html.dark .label,
+html.dark .desc,
+html.dark .sub,
+html.dark .status,
+html.dark .time,
+html.dark .distance,
+html.dark .func-item {
+  color: #9ca3af !important;
+}
+
+html.dark .setting-item {
+  background: #0b0b0b !important;
+  border-color: #232323 !important;
+  color: #e5e7eb !important;
+}
+
+html.dark .setting-item.danger {
+  background: #3f1d28 !important;
+  border-color: #7f1d1d !important;
+  color: #fecdd3 !important;
+}
