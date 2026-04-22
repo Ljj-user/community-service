@@ -31,45 +31,17 @@ const volunteerTop = ref<{ name: string; count: number }[]>([])
 const riskSplit = ref<{ unclaimed: number; unfinished: number }>({ unclaimed: 0, unfinished: 0 })
 const userSummary = ref<UserDashboardSummary | null>(null)
 
-// Demo fallback (when DB has no enough rows yet)
-const demo = {
-  superAdmin: {
-    totalUsers: 1280,
-    totalCommunities: 12,
-    totalServiceHours: 3421,
-    matchRate: 0.736,
-    riskIndex: 18.5,
-    regionCoverage: { 浙江省: 56, 上海市: 42, 江苏省: 37, CN: 12 } as Record<string, number>,
-  },
-  communityAdmin: {
-    pendingRequests: 7,
-    weeklyAvgResponseMinutes: 64.2,
-    activeVolunteers30d: 39,
-    matchRate: 0.681,
-  },
-  trend: {
-    labels: ['04-16', '04-17', '04-18', '04-19', '04-20', '04-21', '04-22'],
-    demand: [6, 8, 7, 10, 12, 9, 11],
-    supply: [4, 6, 5, 8, 9, 7, 8],
-  } as TrendChart,
-  top10: [
-    { name: '张三', count: 42 },
-    { name: '李四', count: 38 },
-    { name: '王五', count: 35 },
-    { name: '赵六', count: 31 },
-    { name: '陈七', count: 28 },
-    { name: '周八', count: 26 },
-    { name: '吴九', count: 23 },
-    { name: '郑十', count: 21 },
-    { name: '钱十一', count: 19 },
-    { name: '孙十二', count: 17 },
-  ],
-}
-
 const isSuperAdmin = computed(() => role.value === 1)
 const isCommunityAdmin = computed(() => role.value === 2)
 const isVolunteer = computed(() => role.value === 3 && identity.value === 2)
 const isResident = computed(() => role.value === 3 && identity.value !== 2)
+const hasAdminData = computed(() => {
+  const s = adminPanel.value?.stats
+  if (!s) return false
+  return Number(s.totalRequests ?? 0) > 0
+    || Number(s.totalUsers ?? 0) > 0
+    || Number(s.totalServiceHours ?? 0) > 0
+})
 
 function dateLoc() {
   return locale.value === 'zn' ? 'zh-CN' : 'en-US'
@@ -143,8 +115,19 @@ const adminFunnelSeries = computed(() => {
   ]
 })
 
+const adminFunnelChartData = computed(() => {
+  if (!adminFunnelSeries.value.length) return null
+  return {
+    labels: adminFunnelSeries.value.map(x => x.name),
+    series: [
+      { name: '需求数量', data: adminFunnelSeries.value.map(x => Number(x.value || 0)) },
+    ],
+  }
+})
+
 const trendChartData = computed(() => {
-  const data = trend.value ?? demo.trend
+  const data = trend.value
+  if (!data) return null
   return {
     labels: data.labels,
     series: [
@@ -154,8 +137,15 @@ const trendChartData = computed(() => {
   }
 })
 
+const trendIsAllZero = computed(() => {
+  if (!trendChartData.value) return false
+  const list = trendChartData.value.series.flatMap(s => s.data || [])
+  return list.length > 0 && list.every(n => Number(n || 0) === 0)
+})
+
 const topBarData = computed(() => {
-  const list = volunteerTop.value?.length ? volunteerTop.value : demo.top10
+  const list = volunteerTop.value?.length ? volunteerTop.value : []
+  if (!list.length) return null
   return {
     labels: list.map(x => x.name),
     series: [
@@ -165,19 +155,14 @@ const topBarData = computed(() => {
 })
 
 const riskDonutData = computed(() => {
-  const total = adminPanel.value?.stats?.totalRequests ?? 0
+  const published = Number(adminPanel.value?.stats?.publishedRequests ?? 0)
+  const claimed = Number(adminPanel.value?.stats?.claimedRequests ?? 0)
+  const completed = Number(adminPanel.value?.stats?.completedRequests ?? 0)
   const unclaimed = Math.max(riskSplit.value.unclaimed, 0)
   const unfinished = Math.max(riskSplit.value.unfinished, 0)
-  const normal = Math.max(total - unclaimed - unfinished, 0)
+  const normal = Math.max(published + claimed + completed - unclaimed - unfinished, 0)
 
-  if (unclaimed + unfinished + normal <= 0) {
-    // 避免 donut 全 0 时视图异常
-    return [
-      { name: '超时未认领', value: 0 },
-      { name: '超时未完成', value: 0 },
-      { name: '正常流程', value: 1 },
-    ]
-  }
+  if (unclaimed + unfinished + normal <= 0) return []
 
   return [
     { name: '超时未认领', value: unclaimed },
@@ -185,6 +170,37 @@ const riskDonutData = computed(() => {
     { name: '正常流程', value: normal },
   ]
 })
+
+const riskDonutOptions = computed(() => ({
+  legend: {
+    position: 'bottom',
+    horizontalAlign: 'center',
+    floating: false,
+  },
+  grid: {
+    padding: {
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    },
+  },
+  plotOptions: {
+    pie: {
+      startAngle: 0,
+      endAngle: 360,
+      offsetX: 0,
+      offsetY: 0,
+      customScale: 0.88,
+      donut: {
+        size: '62%',
+        labels: {
+          show: false,
+        },
+      },
+    },
+  },
+}))
 </script>
 
 <template>
@@ -209,7 +225,7 @@ const riskDonutData = computed(() => {
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Card title="平台覆盖规模">
             <div class="text-2xl font-semibold">
-              {{ adminPanel.stats.totalUsers ?? demo.superAdmin.totalUsers }} 用户 / {{ adminPanel.stats.totalCommunities ?? demo.superAdmin.totalCommunities }} 社区
+              {{ adminPanel.stats.totalUsers ?? 0 }} 用户 / {{ adminPanel.stats.totalCommunities ?? 0 }} 社区
             </div>
             <p class="text-xs text-slate-500 mt-1">
               统计口径：未删除用户数、入驻社区数
@@ -217,7 +233,7 @@ const riskDonutData = computed(() => {
           </Card>
           <Card title="累计社会贡献">
             <div class="text-2xl font-semibold">
-              {{ adminPanel.stats.totalServiceHours ?? demo.superAdmin.totalServiceHours }}
+              {{ adminPanel.stats.totalServiceHours ?? 0 }}
             </div>
             <p class="text-xs text-slate-500 mt-1">
               累计服务时长（小时）
@@ -225,7 +241,7 @@ const riskDonutData = computed(() => {
           </Card>
           <Card title="对接成功率">
             <div class="text-2xl font-semibold">
-              {{ (((adminPanel.stats.matchRate ?? demo.superAdmin.matchRate) || 0) * 100).toFixed(1) }}%
+              {{ (((adminPanel.stats.matchRate ?? 0) || 0) * 100).toFixed(1) }}%
             </div>
             <p class="text-xs text-slate-500 mt-1">
               已完成 / 总需求
@@ -233,7 +249,7 @@ const riskDonutData = computed(() => {
           </Card>
           <Card title="系统风险指数">
             <div class="text-2xl font-semibold">
-              {{ adminPanel.stats.riskIndex ?? demo.superAdmin.riskIndex }}
+              {{ adminPanel.stats.riskIndex ?? 0 }}
             </div>
             <p class="text-xs text-slate-500 mt-1">
               基于超时未认领/未完成估算（0-100）
@@ -249,79 +265,50 @@ const riskDonutData = computed(() => {
               type="donut"
               :height="260"
             />
-            <p v-else class="text-xs text-slate-500">暂无数据（先用演示数据）</p>
+            <p v-else class="text-xs text-slate-500">暂无真实业务数据，请先导入初始化数据或产生服务记录。</p>
           </Card>
 
-          <Card v-if="adminPanel.fundingMonitor" :title="t('community.unifiedDashboard.sectionFund')">
-            <div class="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <div class="text-slate-500">
-                  {{ t('community.unifiedDashboard.fundIn') }}
-                </div>
-                <div class="font-mono">
-                  {{ adminPanel.fundingMonitor.fundIn }}
-                </div>
-              </div>
-              <div>
-                <div class="text-slate-500">
-                  {{ t('community.unifiedDashboard.fundOut') }}
-                </div>
-                <div class="font-mono">
-                  {{ adminPanel.fundingMonitor.fundOut }}
-                </div>
-              </div>
-              <div>
-                <div class="text-slate-500">
-                  {{ t('community.unifiedDashboard.matIn') }}
-                </div>
-                <div class="font-mono">
-                  {{ adminPanel.fundingMonitor.materialIn }}
-                </div>
-              </div>
-              <div>
-                <div class="text-slate-500">
-                  {{ t('community.unifiedDashboard.matOut') }}
-                </div>
-                <div class="font-mono">
-                  {{ adminPanel.fundingMonitor.materialOut }}
-                </div>
-              </div>
-            </div>
-            <p class="text-xs text-slate-400 mt-3">
-              {{ adminPanel.fundingMonitor.note }}
-            </p>
-          </Card>
+          <WelcomeCard />
         </div>
 
         <Card title="全城公益热力图（中国地图）">
           <ChinaHeatMap
-            :data="(adminPanel.regionCoverage?.length ? adminPanel.regionCoverage.reduce((acc: any, it: any) => { acc[it.regionCode] = it.serviceCount; return acc }, {}) : demo.superAdmin.regionCoverage)"
+            :data="(adminPanel.regionCoverage?.length ? adminPanel.regionCoverage.reduce((acc: any, it: any) => { acc[it.regionCode] = it.serviceCount; return acc }, {}) : {})"
             :height="460"
           />
+          <p v-if="!adminPanel.regionCoverage?.length" class="text-xs text-slate-500 mt-2">
+            当前暂无已完成服务数据，热力图待产生数据后自动更新。
+          </p>
         </Card>
 
         <div class="grid gap-4 lg:grid-cols-2">
           <Card title="服务对接全链路漏斗">
             <BaseChart
-              v-if="adminFunnelSeries.length"
-              :data="adminFunnelSeries"
+              v-if="adminFunnelChartData"
+              :data="adminFunnelChartData"
               type="bar"
               :height="360"
               :options="{ plotOptions: { bar: { horizontal: true } } }"
             />
+            <p v-else class="text-xs text-slate-500">暂无漏斗数据。</p>
           </Card>
-          <Card title="系统操作风险分布（环形图）">
+          <Card title="系统操作风险分布">
             <BaseChart
+              v-if="riskDonutData.length"
               :data="riskDonutData"
               type="donut"
               :height="360"
+              :options="riskDonutOptions"
             />
+            <p v-else class="text-xs text-slate-500">暂无风险分布数据。</p>
             <p class="text-xs text-slate-400 mt-2">风险分布建议结合「监控」页统计口径进一步细化。</p>
           </Card>
         </div>
 
-        <Card title="供需趋势对比线（折线图）">
+        <Card title="供需趋势对比线">
           <BaseChart v-if="trendChartData" :data="trendChartData" type="line" :height="260" />
+          <p v-else class="text-xs text-slate-500">暂无趋势数据。</p>
+          <p v-if="trendIsAllZero" class="text-xs text-slate-500 mt-2">最近统计周期内发布/认领均为 0，曲线将贴近 0 轴。</p>
         </Card>
 
         <!-- 去除旧模块：近期服务排期 / 重复漏斗块 -->
@@ -332,10 +319,11 @@ const riskDonutData = computed(() => {
         <n-alert type="info" :bordered="false" class="mb-2">
           {{ t('community.unifiedDashboard.communityScopeNote') }}
         </n-alert>
+        <WelcomeCard />
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Card title="红色警报：待审核">
             <div class="text-2xl font-semibold">
-              {{ adminPanel.stats.pendingRequests ?? demo.communityAdmin.pendingRequests }}
+              {{ adminPanel.stats.pendingRequests ?? 0 }}
             </div>
             <p class="text-xs text-slate-500 mt-1">
               需尽快审核，避免需求积压
@@ -343,7 +331,7 @@ const riskDonutData = computed(() => {
           </Card>
           <Card title="本周响应时效（分钟）">
             <div class="text-2xl font-semibold">
-              {{ adminPanel.stats.weeklyAvgResponseMinutes ?? demo.communityAdmin.weeklyAvgResponseMinutes }}
+              {{ adminPanel.stats.weeklyAvgResponseMinutes ?? 0 }}
             </div>
             <p class="text-xs text-slate-500 mt-1">
               发布 → 志愿者认领的平均时长
@@ -351,7 +339,7 @@ const riskDonutData = computed(() => {
           </Card>
           <Card title="活跃志愿者储备（近30天）">
             <div class="text-2xl font-semibold">
-              {{ adminPanel.stats.activeVolunteers30d ?? demo.communityAdmin.activeVolunteers30d }}
+              {{ adminPanel.stats.activeVolunteers30d ?? 0 }}
             </div>
             <p class="text-xs text-slate-500 mt-1">
               近30天有认领记录人数
@@ -359,7 +347,7 @@ const riskDonutData = computed(() => {
           </Card>
           <Card title="对接成功率">
             <div class="text-2xl font-semibold">
-              {{ (((adminPanel.stats.matchRate ?? demo.communityAdmin.matchRate) || 0) * 100).toFixed(1) }}%
+              {{ (((adminPanel.stats.matchRate ?? 0) || 0) * 100).toFixed(1) }}%
             </div>
             <p class="text-xs text-slate-500 mt-1">
               已完成 / 总需求（本社区口径）
@@ -376,15 +364,19 @@ const riskDonutData = computed(() => {
               :height="260"
             />
           </Card>
-          <Card title="供需趋势对比线（折线图）">
+          <Card title="供需趋势对比线">
             <BaseChart v-if="trendChartData" :data="trendChartData" type="line" :height="260" />
+            <p v-else class="text-xs text-slate-500">暂无趋势数据。</p>
           </Card>
         </div>
 
-        <Card title="志愿者荣誉榜 Top10（近30天服务时长）">
+        <Card title="志愿者荣誉榜 Top10">
           <BaseChart v-if="topBarData" :data="topBarData" type="bar" :height="280" />
           <p v-else class="text-xs text-slate-500">暂无数据</p>
         </Card>
+        <n-alert v-if="!hasAdminData" type="warning" :bordered="false">
+          当前数据库业务数据较少，部分图表为空。建议先导入初始化数据并跑通“发布-审核-认领-完成”流程后再展示。
+        </n-alert>
 
         <!-- 去除旧模块：近期服务排期 / 社区服务对接漏斗 / 重复画像 -->
       </div>

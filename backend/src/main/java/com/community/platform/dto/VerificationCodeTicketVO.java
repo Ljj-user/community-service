@@ -10,7 +10,7 @@ public class VerificationCodeTicketVO {
     private String scene;
     private String target;
     private LocalDateTime expiresAt;
-    /** 演示环境返回验证码，生产可隐藏 */
+    /** 仅在 app.auth.expose-dev-code=true 时返回验证码 */
     private String devCode;
 }
 

@@ -13,3 +13,5 @@ app:
   avatar-upload-dir: uploads/avatars
   # 移动端在 9000 端口渲染 <img> 时需要绝对地址，否则会去请求 9000 的 /static 导致 404
   avatar-base-url: http://localhost:8080/static/avatars/
+  auth:
+    expose-dev-code: true

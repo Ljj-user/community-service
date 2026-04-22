@@ -913,7 +913,7 @@ community:
     chartMonthly: This month (new vs completed)
     chartMonthlyNoData: No monthly stats.
     chartHeatmap: Regional heatmap
-    heatmapHint: Heat by completed services (demo uses CN as a single region).
+    heatmapHint: Heat by completed services aggregated at provincial level on the China map; updates with real records.
     legendMatched: Matched
     legendUnmatched: Unmatched
     seriesNew: New this month

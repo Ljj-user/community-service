@@ -930,7 +930,7 @@ community:
     chartMonthly: 本月需求流转（新增 vs 完成）
     chartMonthlyNoData: 暂无本月统计数据。
     chartHeatmap: 服务区域热力图
-    heatmapHint: 根据已完成服务统计区域热度（当前示例以中国整体 CN 为单一区域演示，可后续细化到省市）。
+    heatmapHint: 根据已完成服务按省级行政区统计热度（中国地图），数据会随业务记录实时更新。
     legendMatched: 已对接
     legendUnmatched: 未对接
     seriesNew: 本月新增

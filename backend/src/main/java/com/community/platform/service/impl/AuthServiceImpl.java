@@ -52,6 +52,9 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.avatar-base-url:http://localhost:8080/static/avatars/}")
     private String avatarBaseUrl;
 
+    @Value("${app.auth.expose-dev-code:false}")
+    private boolean exposeDevCode;
+
     private String normalizeAvatarUrl(String raw) {
         if (raw == null || raw.isBlank()) {
             return raw;
@@ -186,7 +189,9 @@ public class AuthServiceImpl implements AuthService {
         vo.setScene(scene);
         vo.setTarget(maskEmail(request.getEmail().trim()));
         vo.setExpiresAt(expiresAt);
-        vo.setDevCode(code);
+        if (exposeDevCode) {
+            vo.setDevCode(code);
+        }
         return vo;
     }
 

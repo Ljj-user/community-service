@@ -308,7 +308,7 @@ public class DashboardServiceImpl implements DashboardService {
         vo.setFundOut(BigDecimal.ZERO);
         vo.setMaterialIn(BigDecimal.ZERO);
         vo.setMaterialOut(BigDecimal.ZERO);
-        vo.setNote("演示占位：后续可对接财务/物资子系统，汇总捐赠与物资流转。");
+        vo.setNote("当前展示为平台统计口径预留项：未接入独立财务/物资子系统前默认记为 0。");
         return vo;
     }
 

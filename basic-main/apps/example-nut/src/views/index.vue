@@ -255,13 +255,13 @@ onMounted(loadData)
           </div>
           <div class="account-left">
             <div class="mini-label">
-              当前账户
+              我的账户
             </div>
             <div class="account-name">
               {{ displayName }}
             </div>
             <div class="account-sub">
-              {{ resolvedCommunityName }} · 信用分 {{ creditScore }}
+              {{ resolvedCommunityName }}
             </div>
           </div>
           <div class="account-right">
@@ -610,11 +610,11 @@ onMounted(loadData)
 .announce-html :deep(img) { max-width: 100%; height: auto; border-radius: 8px; }
 .announce-html :deep(a) { color: #059669; }
 
-.category-tabs { margin-top: 12px; display: flex; overflow-x: auto; white-space: nowrap; gap: 8px; padding-bottom: 2px; }
+.category-tabs { margin-top: 16px; display: flex; overflow-x: auto; white-space: nowrap; gap: 8px; padding-bottom: 6px; }
 .tab-item { border: 0; background: #fff; padding: 8px 10px; border-radius: 10px; color: #6b7280; border-bottom: 2px solid transparent; }
 .tab-active { color: #059669; border-bottom-color: #059669; font-weight: 800; }
 
-.section-head { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+.section-head { margin-top: 18px; display: flex; justify-content: space-between; align-items: center; }
 .section-head h3 { margin: 0; font-size: 16px; font-weight: 900; }
 .refresh-btn { border: 0; background: transparent; color: #059669; font-weight: 700; }
 .status-text { margin-top: 10px; color: #6b7280; font-size: 13px; }

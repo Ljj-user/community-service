@@ -4,17 +4,18 @@ const profileStore = useProfileStore()
 
 const daysInCommunity = computed(() => {
   const createdAt = profileStore.userProfile?.createdAt
-  if (!createdAt) return 0
+  if (!createdAt) return 1
   const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return 1
   const now = new Date()
   const diffMs = now.getTime() - created.getTime()
-  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+  // 从注册当天按第 1 天开始计数（当天显示 1 天）
+  return Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1)
 })
 
 onMounted(() => {
-  if (!profileStore.userProfile?.id) {
-    profileStore.loadUserProfile()
-  }
+  // 每次进入欢迎卡都刷新一次资料，确保 createdAt 可用
+  profileStore.loadUserProfile()
 })
 </script>
 

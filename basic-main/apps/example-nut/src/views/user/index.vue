@@ -11,6 +11,13 @@ definePage({
 
 const appAuthStore = useAppAuthStore()
 const showSettings = ref(false)
+const showMedalModal = ref(false)
+const selectedMedal = ref<{
+  title: string
+  icon: string
+  acquired: boolean
+  desc: string
+} | null>(null)
 const router = useRouter()
 
 const dashboard = ref<{
@@ -62,6 +69,31 @@ const totalHoursText = computed(() => {
     return '—'
   return `${totalHours.value} 小时`
 })
+
+const medals = [
+  { title: '核心支柱', icon: 'mdi:medal-outline', acquired: true, className: 'active-yellow', desc: '近30天完成服务任务达到 10 单，并保持平均评分不低于 4.5。' },
+  { title: '初露头角', icon: 'mdi:leaf', acquired: true, className: 'active-green', desc: '首次完成服务任务后自动获得，用于标识新手志愿者成长阶段。' },
+  { title: '热心邻里', icon: 'mdi:heart-outline', acquired: true, className: 'active-blue', desc: '累计收到 5 条以上正向评价，且最近一次评价不低于 4 分。' },
+  { title: '社区先锋', icon: 'mdi:shield-star-outline', acquired: false, className: '', desc: '在同一社区连续 3 周保持活跃服务，并参与至少 1 次紧急需求。' },
+] as const
+
+function onOpenMedal(medal: typeof medals[number]) {
+  selectedMedal.value = {
+    title: medal.title,
+    icon: medal.icon,
+    acquired: medal.acquired,
+    desc: medal.desc,
+  }
+  showMedalModal.value = true
+}
+
+function onGotoTask() {
+  router.push({ path: '/hall-overview', query: { kind: 'in-progress' } })
+}
+
+function onGotoMall() {
+  router.push('/mall-404')
+}
 
 async function loadProfile() {
   await appAuthStore.hydrateUser()
@@ -116,7 +148,7 @@ onMounted(loadProfile)
       </section>
 
       <section class="func-grid">
-        <div class="func-item">
+        <div class="func-item" role="button" tabindex="0" @click="onGotoTask">
           <div class="func-icon bg-orange"><FmIcon name="mdi:clipboard-list-outline" /></div>
           <span>我的任务</span>
         </div>
@@ -125,14 +157,11 @@ onMounted(loadProfile)
           <span>完善资料</span>
         </div>
         <div class="func-item">
-          <div class="func-icon bg-blue"><FmIcon name="mdi:account-group-outline" /></div>
-          <span>亲情绑定</span>
-        </div>
-        <div class="func-item">
           <div class="func-icon bg-purple"><FmIcon name="mdi:certificate-outline" /></div>
           <span>时长证明</span>
+          <small>{{ totalHoursText }}</small>
         </div>
-        <div class="func-item">
+        <div class="func-item" role="button" tabindex="0" @click="onGotoMall">
           <div class="func-icon bg-green"><FmIcon name="mdi:storefront-outline" /></div>
           <span>积分商城</span>
         </div>
@@ -141,21 +170,17 @@ onMounted(loadProfile)
       <section class="medal-panel">
         <h3>我的荣誉勋章</h3>
         <div class="medal-row">
-          <div class="medal active-yellow">
-            <FmIcon name="mdi:medal-outline" />
-            <span>核心支柱</span>
-          </div>
-          <div class="medal active-green">
-            <FmIcon name="mdi:leaf" />
-            <span>初露头角</span>
-          </div>
-          <div class="medal active-blue">
-            <FmIcon name="mdi:heart-outline" />
-            <span>热心邻里</span>
-          </div>
-          <div class="medal">
-            <FmIcon name="mdi:shield-star-outline" />
-            <span>社区先锋</span>
+          <div
+            v-for="m in medals"
+            :key="m.title"
+            class="medal"
+            :class="m.className"
+            role="button"
+            tabindex="0"
+            @click="onOpenMedal(m)"
+          >
+            <FmIcon :name="m.icon" />
+            <span>{{ m.title }}</span>
           </div>
         </div>
       </section>
@@ -173,6 +198,28 @@ onMounted(loadProfile)
           <FmIcon name="mdi:logout" />
           <span>退出登录</span>
         </button>
+      </div>
+    </NutPopup>
+
+    <NutPopup
+      v-model:visible="showMedalModal"
+      position="center"
+      round
+      closeable
+      :close-on-click-overlay="true"
+      :style="{ width: 'min(88vw, 360px)' }"
+    >
+      <div v-if="selectedMedal" class="medal-modal">
+        <div class="medal-modal-head">
+          <FmIcon :name="selectedMedal.icon" />
+          <h4>{{ selectedMedal.title }}</h4>
+        </div>
+        <p class="medal-modal-status" :class="selectedMedal.acquired ? 'acquired' : 'not-yet'">
+          {{ selectedMedal.acquired ? '已获得' : '未获得' }}
+        </p>
+        <p class="medal-modal-desc">
+          {{ selectedMedal.desc }}
+        </p>
       </div>
     </NutPopup>
   </AppPageLayout>
@@ -200,6 +247,7 @@ onMounted(loadProfile)
 .bg-blue { background: #eff6ff; color: #3b82f6; }
 .bg-purple { background: #faf5ff; color: #a855f7; }
 .bg-green { background: #ecfdf5; color: #10b981; }
+.func-item small { font-size: 10px; color: #6b7280; }
 
 .medal-panel { background: transparent; border: 0; border-radius: 0; padding: 2px 0 0; }
 .medal-panel h3 { margin: 0 0 10px; font-size: 15px; font-weight: 900; }
@@ -209,6 +257,15 @@ onMounted(loadProfile)
 .active-yellow { border-color: #facc15; color: #ca8a04; }
 .active-green { border-color: #4ade80; color: #16a34a; }
 .active-blue { border-color: #60a5fa; color: #2563eb; }
+
+.medal-modal { padding: 16px; background: #fff; border-radius: 16px; }
+.medal-modal-head { display: flex; align-items: center; gap: 8px; }
+.medal-modal-head :deep(svg) { font-size: 22px; color: #f59e0b; }
+.medal-modal-head h4 { margin: 0; font-size: 16px; font-weight: 900; color: #111827; }
+.medal-modal-status { margin: 12px 0 8px; font-size: 13px; font-weight: 800; }
+.medal-modal-status.acquired { color: #16a34a; }
+.medal-modal-status.not-yet { color: #9ca3af; }
+.medal-modal-desc { margin: 0; line-height: 1.7; font-size: 13px; color: #4b5563; white-space: pre-wrap; }
 
 .settings-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
 .drawer-handle { width: 42px; height: 4px; border-radius: 4px; background: #d1d5db; margin: 0 auto 10px; }
@@ -220,9 +277,13 @@ onMounted(loadProfile)
 :global(.dark) .top-header h2 { color: #f3f4f6; }
 :global(.dark) .setting-btn { background: #1f2937; color: #d1d5db; }
 :global(.dark) .func-item { color: #d1d5db; }
+:global(.dark) .func-item small { color: #9ca3af; }
 :global(.dark) .medal-panel h3 { color: #f3f4f6; }
 :global(.dark) .medal { border-color: #374151; color: #9ca3af; }
 :global(.dark) .settings-drawer { background: #1f2937; }
 :global(.dark) .settings-drawer h3 { color: #f3f4f6; }
 :global(.dark) .setting-item { background: #111827; border-color: #374151; color: #e5e7eb; }
+:global(.dark) .medal-modal { background: #1f2937; }
+:global(.dark) .medal-modal-head h4 { color: #f3f4f6; }
+:global(.dark) .medal-modal-desc { color: #cbd5e1; }
 </style>

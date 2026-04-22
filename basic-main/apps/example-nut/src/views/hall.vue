@@ -128,33 +128,33 @@ onMounted(() => {
       <section class="my-section">
         <h3>我的服务概览</h3>
         <div class="my-grid">
-          <button class="my-card" @click="goOverview('publish-history')">
+          <button class="my-card card-publish" @click="goOverview('publish-history')">
             <div class="title-row">
-              <span>我的发布历史</span>
-              <span class="tag">历史</span>
+              <span>发布历史</span>
+              <span class="tag">发布</span>
             </div>
-            <p>累计 {{ summary.myPublishedCount }} 条，查看我在社区发起过的所有需求。</p>
+            <p>{{ summary.myPublishedCount }} 条</p>
           </button>
-          <button class="my-card" @click="goOverview('in-progress')">
+          <button class="my-card card-progress" @click="goOverview('in-progress')">
             <div class="title-row">
               <span>进行中的单子</span>
               <span class="tag in-progress">进行中</span>
             </div>
-            <p>当前 {{ summary.inProgressCount }} 条，正在服务或等待确认。</p>
+            <p>{{ summary.inProgressCount }} 条</p>
           </button>
-          <button class="my-card" @click="goOverview('reviews')">
+          <button class="my-card card-review" @click="goOverview('reviews')">
             <div class="title-row">
               <span>评价与反馈</span>
               <span class="tag">评价</span>
             </div>
-            <p>已收到 {{ summary.receivedEvaluationCount }} 条评价，平均 {{ summary.receivedAvgRating.toFixed(1) }} 分。</p>
+            <p>{{ summary.receivedEvaluationCount }} 条 · {{ summary.receivedAvgRating.toFixed(1) }} 分</p>
           </button>
-          <button class="my-card" @click="goOverview('stats')">
+          <button class="my-card card-stat" @click="goOverview('stats')">
             <div class="title-row">
               <span>服务统计</span>
               <span class="tag">统计</span>
             </div>
-            <p>累计时长、完成次数、常见服务类型一览。</p>
+            <p>查看详情</p>
           </button>
         </div>
       </section>
@@ -233,13 +233,17 @@ onMounted(() => {
 .my-section { margin-top: 16px; }
 .my-section h3 { margin: 0 0 10px; font-size: 16px; font-weight: 900; color: #111827; }
 .my-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.my-card { background: #fff; border-radius: 14px; border: 1px solid #e5e7eb; padding: 10px; font-size: 12px; color: #4b5563; }
+.my-card { border-radius: 14px; border: 1px solid #e5e7eb; padding: 11px 10px; font-size: 12px; color: #374151; background: #fff; box-shadow: 0 1px 8px rgba(15, 23, 42, .05); }
 .my-card { text-align: left; cursor: pointer; }
 .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .title-row span:first-child { font-weight: 800; color: #111827; }
 .tag { font-size: 10px; padding: 2px 6px; border-radius: 999px; background: #eef2ff; color: #4f46e5; font-weight: 700; }
 .tag.in-progress { background: #ecfdf5; color: #047857; }
-.my-card p { margin: 0; }
+.my-card p { margin: 0; font-size: 12px; color: #6b7280; font-weight: 700; }
+.card-publish { background: linear-gradient(160deg, #ffffff 8%, #f8fafc 95%); }
+.card-progress { background: linear-gradient(160deg, #ffffff 8%, #f0fdf4 95%); border-color: #bbf7d0; }
+.card-review { background: linear-gradient(160deg, #ffffff 8%, #eff6ff 95%); border-color: #bfdbfe; }
+.card-stat { background: linear-gradient(160deg, #ffffff 8%, #faf5ff 95%); border-color: #e9d5ff; }
 
 :global(.dark) .hall-page { background: #111827; }
 :global(.dark) .hero-info-card {
