@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FormInst, FormItemRule, FormRules } from 'naive-ui/es/form/src/interface'
 import { storeToRefs } from 'pinia'
+import AccountService from '~/services/account.service'
 
 import type { RegisterViewModel } from '~/models/Account'
 
@@ -14,13 +15,20 @@ const registerInfo = ref<RegisterViewModel & { passwordConfirm: string, gender: 
   password: '',
   realName: '',
   phone: '',
+  email: '',
+  verificationCode: '',
+  verificationScene: 'REGISTER',
   identityType: 1,
   passwordConfirm: '',
   gender: null,
 })
 const loginFailed = ref(false)
 const router = useRouter()
+const message = useMessage()
 const formRef = ref<FormInst | null>(null)
+const sendingCode = ref(false)
+const countdown = ref(0)
+let timer: number | null = null
 
 const phoneRule: FormItemRule = {
   required: true,
@@ -79,6 +87,21 @@ const rules: FormRules = {
     },
   ],
   phone: [phoneRule],
+  email: [
+    {
+      required: true,
+      type: 'email',
+      trigger: ['blur', 'change'],
+      message: '请输入正确邮箱',
+    },
+  ],
+  verificationCode: [
+    {
+      required: true,
+      trigger: ['blur', 'change'],
+      message: '请输入验证码',
+    },
+  ],
   passwordConfirm: [confirmRule],
   gender: [genderRule],
   identityType: [
@@ -100,6 +123,9 @@ async function register() {
       password: registerInfo.value.password,
       realName: registerInfo.value.realName.trim(),
       phone: registerInfo.value.phone.trim(),
+      email: registerInfo.value.email.trim(),
+      verificationCode: registerInfo.value.verificationCode.trim(),
+      verificationScene: 'REGISTER',
       identityType: registerInfo.value.identityType,
     }
     if (registerInfo.value.gender === 1 || registerInfo.value.gender === 2)
@@ -123,6 +149,39 @@ async function register() {
       }, 2000)
     }
   })
+}
+
+async function sendCode() {
+  if (!registerInfo.value.email || sendingCode.value || countdown.value > 0)
+    return
+  sendingCode.value = true
+  try {
+    const res = await AccountService.sendVerificationCode(registerInfo.value.email, 'REGISTER')
+    if (res.code !== 200) {
+      message.error(res.message || '发送验证码失败')
+      return
+    }
+    if (res.data?.devCode) {
+      message.success(`验证码已生成（演示）: ${res.data.devCode}`)
+    }
+    else {
+      message.success('验证码已发送，请查收邮箱')
+    }
+    countdown.value = 60
+    timer = window.setInterval(() => {
+      countdown.value -= 1
+      if (countdown.value <= 0 && timer) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }, 1000)
+  }
+  catch (e: any) {
+    message.error(e?.message || '发送验证码失败')
+  }
+  finally {
+    sendingCode.value = false
+  }
 }
 </script>
 
@@ -169,6 +228,25 @@ meta:
                 maxlength="11"
                 :placeholder="t('register.phonePlaceholder')"
               />
+            </n-form-item>
+
+            <n-form-item path="email" label="邮箱">
+              <n-input
+                v-model:value="registerInfo.email"
+                placeholder="请输入邮箱（用于验证码）"
+              />
+            </n-form-item>
+
+            <n-form-item path="verificationCode" label="验证码">
+              <div class="flex gap-2 w-full">
+                <n-input
+                  v-model:value="registerInfo.verificationCode"
+                  placeholder="请输入验证码"
+                />
+                <n-button :loading="sendingCode" :disabled="countdown > 0" @click="sendCode">
+                  {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
+                </n-button>
+              </div>
             </n-form-item>
 
             <n-form-item path="gender" :label="t('register.gender')">

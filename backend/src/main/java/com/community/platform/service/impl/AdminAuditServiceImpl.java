@@ -2,14 +2,20 @@ package com.community.platform.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.community.platform.common.Constants;
 import com.community.platform.dto.AuditLogListQuery;
 import com.community.platform.dto.AuditLogVO;
 import com.community.platform.dto.PageResult;
 import com.community.platform.generated.entity.AuditLog;
+import com.community.platform.generated.entity.SysUser;
 import com.community.platform.generated.mapper.AuditLogMapper;
+import com.community.platform.generated.mapper.SysUserMapper;
+import com.community.platform.security.UserDetailsImpl;
 import com.community.platform.service.AdminAuditService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -25,13 +31,17 @@ public class AdminAuditServiceImpl implements AdminAuditService {
 
     @Autowired
     private AuditLogMapper auditLogMapper;
+    @Autowired
+    private SysUserMapper sysUserMapper;
 
     @Override
     public PageResult<AuditLogVO> list(AuditLogListQuery query) {
+        SysUser operator = currentOperator();
         int page = query.getPage() == null || query.getPage() < 1 ? 1 : query.getPage();
         int size = query.getSize() == null || query.getSize() < 1 ? 10 : query.getSize();
 
         LambdaQueryWrapper<AuditLog> wrapper = new LambdaQueryWrapper<>();
+        applyDataScope(operator, wrapper);
         if (query.getUsername() != null && !query.getUsername().isBlank()) {
             wrapper.like(AuditLog::getUsername, query.getUsername().trim());
         }
@@ -71,7 +81,16 @@ public class AdminAuditServiceImpl implements AdminAuditService {
 
     @Override
     public AuditLogVO getById(Long id) {
+        SysUser operator = currentOperator();
         AuditLog log = auditLogMapper.selectById(id);
+        if (log == null) {
+            return null;
+        }
+        if (operator.getRole() != null
+                && operator.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN)
+                && !isUserInCommunity(log.getUserId(), operator.getCommunityId())) {
+            throw new RuntimeException("仅可查看本社区审计日志");
+        }
         return log == null ? null : toVO(log);
     }
 
@@ -114,5 +133,42 @@ public class AdminAuditServiceImpl implements AdminAuditService {
                 return null;
             }
         }
+    }
+
+    private SysUser currentOperator() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new RuntimeException("未登录");
+        }
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        SysUser user = sysUserMapper.selectById(userDetails.getUser().getId());
+        if (user == null || (user.getIsDeleted() != null && user.getIsDeleted() == 1)) {
+            throw new RuntimeException("当前用户不存在");
+        }
+        return user;
+    }
+
+    private void applyDataScope(SysUser operator, LambdaQueryWrapper<AuditLog> wrapper) {
+        if (operator.getRole() != null && operator.getRole().equals(Constants.ROLE_SUPER_ADMIN)) {
+            return;
+        }
+        if (operator.getRole() != null && operator.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN)) {
+            if (operator.getCommunityId() == null) {
+                throw new RuntimeException("管理员未绑定社区，无法查看审计日志");
+            }
+            wrapper.inSql(AuditLog::getUserId,
+                    "SELECT id FROM sys_user WHERE is_deleted=0 AND community_id=" + operator.getCommunityId());
+            return;
+        }
+        throw new RuntimeException("无权限查看审计日志");
+    }
+
+    private boolean isUserInCommunity(Long userId, Long communityId) {
+        if (userId == null || communityId == null) {
+            return false;
+        }
+        SysUser u = sysUserMapper.selectById(userId);
+        return u != null && u.getIsDeleted() != null && u.getIsDeleted() == 0
+                && communityId.equals(u.getCommunityId());
     }
 }

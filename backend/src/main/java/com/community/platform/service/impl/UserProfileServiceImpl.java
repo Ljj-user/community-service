@@ -13,6 +13,7 @@ import com.community.platform.service.UserProfileService;
 import com.community.platform.util.DefaultAvatarUtil;
 import com.community.platform.util.IdentityTypeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,28 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Autowired
     private SysRegionMapper sysRegionMapper;
 
+    @Value("${app.avatar-base-url:http://localhost:8080/static/avatars/}")
+    private String avatarBaseUrl;
+
+    private String normalizeAvatarUrl(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return raw;
+        }
+        String url = raw.trim();
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return url;
+        }
+        // 兼容历史数据：DB 内可能存的是 /static/avatars/xxx，移动端需要可直接访问的绝对地址
+        if (url.startsWith("/static/avatars/")) {
+            String base = (avatarBaseUrl == null || avatarBaseUrl.isBlank())
+                    ? "http://localhost:8080/static/avatars/"
+                    : avatarBaseUrl.trim();
+            if (!base.endsWith("/")) base = base + "/";
+            return base + url.substring("/static/avatars/".length());
+        }
+        return url;
+    }
+
     private SysUser getCurrentSysUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
@@ -34,6 +57,10 @@ public class UserProfileServiceImpl implements UserProfileService {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         SysUser user = userDetails.getUser();
         return sysUserMapper.selectById(user.getId());
+    }
+
+    private boolean isAdminRole(Byte role) {
+        return role != null && (role.equals(Constants.ROLE_SUPER_ADMIN) || role.equals(Constants.ROLE_COMMUNITY_ADMIN));
     }
 
     private UserProfileResponse convertToResponse(SysUser user) {
@@ -46,7 +73,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         resp.setRealName(user.getRealName());
         resp.setPhone(user.getPhone());
         resp.setEmail(user.getEmail());
-        resp.setAvatarUrl(user.getAvatarUrl());
+        resp.setAvatarUrl(normalizeAvatarUrl(user.getAvatarUrl()));
         resp.setRole(user.getRole());
         if (user.getRole() != null && user.getRole().equals(Constants.ROLE_NORMAL_USER)) {
             resp.setIdentityType(IdentityTypeUtil.normalize(user.getIdentityType()));
@@ -81,7 +108,11 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     public UserProfileResponse updateCurrentUserProfile(UserProfileUpdateRequest request) {
         SysUser user = getCurrentSysUser();
+        boolean adminRole = isAdminRole(user.getRole());
         if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            if (adminRole) {
+                throw new RuntimeException("管理员账号用户名为固定字段，不允许修改");
+            }
             String nu = request.getUsername().trim();
             if (!nu.equals(user.getUsername())) {
                 if (nu.length() < 2 || nu.length() > 64) {
@@ -121,6 +152,9 @@ public class UserProfileServiceImpl implements UserProfileService {
             user.setAddress(request.getAddress());
         }
         if (request.getCommunityId() != null) {
+            if (adminRole) {
+                throw new RuntimeException("管理员账号所属社区由系统分配，不允许在个人资料中修改");
+            }
             SysRegion region = sysRegionMapper.selectById(request.getCommunityId());
             if (region == null) {
                 throw new RuntimeException("社区/区域不存在，请从可用的 sys_region 列表中选择");
@@ -146,6 +180,9 @@ public class UserProfileServiceImpl implements UserProfileService {
             user.setSkillTags(request.getSkillTags());
         }
         if (request.getIdentityTag() != null) {
+            if (adminRole) {
+                throw new RuntimeException("管理员账号身份标签为固定字段，不允许修改");
+            }
             user.setIdentityTag(request.getIdentityTag());
         }
         user.setUpdatedAt(java.time.LocalDateTime.now());

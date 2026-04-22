@@ -11,6 +11,7 @@ import com.community.platform.dto.ServiceRequestQueryDTO;
 import com.community.platform.dto.ServiceRequestVO;
 import com.community.platform.dto.ServiceMonitorQueryDTO;
 import com.community.platform.dto.ServiceMonitorVO;
+import com.community.platform.dto.MatchExplainVO;
 import com.community.platform.generated.entity.ServiceClaim;
 import com.community.platform.generated.entity.ServiceEvaluation;
 import com.community.platform.generated.entity.ServiceRequest;
@@ -28,6 +29,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,8 +37,10 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -62,6 +66,9 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
 
     @Autowired
     private UserNotificationService userNotificationService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -224,6 +231,9 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         
         // 批量查询用户信息
         fillUserInfo(voList);
+        if (currentUserId != null) {
+            fillMatchExplain(voList, currentUserId);
+        }
         
         // 构建分页结果
         Page<ServiceRequestVO> voPage = new Page<>(requestPage.getCurrent(), requestPage.getSize(), requestPage.getTotal());
@@ -291,8 +301,9 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
     }
 
     @Override
-    public IPage<ServiceMonitorVO> listMonitor(ServiceMonitorQueryDTO queryDTO) {
+    public IPage<ServiceMonitorVO> listMonitor(ServiceMonitorQueryDTO queryDTO, Long currentUserId) {
         LocalDateTime now = LocalDateTime.now();
+        SysUser currentUser = currentUserId == null ? null : sysUserMapper.selectById(currentUserId);
 
         LambdaQueryWrapper<ServiceRequest> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ServiceRequest::getIsDeleted, 0);
@@ -312,6 +323,13 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 // 超时未完成：已认领但未完成
                 wrapper.eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_CLAIMED);
             }
+        }
+        if (currentUser != null && currentUser.getRole() != null
+                && currentUser.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN)) {
+            if (currentUser.getCommunityId() == null) {
+                throw new RuntimeException("管理员未绑定社区，无法查看监控数据");
+            }
+            wrapper.eq(ServiceRequest::getCommunityId, currentUser.getCommunityId());
         }
 
         Page<ServiceRequest> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());
@@ -497,5 +515,180 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 }
             }
         }
+    }
+
+    private void fillMatchExplain(List<ServiceRequestVO> voList, Long currentUserId) {
+        if (voList == null || voList.isEmpty() || currentUserId == null) {
+            return;
+        }
+        SysUser volunteer = sysUserMapper.selectById(currentUserId);
+        if (volunteer == null || volunteer.getIsDeleted() == 1 || volunteer.getRole() != Constants.ROLE_NORMAL_USER) {
+            return;
+        }
+        double volunteerRatingScore = calcVolunteerRatingScore(currentUserId);
+        Set<String> volunteerSkills = loadVolunteerSkills(currentUserId, volunteer.getSkillTags());
+        for (ServiceRequestVO vo : voList) {
+            MatchExplainVO explain = new MatchExplainVO();
+            List<String> requestTags = loadRequestTags(vo.getId(), vo.getSpecialTags());
+            double skillScore = calcSkillScore(volunteerSkills, requestTags);
+            double areaScore = calcAreaScore(volunteer.getCommunityId(), vo.getCommunityId());
+            double priorityScore = calcPriorityScore(vo.getUrgencyLevel());
+            double ratingScore = volunteerRatingScore;
+            double totalScore = 0.5D * skillScore + 0.3D * areaScore + 0.1D * priorityScore + 0.1D * ratingScore;
+            explain.setSkillScore(round1(skillScore));
+            explain.setAreaScore(round1(areaScore));
+            explain.setPriorityScore(round1(priorityScore));
+            explain.setRatingScore(round1(ratingScore));
+            explain.setTotalScore(round1(totalScore));
+            vo.setMatchExplain(explain);
+            vo.setMatchReasons(buildMatchReasons(skillScore, areaScore, priorityScore, ratingScore));
+        }
+    }
+
+    private Set<String> loadVolunteerSkills(Long userId, String fallbackJson) {
+        try {
+            List<String> tags = jdbcTemplate.query(
+                    "SELECT skill_tag FROM sys_user_skill WHERE user_id=?",
+                    (rs, rowNum) -> rs.getString("skill_tag"),
+                    userId
+            );
+            if (tags != null && !tags.isEmpty()) {
+                return tags.stream().filter(StringUtils::hasText).map(String::trim).collect(Collectors.toSet());
+            }
+        } catch (Exception ignored) {
+            // fallback to json
+        }
+        return parseTags(fallbackJson);
+    }
+
+    private List<String> loadRequestTags(Long requestId, List<String> fallback) {
+        if (requestId == null) {
+            return fallback == null ? List.of() : fallback;
+        }
+        try {
+            List<String> tags = jdbcTemplate.query(
+                    "SELECT tag_name FROM service_request_tag WHERE request_id=?",
+                    (rs, rowNum) -> rs.getString("tag_name"),
+                    requestId
+            );
+            if (tags != null && !tags.isEmpty()) {
+                return tags.stream().filter(StringUtils::hasText).map(String::trim).toList();
+            }
+        } catch (Exception ignored) {
+        }
+        return fallback == null ? List.of() : fallback;
+    }
+
+    private double calcVolunteerRatingScore(Long volunteerUserId) {
+        List<ServiceEvaluation> evaluations = serviceEvaluationMapper.selectList(new LambdaQueryWrapper<ServiceEvaluation>()
+                .eq(ServiceEvaluation::getVolunteerUserId, volunteerUserId)
+                .eq(ServiceEvaluation::getIsDeleted, 0));
+        if (evaluations.isEmpty()) {
+            return 70D;
+        }
+        double avg = evaluations.stream().map(ServiceEvaluation::getRating).filter(java.util.Objects::nonNull)
+                .mapToInt(Byte::intValue).average().orElse(3.5D);
+        return Math.max(0D, Math.min(100D, avg * 20D));
+    }
+
+    private Set<String> parseTags(String rawTags) {
+        if (!StringUtils.hasText(rawTags)) {
+            return Set.of();
+        }
+        try {
+            List<String> tags = objectMapper.readValue(rawTags, new TypeReference<List<String>>() {});
+            return tags.stream().filter(StringUtils::hasText).map(String::trim).collect(Collectors.toSet());
+        } catch (Exception ignored) {
+            return java.util.Arrays.stream(rawTags.split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::hasText)
+                    .collect(Collectors.toSet());
+        }
+    }
+
+    private double calcSkillScore(Set<String> volunteerSkills, List<String> requestTags) {
+        if (requestTags == null || requestTags.isEmpty()) {
+            return 60D;
+        }
+        if (volunteerSkills == null || volunteerSkills.isEmpty()) {
+            return calcColdStartSkillScore(requestTags);
+        }
+        Set<String> req = requestTags.stream().filter(StringUtils::hasText).map(String::trim).collect(Collectors.toSet());
+        if (req.isEmpty()) {
+            return 60D;
+        }
+        Set<String> hit = new HashSet<>(req);
+        hit.retainAll(volunteerSkills);
+        return Math.min(100D, (hit.size() * 1.0D / req.size()) * 100D);
+    }
+
+    private double calcColdStartSkillScore(List<String> requestTags) {
+        if (requestTags == null || requestTags.isEmpty()) {
+            return 50D;
+        }
+        List<String> req = requestTags.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (req.isEmpty()) {
+            return 50D;
+        }
+        try {
+            Integer maxCount = jdbcTemplate.queryForObject("SELECT MAX(user_count) FROM skill_tag_stat", Integer.class);
+            int max = maxCount == null ? 0 : maxCount;
+            if (max <= 0) {
+                return 45D;
+            }
+            double ratioSum = 0D;
+            for (String tag : req) {
+                Integer c = jdbcTemplate.queryForObject(
+                        "SELECT user_count FROM skill_tag_stat WHERE skill_tag=?",
+                        Integer.class,
+                        tag
+                );
+                int count = c == null ? 0 : c;
+                ratioSum += (count * 1.0D / max);
+            }
+            double avgRatio = ratioSum / req.size();
+            // 冷启动区间映射：至少给 40 分，避免新用户永远排在末尾
+            return Math.max(40D, Math.min(80D, 40D + avgRatio * 40D));
+        } catch (Exception ignored) {
+            return 45D;
+        }
+    }
+
+    private double calcAreaScore(Long volunteerCommunityId, Long requestCommunityId) {
+        if (volunteerCommunityId == null || requestCommunityId == null) {
+            return 40D;
+        }
+        return volunteerCommunityId.equals(requestCommunityId) ? 100D : 20D;
+    }
+
+    private double calcPriorityScore(Byte urgencyLevel) {
+        if (urgencyLevel == null) {
+            return 60D;
+        }
+        return switch (urgencyLevel) {
+            case 4 -> 100D;
+            case 3 -> 85D;
+            case 2 -> 70D;
+            default -> 50D;
+        };
+    }
+
+    private List<String> buildMatchReasons(double skillScore, double areaScore, double priorityScore, double ratingScore) {
+        List<String> reasons = new ArrayList<>();
+        if (skillScore >= 80D) reasons.add("技能高度匹配");
+        else if (skillScore >= 50D) reasons.add("技能部分匹配");
+        if (areaScore >= 80D) reasons.add("同社区就近服务");
+        if (priorityScore >= 85D) reasons.add("高优先级需求");
+        if (ratingScore >= 80D) reasons.add("历史服务评价较好");
+        if (reasons.isEmpty()) reasons.add("综合评分推荐");
+        return reasons;
+    }
+
+    private double round1(double val) {
+        return Math.round(val * 10.0D) / 10.0D;
     }
 }

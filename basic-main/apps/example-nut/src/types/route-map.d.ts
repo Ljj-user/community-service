@@ -69,6 +69,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    'join-community': RouteRecordInfo<
+      'join-community',
+      '/join-community',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     'login': RouteRecordInfo<
       'login',
       '/login',
@@ -79,6 +86,20 @@ declare module 'vue-router/auto-routes' {
     '/notices': RouteRecordInfo<
       '/notices',
       '/notices',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    'profile-edit': RouteRecordInfo<
+      'profile-edit',
+      '/profile-edit',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    'register': RouteRecordInfo<
+      'register',
+      '/register',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -153,6 +174,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/views/join-community.vue': {
+      routes:
+        | 'join-community'
+      views:
+        | never
+    }
     'src/views/login.vue': {
       routes:
         | 'login'
@@ -162,6 +189,18 @@ declare module 'vue-router/auto-routes' {
     'src/views/notices.vue': {
       routes:
         | '/notices'
+      views:
+        | never
+    }
+    'src/views/profile-edit.vue': {
+      routes:
+        | 'profile-edit'
+      views:
+        | never
+    }
+    'src/views/register.vue': {
+      routes:
+        | 'register'
       views:
         | never
     }

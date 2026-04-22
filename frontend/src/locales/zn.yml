@@ -235,6 +235,8 @@ menu:
   communityVolunteers: 志愿者申请审核
   communityMonitor: 服务过程监控
   communityAnnouncements: 信息发布与公告
+  communityInviteCodes: 社区邀请码
+  communityBanners: 社区轮播图
   userResident: 居民工作台
   userVolunteer: 志愿者工作台
   user-announcements: 社区公告
@@ -958,7 +960,7 @@ community:
     colType: 服务类型
     colTime: 期望时间
     colAddr: 地址
-    communityScopeNote: 当前辖区统计与全库一致；后续将按管理员绑定社区维度过滤。
+    communityScopeNote: 当前数据已按您绑定的社区维度统计（跨社区功能除外）。
     kpiActiveUsers: 活跃志愿者
     kpiActiveUsersHint: 本辖区视角（演示数据与全库一致）
     kpiPendingAudit: 待审核申请

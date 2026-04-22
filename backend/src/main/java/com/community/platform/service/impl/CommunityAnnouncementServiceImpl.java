@@ -37,7 +37,8 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
     private UserNotificationService userNotificationService;
 
     @Override
-    public IPage<AnnouncementVO> list(AnnouncementQueryDTO queryDTO) {
+    public IPage<AnnouncementVO> list(Long operatorUserId, AnnouncementQueryDTO queryDTO) {
+        SysUser operator = getOperator(operatorUserId);
         LambdaQueryWrapper<Announcement> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Announcement::getIsDeleted, 0);
 
@@ -59,6 +60,13 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
         if (queryDTO.getIsTop() != null) {
             wrapper.eq(Announcement::getIsTop, queryDTO.getIsTop());
         }
+        // 社区管理员只能看本社区公告
+        if (isCommunityAdmin(operator)) {
+            if (operator.getCommunityId() == null) {
+                throw new RuntimeException("管理员未绑定社区，无法查看公告");
+            }
+            wrapper.eq(Announcement::getTargetCommunityId, operator.getCommunityId());
+        }
 
         wrapper.orderByDesc(Announcement::getIsTop)
                 .orderByDesc(Announcement::getTopAt)
@@ -77,11 +85,13 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
     }
 
     @Override
-    public AnnouncementVO detail(Long id) {
+    public AnnouncementVO detail(Long operatorUserId, Long id) {
+        SysUser operator = getOperator(operatorUserId);
         Announcement a = announcementMapper.selectById(id);
         if (a == null || a.getIsDeleted() == 1) {
             throw new RuntimeException("公告不存在");
         }
+        assertScope(operator, a.getTargetCommunityId());
         AnnouncementVO vo = toVO(a);
         fillPublisher(List.of(vo));
         return vo;
@@ -96,6 +106,19 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
         }
         if (user.getRole() != Constants.ROLE_COMMUNITY_ADMIN && user.getRole() != Constants.ROLE_SUPER_ADMIN) {
             throw new RuntimeException("只有社区管理员可以发布公告");
+        }
+        if (isCommunityAdmin(user)) {
+            if (user.getCommunityId() == null) {
+                throw new RuntimeException("管理员未绑定社区，无法发布公告");
+            }
+            if (dto.getTargetScope() != null && dto.getTargetScope() != 0
+                    && dto.getTargetCommunityId() != null
+                    && !user.getCommunityId().equals(dto.getTargetCommunityId())) {
+                throw new RuntimeException("社区管理员仅可发布本社区公告");
+            }
+            if (dto.getTargetScope() == null || dto.getTargetScope() != 0) {
+                dto.setTargetCommunityId(user.getCommunityId());
+            }
         }
 
         // scope校验：楼栋必须带communityId + buildingId；社区必须带communityId
@@ -124,6 +147,7 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
             if (a == null || a.getIsDeleted() == 1) {
                 throw new RuntimeException("公告不存在");
             }
+            assertScope(user, a.getTargetCommunityId());
             previousStatus = a.getStatus();
         }
 
@@ -168,10 +192,12 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
     @Override
     @Transactional
     public void delete(Long id, Long operatorUserId) {
+        SysUser operator = getOperator(operatorUserId);
         Announcement a = announcementMapper.selectById(id);
         if (a == null || a.getIsDeleted() == 1) {
             return;
         }
+        assertScope(operator, a.getTargetCommunityId());
         a.setIsDeleted((byte) 1);
         a.setUpdatedAt(LocalDateTime.now());
         announcementMapper.updateById(a);
@@ -180,14 +206,47 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
     @Override
     @Transactional
     public void setTop(Long id, boolean isTop, Long operatorUserId) {
+        SysUser operator = getOperator(operatorUserId);
         Announcement a = announcementMapper.selectById(id);
         if (a == null || a.getIsDeleted() == 1) {
             throw new RuntimeException("公告不存在");
         }
+        assertScope(operator, a.getTargetCommunityId());
         a.setIsTop((byte) (isTop ? 1 : 0));
         a.setTopAt(isTop ? LocalDateTime.now() : null);
         a.setUpdatedAt(LocalDateTime.now());
         announcementMapper.updateById(a);
+    }
+
+    private SysUser getOperator(Long operatorUserId) {
+        SysUser operator = sysUserMapper.selectById(operatorUserId);
+        if (operator == null || operator.getIsDeleted() == 1) {
+            throw new RuntimeException("当前用户不存在");
+        }
+        return operator;
+    }
+
+    private boolean isCommunityAdmin(SysUser user) {
+        return user != null && user.getRole() != null && user.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN);
+    }
+
+    private boolean isSuperAdmin(SysUser user) {
+        return user != null && user.getRole() != null && user.getRole().equals(Constants.ROLE_SUPER_ADMIN);
+    }
+
+    private void assertScope(SysUser operator, Long targetCommunityId) {
+        if (isSuperAdmin(operator)) {
+            return;
+        }
+        if (!isCommunityAdmin(operator)) {
+            throw new RuntimeException("无权限操作公告");
+        }
+        if (operator.getCommunityId() == null) {
+            throw new RuntimeException("管理员未绑定社区，无法操作公告");
+        }
+        if (targetCommunityId == null || !operator.getCommunityId().equals(targetCommunityId)) {
+            throw new RuntimeException("仅可操作本社区公告");
+        }
     }
 
     private AnnouncementVO toVO(Announcement a) {

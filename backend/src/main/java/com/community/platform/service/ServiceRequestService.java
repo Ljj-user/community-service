@@ -42,5 +42,5 @@ public interface ServiceRequestService {
     /**
      * 服务过程监控列表
      */
-    IPage<ServiceMonitorVO> listMonitor(ServiceMonitorQueryDTO queryDTO);
+    IPage<ServiceMonitorVO> listMonitor(ServiceMonitorQueryDTO queryDTO, Long currentUserId);
 }

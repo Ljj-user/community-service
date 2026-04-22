@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.io.File;
+
 /**
  * 静态资源映射配置，用于访问上传的头像文件
  */
@@ -16,7 +18,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String location = avatarUploadDir.replace("\\", "/");
+        File dir = new File(avatarUploadDir).getAbsoluteFile();
+        if (!dir.exists()) {
+            // best effort; failures will surface on upload
+            dir.mkdirs();
+        }
+
+        String location = dir.getPath().replace("\\", "/");
         if (!location.endsWith("/")) {
             location = location + "/";
         }

@@ -80,7 +80,7 @@ const effectiveCollapsed = computed(() => {
 })
 
 /** 社区管理员不可见的高危菜单 key */
-const COMMUNITY_ADMIN_EXCLUDE_KEYS = new Set(['admin-config', 'admin-backup'])
+const COMMUNITY_ADMIN_EXCLUDE_KEYS = new Set(['admin-config', 'admin-backup', 'admin-audit', 'admin-global-dashboard'])
 
 function filterCommunityAdminMenu(options: SidebarMenuOption[]): SidebarMenuOption[] {
   return options
@@ -178,6 +178,20 @@ const adminMenuTemplate = computed<SidebarMenuOption[]>(() => {
           route: '/community/announcements',
           key: 'communityAnnouncements',
           icon: PagesIcon,
+        },
+        {
+          label: t('menu.communityInviteCodes'),
+          route: '/community/invite-codes',
+          key: 'communityInviteCodes',
+          icon: FormsIcon,
+          activeIcon: FormsIcon,
+        },
+        {
+          label: t('menu.communityBanners'),
+          route: '/community/banners',
+          key: 'communityBanners',
+          icon: BrandsIcon,
+          activeIcon: BrandsIconActive,
         },
       ],
     },

@@ -6,6 +6,7 @@ import com.community.platform.dto.FundingMonitorVO;
 import com.community.platform.dto.NameCountVO;
 import com.community.platform.dto.RegionStatVO;
 import com.community.platform.dto.ScheduleBriefVO;
+import com.community.platform.dto.TrendChartVO;
 
 import java.util.List;
 
@@ -17,17 +18,17 @@ public interface DashboardService {
     /**
      * 获取统计数据（管理员）
      */
-    DashboardStatsVO getStats();
+    DashboardStatsVO getStats(Long communityId);
 
     /**
      * 按区域聚合的服务覆盖统计（用于热力图）
      */
-    List<RegionStatVO> getRegionCoverage();
+    List<RegionStatVO> getRegionCoverage(Long communityId);
 
     /**
      * 按服务类型统计需求分布
      */
-    List<NameCountVO> getDemandByServiceType();
+    List<NameCountVO> getDemandByServiceType(Long communityId);
 
     /**
      * 资金/物资监控占位（超级管理员）
@@ -37,10 +38,20 @@ public interface DashboardService {
     /**
      * 近期期望服务时间的需求排期
      */
-    List<ScheduleBriefVO> getUpcomingSchedule(int limit);
+    List<ScheduleBriefVO> getUpcomingSchedule(int limit, Long communityId);
 
     /**
      * 管理员首页看板聚合（根据是否超管附带资金监控）
      */
-    AdminDashboardPanelVO buildAdminPanel(boolean superAdmin);
+    AdminDashboardPanelVO buildAdminPanel(boolean superAdmin, Long communityId);
+
+    /**
+     * 供需趋势对比（近 N 天）
+     */
+    TrendChartVO getSupplyDemandTrend(Long communityId, int days);
+
+    /**
+     * 志愿者荣誉榜 TopN（按完成时长）
+     */
+    List<NameCountVO> getVolunteerHonorTop(Long communityId, int days, int topN);
 }

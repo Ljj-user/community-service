@@ -6,6 +6,22 @@ interface LoginData {
   userInfo: UserInfo
 }
 
+interface VerificationTicket {
+  ticketId: number
+  scene: string
+  target: string
+  expiresAt: string
+  devCode?: string
+}
+
+interface InviteVerifyVO {
+  communityId: number
+  communityName: string
+  expiresAt?: string | null
+  maxUses?: number
+  usedCount?: number
+}
+
 export default {
   // 登录
   login: (data: {
@@ -18,4 +34,26 @@ export default {
 
   // 获取当前用户信息
   me: () => api.get<any, BackendResult<UserInfo>>('/auth/me'),
+
+  sendVerificationCode: (data: { email: string; scene: string }) =>
+    api.post<any, BackendResult<VerificationTicket>>('/auth/verification/send', data),
+
+  register: (data: {
+    username: string
+    password: string
+    realName: string
+    phone: string
+    email: string
+    verificationCode: string
+    verificationScene: string
+    identityType: number
+    communityId?: number
+    gender?: number
+  }) => api.post<any, BackendResult<any>>('/auth/register', data),
+
+  verifyInviteCode: (data: { code: string }) =>
+    api.post<any, BackendResult<InviteVerifyVO>>('/community/invite/verify', data),
+
+  joinCommunity: (data: { code: string }) =>
+    api.post<any, BackendResult<UserInfo>>('/community/join', data),
 }

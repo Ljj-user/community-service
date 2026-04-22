@@ -6,6 +6,7 @@ export const useProfileStore = defineStore('Profile', () => {
   const userProfile = ref<Profile>({} as Profile)
   const userSettings = ref<ProfileSettings>({} as ProfileSettings)
   const isLoading = ref(false)
+  const avatarNonce = ref(0)
 
   async function loadUserProfile() {
     isLoading.value = true
@@ -13,9 +14,14 @@ export const useProfileStore = defineStore('Profile', () => {
     try {
       const profile = await ProfileService.getUserProfile()
       userProfile.value = profile
+      avatarNonce.value = Date.now()
     } finally {
       isLoading.value = false
     }
+  }
+
+  function bumpAvatarNonce() {
+    avatarNonce.value = Date.now()
   }
 
   async function loadSettings() {
@@ -25,6 +31,8 @@ export const useProfileStore = defineStore('Profile', () => {
 
   return {
     userProfile,
+    avatarNonce,
+    bumpAvatarNonce,
     loadUserProfile,
     isLoading,
     loadSettings,

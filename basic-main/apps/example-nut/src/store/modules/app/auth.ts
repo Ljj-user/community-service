@@ -13,6 +13,7 @@ export interface UserInfo {
   role: number
   identityType?: number
   realName?: string
+  avatarUrl?: string
   communityId?: number
   /** 绑定社区名称（后端由 sys_user.community_id 关联 sys_region） */
   communityName?: string

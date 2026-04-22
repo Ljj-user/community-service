@@ -15,6 +15,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -23,6 +25,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/user")
 public class UserProfileController {
+    private static final Set<String> ALLOWED_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp");
 
     @Autowired
     private UserProfileService userProfileService;
@@ -77,30 +80,42 @@ public class UserProfileController {
             return Result.error("上传文件为空");
         }
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
+        String originalFilename = file.getOriginalFilename();
+        String ext = StringUtils.getFilenameExtension(originalFilename);
+        String extLower = ext == null ? "" : ext.toLowerCase(Locale.ROOT);
+        boolean extAllowed = !extLower.isEmpty() && ALLOWED_EXT.contains(extLower);
+        boolean mimeLooksImage = contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("image/");
+        if (!mimeLooksImage && !extAllowed) {
             return Result.error("仅支持图片类型文件");
         }
 
-        String originalFilename = file.getOriginalFilename();
-        String ext = StringUtils.getFilenameExtension(originalFilename);
         String filename = UUID.randomUUID().toString().replace("-", "");
-        if (ext != null && !ext.isEmpty()) {
-            filename = filename + "." + ext;
+        if (extAllowed) {
+            filename = filename + "." + extLower;
         }
 
-        File uploadRoot = new File(avatarUploadDir);
+        File uploadRoot = new File(avatarUploadDir).getAbsoluteFile();
         if (!uploadRoot.exists()) {
-            uploadRoot.mkdirs();
+            boolean ok = uploadRoot.mkdirs();
+            if (!ok) {
+                return Result.error("上传头像失败: 无法创建目录 " + uploadRoot.getPath());
+            }
         }
 
         File dest = new File(uploadRoot, filename);
         try {
+            File parent = dest.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
             file.transferTo(dest);
         } catch (IOException e) {
             return Result.error("上传头像失败: " + e.getMessage());
         }
 
-        String avatarUrl = avatarBaseUrl + filename;
+        String base = avatarBaseUrl == null ? "/static/avatars/" : avatarBaseUrl.trim();
+        if (!base.endsWith("/")) base = base + "/";
+        String avatarUrl = base + filename;
         UserProfileResponse profile = userProfileService.updateAvatar(avatarUrl);
         return Result.success("头像更新成功", profile);
     }

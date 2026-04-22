@@ -1,12 +1,42 @@
 <script setup lang="ts">
+import AccountService from '~/services/account.service'
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const message = useMessage()
 
 const isVolunteer = computed(() => route.query.identity === 'volunteer')
+const saving = ref(false)
+const form = ref({
+  skillTags: [] as string[],
+  preferredFeatures: [] as string[],
+  intentNote: '',
+})
+const skillOptions = ['助老陪伴', '家政清洁', '跑腿代办', '健康陪诊', '心理支持']
+const featureOptions = ['发布求助', '接单服务', '社区发帖', '以物易物', '活动报名']
 
-function goProfile() {
-  router.push('/Account/profile')
+async function goProfile() {
+  saving.value = true
+  try {
+    const res = await AccountService.submitOnboarding({
+      skillTags: form.value.skillTags,
+      preferredFeatures: form.value.preferredFeatures,
+      intentNote: form.value.intentNote,
+    })
+    if (res.code !== 200) {
+      message.error(res.message || '保存引导信息失败')
+      return
+    }
+    message.success('引导信息已保存')
+    router.push('/Account/profile')
+  }
+  catch (e: any) {
+    message.error(e?.message || '保存失败')
+  }
+  finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -26,8 +56,34 @@ meta:
       <p class="text-lg md:text-xl text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
         {{ isVolunteer ? t('register.welcomeVolunteerHint') : t('register.welcomeResidentHint') }}
       </p>
-      <n-button type="primary" size="large" class="!text-lg !px-10 !h-12" @click="goProfile">
-        {{ t('register.welcomeGoProfile') }}
+      <div class="space-y-4 text-left mb-8">
+        <div>
+          <div class="text-sm text-slate-500 mb-2">你具备哪些技能？（可多选）</div>
+          <n-checkbox-group v-model:value="form.skillTags">
+            <n-space>
+              <n-checkbox v-for="item in skillOptions" :key="item" :value="item">
+                {{ item }}
+              </n-checkbox>
+            </n-space>
+          </n-checkbox-group>
+        </div>
+        <div>
+          <div class="text-sm text-slate-500 mb-2">你主要想体验哪些功能？（可多选）</div>
+          <n-checkbox-group v-model:value="form.preferredFeatures">
+            <n-space>
+              <n-checkbox v-for="item in featureOptions" :key="item" :value="item">
+                {{ item }}
+              </n-checkbox>
+            </n-space>
+          </n-checkbox-group>
+        </div>
+        <div>
+          <div class="text-sm text-slate-500 mb-2">补充说明</div>
+          <n-input v-model:value="form.intentNote" type="textarea" placeholder="比如希望重点做长期陪伴服务" />
+        </div>
+      </div>
+      <n-button type="primary" size="large" class="!text-lg !px-10 !h-12" :loading="saving" @click="goProfile">
+        保存并进入个人中心
       </n-button>
     </div>
   </div>

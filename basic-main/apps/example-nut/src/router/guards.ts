@@ -7,6 +7,10 @@ function setupAuth(router: Router) {
   router.beforeEach(async (to) => {
     const appSettingsStore = useAppSettingsStore()
     const appAuthStore = useAppAuthStore()
+    // 登录态下尽量刷新一次 userInfo，便于社区绑定判断
+    if (appAuthStore.isLogin) {
+      await appAuthStore.hydrateUser()
+    }
     if (to.meta.auth) {
       if (appAuthStore.isLogin) {
         try {
@@ -16,6 +20,12 @@ function setupAuth(router: Router) {
           }
         }
         catch {}
+
+        // 强制引导：已登录但未绑定社区 → 进入加入社区页
+        const allow = new Set(['login', 'register', 'join-community', 'scan', 'reload'])
+        if (!allow.has(String(to.name)) && !appAuthStore.user?.communityId) {
+          return { name: 'join-community' }
+        }
       }
       else {
         return {

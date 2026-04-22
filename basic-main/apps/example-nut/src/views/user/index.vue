@@ -11,6 +11,7 @@ definePage({
 
 const appAuthStore = useAppAuthStore()
 const showSettings = ref(false)
+const router = useRouter()
 
 const dashboard = ref<{
   panelType?: 'RESIDENT' | 'VOLUNTEER'
@@ -81,7 +82,7 @@ onMounted(loadProfile)
   <AppPageLayout :navbar="false" tabbar>
     <div class="profile-page">
       <div class="top-header">
-        <h2>数字时间存折</h2>
+        <h2>个人中心</h2>
         <button class="setting-btn" @click="showSettings = true">
           <FmIcon name="mdi:cog-outline" />
         </button>
@@ -91,8 +92,8 @@ onMounted(loadProfile)
         <div class="card-bubble" />
         <div class="card-top">
           <div>
-            <p class="small-label">当前可用时币</p>
-            <h2>{{ timeCoins.toFixed(2) }}</h2>
+            <p class="small-label">贡献积分</p>
+            <h2>{{ creditScore }}</h2>
           </div>
           <div class="credit-badge">
             <FmIcon name="i-carbon:shield" />
@@ -118,6 +119,10 @@ onMounted(loadProfile)
         <div class="func-item">
           <div class="func-icon bg-orange"><FmIcon name="mdi:clipboard-list-outline" /></div>
           <span>我的任务</span>
+        </div>
+        <div class="func-item" role="button" tabindex="0" @click="router.push('/profile-edit')">
+          <div class="func-icon bg-blue"><FmIcon name="mdi:account-edit-outline" /></div>
+          <span>完善资料</span>
         </div>
         <div class="func-item">
           <div class="func-icon bg-blue"><FmIcon name="mdi:account-group-outline" /></div>

@@ -81,6 +81,9 @@ function quickFill(username: string, password: string) {
           <FmButton :loading class="w-full" type="submit">
             登录
           </FmButton>
+          <FmButton class="w-full mt-3" variant="outline" type="button" @click="router.push('/register')">
+            没有账号？去注册
+          </FmButton>
           <FmDivider>
             快速填充（可改成你的测试账号）
           </FmDivider>

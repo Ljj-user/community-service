@@ -140,7 +140,11 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 公开接口
-                        .requestMatchers("/auth/login", "/auth/register").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/verification/send").permitAll()
+                        // 普通用户加入/改绑社区（邀请码/扫码）
+                        .requestMatchers("/community/invite/verify", "/community/join").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        // 普通用户：首页轮播图
+                        .requestMatchers("/user/banner/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
                         // 静态资源（头像）
                         .requestMatchers("/static/**").permitAll()
                         .requestMatchers("/error").permitAll()
@@ -148,8 +152,14 @@ public class SecurityConfig {
                         // 超级管理员：系统配置、备份与导出等高危操作
                         .requestMatchers("/admin/config/**", "/admin/backup/**", "/admin/export/**").hasRole("SUPER_ADMIN")
 
-                        // 超级管理员 & 社区管理员：用户与角色管理、审核日志（按角色在业务中再细分权限）
-                        .requestMatchers("/admin/users/**", "/admin/audit/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        // 用户与角色管理（按业务再做社区范围约束）
+                        .requestMatchers("/admin/users/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        // 社区邀请码（社区管理员/系统管理员）
+                        .requestMatchers("/admin/invite-code/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        // 轮播图管理（社区管理员/系统管理员）
+                        .requestMatchers("/admin/banner/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        // 审计日志仅系统管理员可见
+                        .requestMatchers("/admin/audit/**").hasRole("SUPER_ADMIN")
 
                         // 社区管理员：审核需求、管理志愿者、数据看板
                         .requestMatchers("/community/**", "/dashboard/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")

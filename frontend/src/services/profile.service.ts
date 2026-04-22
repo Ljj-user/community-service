@@ -35,6 +35,11 @@ function normalizeAvatarUrl(raw?: string): string {
   // Compatibility for Windows absolute file path accidentally saved before.
   if (/^[A-Za-z]:[\\/]/.test(raw))
     return ''
+  // Backend may return absolute URL in dev; route it through Vite proxy to avoid cross-origin/CSP/cache issues.
+  if (/^https?:\/\/localhost:8080\/static\//i.test(raw))
+    return raw.replace(/^https?:\/\/localhost:8080/i, '/api')
+  if (/^https?:\/\/127\.0\.0\.1:8080\/static\//i.test(raw))
+    return raw.replace(/^https?:\/\/127\.0\.0\.1:8080/i, '/api')
   if (/^https?:\/\//i.test(raw))
     return raw
   const url = raw.startsWith('/') ? raw : `/${raw}`

@@ -63,15 +63,82 @@ DEALLOCATE PREPARE __stmt;
 -- points: 累计积分/经验
 -- identity_tag: 身份标签（如普通居民、孤寡老人、残疾人）
 -- ============================================
-ALTER TABLE sys_user
-  ADD COLUMN community_id BIGINT UNSIGNED NULL COMMENT '关联区域ID',
-  ADD COLUMN time_coins BIGINT NOT NULL DEFAULT 0 COMMENT '当前可用时间币',
-  ADD COLUMN points BIGINT NOT NULL DEFAULT 0 COMMENT '累计积分/经验值',
-  ADD COLUMN identity_tag VARCHAR(64) NULL COMMENT '身份标签（如普通居民、孤寡老人、残疾人）';
+-- 可重复执行：按列检查是否存在再添加（避免与最新 schema.sql 重复）
+SET @__col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'sys_user'
+    AND column_name = 'community_id'
+);
+SET @__sql := IF(@__col_exists > 0,
+  'SELECT 1',
+  'ALTER TABLE sys_user ADD COLUMN community_id BIGINT UNSIGNED NULL COMMENT ''关联区域ID'''
+);
+PREPARE __stmt FROM @__sql;
+EXECUTE __stmt;
+DEALLOCATE PREPARE __stmt;
+
+SET @__col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'sys_user'
+    AND column_name = 'time_coins'
+);
+SET @__sql := IF(@__col_exists > 0,
+  'SELECT 1',
+  'ALTER TABLE sys_user ADD COLUMN time_coins BIGINT NOT NULL DEFAULT 0 COMMENT ''当前可用时间币'''
+);
+PREPARE __stmt FROM @__sql;
+EXECUTE __stmt;
+DEALLOCATE PREPARE __stmt;
+
+SET @__col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'sys_user'
+    AND column_name = 'points'
+);
+SET @__sql := IF(@__col_exists > 0,
+  'SELECT 1',
+  'ALTER TABLE sys_user ADD COLUMN points BIGINT NOT NULL DEFAULT 0 COMMENT ''累计积分/经验值'''
+);
+PREPARE __stmt FROM @__sql;
+EXECUTE __stmt;
+DEALLOCATE PREPARE __stmt;
+
+SET @__col_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'sys_user'
+    AND column_name = 'identity_tag'
+);
+SET @__sql := IF(@__col_exists > 0,
+  'SELECT 1',
+  'ALTER TABLE sys_user ADD COLUMN identity_tag VARCHAR(64) NULL COMMENT ''身份标签（如普通居民、孤寡老人、残疾人）'''
+);
+PREPARE __stmt FROM @__sql;
+EXECUTE __stmt;
+DEALLOCATE PREPARE __stmt;
 
 -- 仅加索引，不强制外键约束，降低历史数据/初始化风险
-ALTER TABLE sys_user
-  ADD INDEX idx_sys_user_community (community_id);
+SET @__idx_exists := (
+  SELECT COUNT(1)
+  FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name = 'sys_user'
+    AND index_name = 'idx_sys_user_community'
+);
+SET @__sql := IF(@__idx_exists > 0,
+  'SELECT 1',
+  'CREATE INDEX idx_sys_user_community ON sys_user (community_id)'
+);
+PREPARE __stmt FROM @__sql;
+EXECUTE __stmt;
+DEALLOCATE PREPARE __stmt;
 
 -- ============================================
 -- 3) 创建服务订单表：service_order

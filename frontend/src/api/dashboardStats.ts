@@ -4,7 +4,9 @@ export interface DashboardStats {
   totalRequests: number
   pendingRequests: number
   publishedRequests: number
+  claimedRequests?: number
   completedRequests: number
+  rejectedRequests?: number
   totalServiceHours: number
   activeVolunteers: number
   monthlyNewRequests: number
@@ -49,6 +51,12 @@ export interface AdminDashboardPanel {
   upcomingSchedule: ScheduleBrief[]
 }
 
+export interface TrendChart {
+  labels: string[]
+  demand: number[]
+  supply: number[]
+}
+
 export interface BackendResult<T> {
   code: number
   message: string
@@ -68,5 +76,15 @@ export async function getRegionCoverage() {
 
 export async function getDashboardPanel() {
   return apiService.get<BackendResult<AdminDashboardPanel>>('panel')
+}
+
+export async function getSupplyDemandTrend(days = 7) {
+  return apiService.get<BackendResult<TrendChart>>(`trend?days=${days}`)
+}
+
+export async function getVolunteerTop(days = 30, topN = 10) {
+  return apiService.get<BackendResult<NameCount[]>>(
+    `volunteer-top?days=${days}&topN=${topN}`,
+  )
 }
 

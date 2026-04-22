@@ -179,6 +179,12 @@ const columns = computed<DataTableColumns<ServiceRequestVO>>(() => [
         dtActionBtn('一键认领', { type: 'success', onClick: () => claim(r) }, HandRight20Regular),
       ]),
   },
+  {
+    title: '匹配得分',
+    key: 'matchScore',
+    width: 120,
+    render: (r) => `${r.matchExplain?.totalScore ?? '-'}`
+  },
 ])
 
 onMounted(() => {
@@ -251,6 +257,27 @@ onMounted(() => {
               <div><span class="text-slate-500">发布时间：</span>{{ formatTime(detail.publishedAt) }}</div>
               <div class="md:col-span-2"><span class="text-slate-500">描述：</span>{{ detail.description || '（无）' }}</div>
             </div>
+
+            <n-card v-if="detail.matchExplain" size="small" title="智能匹配解释（可视化中间逻辑）">
+              <div class="text-sm space-y-2">
+                <div>
+                  公式：score = w1*skillScore + w2*areaScore + w3*priorityScore + w4*ratingScore
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>总分：<b>{{ detail.matchExplain.totalScore }}</b></div>
+                  <div>w1~w4：{{ detail.matchExplain.w1 ?? 0.5 }}/{{ detail.matchExplain.w2 ?? 0.3 }}/{{ detail.matchExplain.w3 ?? 0.1 }}/{{ detail.matchExplain.w4 ?? 0.1 }}</div>
+                  <div>技能匹配：{{ detail.matchExplain.skillScore }}</div>
+                  <div>地理距离：{{ detail.matchExplain.areaScore }}</div>
+                  <div>紧急程度：{{ detail.matchExplain.priorityScore }}</div>
+                  <div>历史评价：{{ detail.matchExplain.ratingScore }}</div>
+                </div>
+                <div v-if="detail.matchReasons?.length" class="flex flex-wrap gap-2 pt-1">
+                  <n-tag v-for="reason in detail.matchReasons" :key="reason" size="small" type="success" bordered>
+                    {{ reason }}
+                  </n-tag>
+                </div>
+              </div>
+            </n-card>
 
             <div v-if="detail.specialTags?.length" class="flex flex-wrap gap-2">
               <n-tag v-for="tag in detail.specialTags" :key="tag" size="small" bordered>

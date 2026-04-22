@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import { storeToRefs } from 'pinia'
+import type { UploadFileInfo } from 'naive-ui'
 import type { Profile } from '~/models/Profile'
 import ProfileService from '~/services/profile.service'
 import tokenService from '~/common/api/token.service'
 
 const { t } = useI18n()
+const message = useMessage()
 const store = useProfileStore()
 const { userProfile, isLoading } = storeToRefs(store)
 
@@ -14,6 +16,10 @@ const draft = ref<Profile>({} as Profile)
 const isVolunteer = computed(
   () => Number(userProfile.value?.identityType) === 2,
 )
+const isAdminAccount = computed(() => {
+  const r = Number(userProfile.value?.role ?? 0)
+  return r === 1 || r === 2
+})
 
 function cloneProfile(p: Profile): Profile {
   return JSON.parse(JSON.stringify(p))
@@ -60,10 +66,55 @@ const uploadHeaders = computed(() => {
     : {}
 })
 
-async function onAvatarUploaded() {
+async function onAvatarUploaded(options: { event?: ProgressEvent }) {
+  let applied = false
+  const text = options.event?.target ? (options.event.target as XMLHttpRequest).responseText : ''
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as { code?: number, message?: string, data?: { avatarUrl?: string } }
+      if (parsed.code && parsed.code !== 200) {
+        message.error(parsed.message || '头像上传失败')
+        return
+      }
+      const rawAvatar = parsed.data?.avatarUrl
+      if (rawAvatar) {
+        let normalized = rawAvatar
+        if (rawAvatar.startsWith('/static/'))
+          normalized = `/api${rawAvatar}`
+        else if (/^https?:\/\/localhost:8080\/static\//i.test(rawAvatar))
+          normalized = rawAvatar.replace(/^https?:\/\/localhost:8080/i, '/api')
+        else if (/^https?:\/\/127\.0\.0\.1:8080\/static\//i.test(rawAvatar))
+          normalized = rawAvatar.replace(/^https?:\/\/127\.0\.0\.1:8080/i, '/api')
+        userProfile.value.avatar = normalized
+        store.bumpAvatarNonce()
+        applied = true
+      }
+    }
+    catch {}
+  }
+  // 某些浏览器上传组件不一定回传可解析 responseText，兜底再拉一次 profile。
   await store.loadUserProfile()
+  if (!applied && !userProfile.value.avatar) {
+    const latest = await ProfileService.getUserProfile()
+    userProfile.value = latest
+  }
+  store.bumpAvatarNonce()
   if (editing.value)
     draft.value = cloneProfile(userProfile.value)
+  message.success('头像上传成功')
+}
+
+function onAvatarUploadError(options: { file: UploadFileInfo, event?: ProgressEvent }) {
+  const text = options.event?.target ? (options.event.target as XMLHttpRequest).responseText : ''
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as { message?: string }
+      message.error(parsed.message || '头像上传失败')
+      return
+    }
+    catch {}
+  }
+  message.error('头像上传失败，请检查文件大小/格式或登录状态')
 }
 
 const genderSelectOptions = computed(() => [
@@ -79,13 +130,16 @@ const genderSelectOptions = computed(() => [
       <p class="text-base text-slate-500 dark:text-slate-400 mb-4">
         {{ t('profile.readOnlyHint') }}
       </p>
+      <n-alert v-if="isAdminAccount" type="info" class="mb-4">
+        管理员/超管账号的用户名、身份标签、所属社区等关键字段为固定项，不能在此页面修改。
+      </n-alert>
 
       <n-form size="large" :model="display" @submit.prevent>
         <n-grid :span="24" :x-gap="42" :y-gap="18">
           <n-form-item-gi :span="24" class="mb-1" path="username" :label="t('profile.username')">
             <n-input
               v-model:value="draft.username"
-              :disabled="!editing"
+              :disabled="!editing || isAdminAccount"
               :placeholder="t('profile.username')"
             />
           </n-form-item-gi>
@@ -106,6 +160,7 @@ const genderSelectOptions = computed(() => [
                 action="/api/user/avatar"
                 name="file"
                 @finish="onAvatarUploaded"
+                @error="onAvatarUploadError"
               >
                 <n-button type="primary" dashed>
                   {{ t('profile.uploadAvatar') }}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { getUserAnnouncementDetail, listUserAnnouncements, type AnnouncementVO } from '@/api/modules/announcements'
 import { getPublishedRequests, type ServiceRequestVO } from '@/api/modules/serviceRequests'
+import { listBanners, type BannerVO } from '@/api/modules/banner'
 
 definePage({
   meta: {
@@ -26,17 +27,17 @@ const publishForm = reactive({
 
 const categories = ['全部需求', '助老', '代买跑腿', '清洁', '陪诊', '维修']
 const communityOptions = ['幸福里社区', '阳光社区', '和谐社区']
-/** 仅用于公告区/弹窗切换演示数据；顶部与账户卡片展示以后端绑定社区为准 */
+/** 仅用于公告区演示数据；顶部社区显示以“后端绑定社区”为准 */
 const noticeCommunity = ref(communityOptions[0])
-const showCommunityModal = ref(false)
 const communityDistanceMap: Record<string, string> = {
   幸福里社区: '0.8km',
   阳光社区: '1.6km',
   和谐社区: '2.4km',
 }
-const bannerList = [
+const bannerList = ref<Array<{ id: number; title: string; sub: string }>>([])
+const bannerFallback = [
   { id: 1, title: '春季互助行动', sub: '邻里协作让生活更轻松' },
-  { id: 2, title: '积分激励周', sub: '完成服务可获额外时币奖励' },
+  { id: 2, title: '积分激励周', sub: '完成服务可获额外贡献积分' },
   { id: 3, title: '社区关怀日', sub: '优先帮助独居老人和行动不便居民' },
 ]
 
@@ -55,6 +56,7 @@ const bannerLocationSubtitle = computed(() => {
   return name
 })
 const bannerUserName = computed(() => displayName.value || '邻里用户')
+const accountAvatarUrl = computed(() => appAuthStore.user?.avatarUrl || '')
 /** 与 sys_user.time_coins 一致，由 /auth/me 刷新 */
 const coins = computed(() => {
   const t = appAuthStore.user?.timeCoins
@@ -62,7 +64,8 @@ const coins = computed(() => {
 })
 /** 与 sys_user.points 一致（信用分/积分） */
 const creditScore = computed(() => Number(appAuthStore.user?.points ?? 0))
-const headerDistance = computed(() => communityDistanceMap[resolvedCommunityName.value] ?? '—')
+// 顶部不再模拟“距离”，避免与绑定社区逻辑冲突；展示占位
+const headerDistance = computed(() => (appAuthStore.user?.communityName ? '已绑定' : '去绑定'))
 /** 需求卡片上展示的距离仍跟公告切换社区（演示）一致 */
 const listDistance = computed(() => communityDistanceMap[noticeCommunity.value] ?? '—')
 const announcementRows = ref<AnnouncementVO[]>([])
@@ -110,10 +113,20 @@ async function loadData() {
     const bound = appAuthStore.user?.communityName
     if (bound && communityOptions.includes(bound))
       noticeCommunity.value = bound
-    const [annRes, reqRes] = await Promise.all([
+    const [bannerRes, annRes, reqRes] = await Promise.all([
+      listBanners(),
       listUserAnnouncements(1, 30),
       getPublishedRequests(1, LIST_PAGE_SIZE, activeCategory.value),
     ])
+    if (bannerRes.code === 200 && Array.isArray(bannerRes.data)) {
+      const mapped = (bannerRes.data as BannerVO[])
+        .filter(x => x && x.title)
+        .map(x => ({ id: x.id, title: x.title, sub: x.subtitle || '' }))
+      bannerList.value = mapped.length ? mapped : bannerFallback
+    }
+    else {
+      bannerList.value = bannerFallback
+    }
     if (annRes.code === 200)
       announcementRows.value = annRes.data.records || []
     else
@@ -146,9 +159,12 @@ function onScan() {
   router.push('/scan')
 }
 
+function onChangeCommunity() {
+  router.push('/join-community')
+}
+
 function onSelectCommunity(name: string) {
   noticeCommunity.value = name
-  showCommunityModal.value = false
   loadData()
 }
 
@@ -204,11 +220,11 @@ onMounted(loadData)
   <AppPageLayout :navbar="false" tabbar>
     <div class="home-page">
       <header class="biz-header">
-        <button class="community-switch" @click="showCommunityModal = true">
+        <button class="community-switch" @click="onChangeCommunity">
           <FmIcon name="i-carbon:location-filled" class="community-icon" />
           <span>{{ resolvedCommunityName }}</span>
           <span class="distance">{{ headerDistance }}</span>
-          <FmIcon name="i-carbon:chevron-down" />
+          <FmIcon name="i-carbon:chevron-right" />
         </button>
         <button type="button" class="scan-btn" aria-label="扫一扫" @click="onScan">
           <FmIcon name="i-carbon:qr-code" />
@@ -222,7 +238,7 @@ onMounted(loadData)
               <div class="hero-title">
                 {{ b.title }}
               </div>
-              <div class="hero-sub">
+              <div v-if="b.sub" class="hero-sub">
                 {{ b.sub }}
               </div>
               <div class="hero-user">
@@ -234,7 +250,8 @@ onMounted(loadData)
 
         <button class="account-card" @click="onGotoMe">
           <div class="avatar-wrap">
-            <FmIcon name="i-carbon:user-avatar-filled-alt" />
+            <img v-if="accountAvatarUrl" :src="accountAvatarUrl" alt="avatar">
+            <FmIcon v-else name="i-carbon:user-avatar-filled-alt" />
           </div>
           <div class="account-left">
             <div class="mini-label">
@@ -249,10 +266,10 @@ onMounted(loadData)
           </div>
           <div class="account-right">
             <div class="mini-label">
-              可用时币
+              贡献积分
             </div>
             <div class="account-coins">
-              {{ coins }}
+              {{ creditScore }}
             </div>
             <div class="to-me">
               查看我的 >
@@ -326,9 +343,7 @@ onMounted(loadData)
                 <span class="biz-tag" :class="tagClass(r.serviceType)">{{ r.serviceType }}</span>
                 <span class="title">{{ r.requesterName || `${r.serviceType}需求` }}</span>
               </div>
-              <div class="reward">
-                +{{ Math.max(1, r.urgencyLevel) * 0.5 }} 时币
-              </div>
+              <!-- 时间币概念暂时隐藏：不在主流程列表中展示奖励 -->
             </div>
 
             <div class="row-2">
@@ -406,27 +421,7 @@ onMounted(loadData)
         </div>
       </NutPopup>
 
-      <NutPopup v-model:visible="showCommunityModal" position="bottom" round>
-        <div class="community-drawer">
-          <div class="drawer-handle" />
-          <h3>切换社区</h3>
-          <div class="community-list">
-            <button
-              v-for="name in communityOptions"
-              :key="name"
-              class="community-item"
-              :class="{ active: noticeCommunity === name }"
-              @click="onSelectCommunity(name)"
-            >
-              <span class="left">
-                <FmIcon name="i-carbon:location-filled" />
-                {{ name }}
-              </span>
-              <span class="right">{{ communityDistanceMap[name] }}</span>
-            </button>
-          </div>
-        </div>
-      </NutPopup>
+      <!-- 社区绑定已改为邀请码/扫码；不再提供“直接切换社区”抽屉 -->
 
       <NutPopup
         v-model:visible="showAnnouncementModal"
@@ -511,7 +506,8 @@ onMounted(loadData)
 .hero-user { margin-top: auto; opacity: .92; font-size: 12px; }
 
 .account-card { margin-top: 10px; border-radius: 14px; background: #fff; border: 1px solid #e5e7eb; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; }
-.avatar-wrap { width: 46px; height: 46px; border-radius: 999px; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
+.avatar-wrap { width: 46px; height: 46px; border-radius: 999px; overflow: hidden; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
+.avatar-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .account-left { min-width: 0; }
 .mini-label { font-size: 12px; color: #6b7280; }
 .account-name { margin-top: 2px; font-size: 16px; font-weight: 900; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

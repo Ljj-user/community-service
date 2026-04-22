@@ -245,6 +245,8 @@ menu:
   communityVolunteers: Volunteer Applications
   communityMonitor: Service Monitoring
   communityAnnouncements: Announcements
+  communityInviteCodes: Community Invite Codes
+  communityBanners: Community Banners
   userResident: Resident Workspace
   userVolunteer: Volunteer Workspace
   user-announcements: Community Announcements
@@ -941,7 +943,7 @@ community:
     colType: Service type
     colTime: Expected time
     colAddr: Address
-    communityScopeNote: Community scope currently matches global data; per-community filters will follow.
+    communityScopeNote: Data is scoped to your bound community (except cross-community features).
     kpiActiveUsers: Active volunteers
     kpiActiveUsersHint: Community view (demo same as global)
     kpiPendingAudit: Pending reviews

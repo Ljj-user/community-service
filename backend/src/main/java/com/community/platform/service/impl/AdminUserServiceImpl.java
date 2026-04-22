@@ -119,12 +119,19 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public AdminUserVO update(AdminUserUpdateRequest request) {
+        SysUser operator = currentOperator();
         SysUser user = sysUserMapper.selectById(request.getId());
         if (user == null || (user.getIsDeleted() != null && user.getIsDeleted() == 1)) {
             throw new RuntimeException("用户不存在");
         }
+        assertOperableByCommunityAdmin(operator, user);
 
         if (request.getRole() != null) {
+            if (operator.getRole() != null
+                    && operator.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN)
+                    && !request.getRole().equals(Constants.ROLE_NORMAL_USER)) {
+                throw new RuntimeException("社区管理员只能将用户设置为普通用户");
+            }
             user.setRole(request.getRole());
             if (request.getRole().equals(Constants.ROLE_NORMAL_USER)) {
                 if (request.getIdentityType() != null) {
@@ -153,10 +160,12 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void delete(Long id) {
+        SysUser operator = currentOperator();
         SysUser user = sysUserMapper.selectById(id);
         if (user == null || (user.getIsDeleted() != null && user.getIsDeleted() == 1)) {
             return;
         }
+        assertOperableByCommunityAdmin(operator, user);
         // 逻辑删除
         user.setIsDeleted((byte) 1);
         user.setUpdatedAt(LocalDateTime.now());
@@ -165,14 +174,37 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public AdminUserVO setStatus(Long id, Byte status) {
+        SysUser operator = currentOperator();
         SysUser user = sysUserMapper.selectById(id);
         if (user == null || (user.getIsDeleted() != null && user.getIsDeleted() == 1)) {
             throw new RuntimeException("用户不存在");
         }
+        assertOperableByCommunityAdmin(operator, user);
         user.setStatus(status);
         user.setUpdatedAt(LocalDateTime.now());
         sysUserMapper.updateById(user);
         return toVO(user);
+    }
+
+    private void assertOperableByCommunityAdmin(SysUser operator, SysUser targetUser) {
+        if (operator == null || operator.getRole() == null) {
+            throw new RuntimeException("无权限操作");
+        }
+        if (operator.getRole().equals(Constants.ROLE_SUPER_ADMIN)) {
+            return;
+        }
+        if (!operator.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN)) {
+            throw new RuntimeException("无权限操作用户");
+        }
+        if (operator.getCommunityId() == null) {
+            throw new RuntimeException("管理员未绑定社区，无法操作用户");
+        }
+        if (!operator.getCommunityId().equals(targetUser.getCommunityId())) {
+            throw new RuntimeException("仅可操作本社区用户");
+        }
+        if (targetUser.getRole() != null && !targetUser.getRole().equals(Constants.ROLE_NORMAL_USER)) {
+            throw new RuntimeException("社区管理员仅可操作普通用户");
+        }
     }
 
     private AdminUserVO toVO(SysUser user) {

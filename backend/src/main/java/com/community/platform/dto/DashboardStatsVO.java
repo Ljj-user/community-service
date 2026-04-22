@@ -9,6 +9,11 @@ import java.math.BigDecimal;
  */
 @Data
 public class DashboardStatsVO {
+    /** 平台用户总数（未删除） */
+    private Long totalUsers;
+    /** 入驻社区数（sys_region level=3） */
+    private Long totalCommunities;
+
     /**
      * 总需求数
      */
@@ -28,6 +33,16 @@ public class DashboardStatsVO {
      * 已完成需求数
      */
     private Long completedRequests;
+
+    /**
+     * 已认领需求数
+     */
+    private Long claimedRequests;
+
+    /**
+     * 已驳回需求数
+     */
+    private Long rejectedRequests;
     
     /**
      * 总服务时长（小时）
@@ -58,4 +73,13 @@ public class DashboardStatsVO {
      * 服务覆盖率（活跃志愿者数 / 有效志愿者总数，0-1 之间的小数）
      */
     private BigDecimal coverageRate;
+
+    /** 系统风险指数（0-100，越高风险越大） */
+    private BigDecimal riskIndex;
+
+    /** 本周响应时效（分钟）：需求发布->志愿者认领的平均时长 */
+    private BigDecimal weeklyAvgResponseMinutes;
+
+    /** 近30天活跃志愿者储备（有认领记录的志愿者人数） */
+    private Long activeVolunteers30d;
 }

@@ -94,7 +94,8 @@ public class ServiceRequestController {
     @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
     public Result<com.baomidou.mybatisplus.core.metadata.IPage<ServiceMonitorVO>> monitor(ServiceMonitorQueryDTO queryDTO) {
         try {
-            com.baomidou.mybatisplus.core.metadata.IPage<ServiceMonitorVO> page = serviceRequestService.listMonitor(queryDTO);
+            Long currentUserId = getCurrentUserId();
+            com.baomidou.mybatisplus.core.metadata.IPage<ServiceMonitorVO> page = serviceRequestService.listMonitor(queryDTO, currentUserId);
             return Result.success(page);
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());

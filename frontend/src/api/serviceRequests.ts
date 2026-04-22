@@ -35,6 +35,18 @@ export interface ServiceRequestVO {
   claimedAt?: string
   completedAt?: string
   createdAt?: string
+  matchExplain?: {
+    totalScore: number
+    skillScore: number
+    areaScore: number
+    priorityScore: number
+    ratingScore: number
+    w1?: number
+    w2?: number
+    w3?: number
+    w4?: number
+  }
+  matchReasons?: string[]
 }
 
 export interface ServiceRequestQuery {

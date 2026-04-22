@@ -10,9 +10,9 @@ import com.community.platform.dto.AnnouncementVO;
  */
 public interface CommunityAnnouncementService {
 
-    IPage<AnnouncementVO> list(AnnouncementQueryDTO queryDTO);
+    IPage<AnnouncementVO> list(Long operatorUserId, AnnouncementQueryDTO queryDTO);
 
-    AnnouncementVO detail(Long id);
+    AnnouncementVO detail(Long operatorUserId, Long id);
 
     Long save(Long publisherUserId, AnnouncementSaveDTO dto);
 

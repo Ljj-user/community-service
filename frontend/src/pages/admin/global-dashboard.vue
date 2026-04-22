@@ -9,10 +9,10 @@ meta:
 
 <script setup lang="ts">
 import type { ChartData, SimpleChartSeries } from '~/models/ChartData'
-import 'vue3-map-chart/dist/style.css'
-import { MapChart } from 'vue3-map-chart'
+import ChinaHeatMap from '~/components/Charts/ChinaHeatMap.vue'
 import type { DashboardStats, RegionStat } from '~/api/dashboardStats'
 import { getDashboardStats, getRegionCoverage } from '~/api/dashboardStats'
+import { serviceMonitorList } from '~/api/serviceMonitor'
 
 const { t, locale } = useI18n()
 const message = useMessage()
@@ -69,10 +69,17 @@ const monthlyTrendChart = computed<ChartData | null>(() => {
   }
 })
 
+const riskChart = ref<SimpleChartSeries[]>([])
+
 async function loadData() {
   loading.value = true
   try {
-    const [statsRes, regionRes] = await Promise.all([getDashboardStats(), getRegionCoverage()])
+    const [statsRes, regionRes, risk1, risk2] = await Promise.all([
+      getDashboardStats(),
+      getRegionCoverage(),
+      serviceMonitorList({ current: 1, size: 1, riskType: 1 }),
+      serviceMonitorList({ current: 1, size: 1, riskType: 2 }),
+    ])
     if (statsRes.code === 200 && statsRes.data) {
       stats.value = statsRes.data
     } else {
@@ -81,6 +88,12 @@ async function loadData() {
     if (regionRes.code === 200 && regionRes.data) {
       regionStats.value = regionRes.data
     }
+    const r1 = risk1.code === 200 ? (risk1.data?.total ?? 0) : 0
+    const r2 = risk2.code === 200 ? (risk2.data?.total ?? 0) : 0
+    riskChart.value = [
+      { name: '超时未认领', value: r1 },
+      { name: '超时未完成', value: r2 },
+    ]
   } catch (e: any) {
     message.error(e?.message || t('community.globalDashboard.loadFail'))
   } finally {
@@ -108,6 +121,15 @@ onMounted(loadData)
     </div>
 
     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <Card title="平台覆盖规模">
+        <div class="text-3xl font-semibold">
+          {{ stats?.totalUsers ?? 0 }} 用户
+        </div>
+        <p class="text-xs text-slate-500">
+          入驻社区：{{ stats?.totalCommunities ?? 0 }}
+        </p>
+      </Card>
+
       <Card :title="t('community.globalDashboard.kpiMatchRate')">
         <div class="flex flex-col gap-1">
           <div class="text-3xl font-semibold">
@@ -153,13 +175,13 @@ onMounted(loadData)
         </div>
       </Card>
 
-      <Card :title="t('community.globalDashboard.kpiHours')">
+      <Card title="系统风险指数">
         <div class="flex flex-col gap-1">
           <div class="text-3xl font-semibold">
-            {{ stats?.totalServiceHours ?? 0 }}
+            {{ stats?.riskIndex ?? 0 }}
           </div>
           <p class="text-xs text-slate-500">
-            {{ t('community.globalDashboard.kpiHoursDesc') }}
+            基于超时未认领/未完成估算（0-100）
           </p>
         </div>
       </Card>
@@ -191,13 +213,27 @@ onMounted(loadData)
       </Card>
     </div>
 
+    <div class="grid gap-4 lg:grid-cols-2">
+      <Card title="服务对接全链路漏斗">
+        <BaseChart v-if="stats" :data="[
+          { name: '待审核', value: stats.pendingRequests ?? 0 },
+          { name: '已发布', value: stats.publishedRequests ?? 0 },
+          { name: '已认领', value: stats.claimedRequests ?? 0 },
+          { name: '已完成', value: stats.completedRequests ?? 0 },
+        ]" type="bar" :height="260" :options="{ plotOptions: { bar: { horizontal: true } } }" />
+      </Card>
+
+      <Card title="系统操作风险分布">
+        <BaseChart v-if="riskChart.length" :data="riskChart" type="donut" :height="260" />
+        <p v-else class="text-xs text-slate-500">
+          {{ t('community.globalDashboard.chartNoData') }}
+        </p>
+      </Card>
+    </div>
+
     <Card :title="t('community.globalDashboard.chartHeatmap')">
       <div class="mt-2">
-        <MapChart
-          :data="mapData"
-          base-color="var(--primary-color)"
-          height="420"
-        />
+        <ChinaHeatMap :data="mapData" :height="420" />
         <p class="mt-2 text-xs text-slate-500">
           {{ t('community.globalDashboard.heatmapHint') }}
         </p>

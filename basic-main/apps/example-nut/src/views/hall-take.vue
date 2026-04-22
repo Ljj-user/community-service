@@ -114,9 +114,7 @@ onMounted(loadData)
               <span class="biz-tag" :class="tagClass(r.serviceType)">{{ r.serviceType }}</span>
               <span class="title">{{ r.requesterName || `${r.serviceType}需求` }}</span>
             </div>
-            <div class="reward">
-              +{{ rewardCoins(r.urgencyLevel) }} 时币
-            </div>
+            <!-- 时间币概念暂时隐藏：不在接单列表中展示奖励 -->
           </div>
           <div class="row-2">
             {{ r.description || '需要邻里协助，欢迎认领' }}

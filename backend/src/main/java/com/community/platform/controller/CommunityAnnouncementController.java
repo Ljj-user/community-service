@@ -28,7 +28,8 @@ public class CommunityAnnouncementController {
     @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
     public Result<IPage<AnnouncementVO>> list(AnnouncementQueryDTO queryDTO) {
         try {
-            return Result.success(communityAnnouncementService.list(queryDTO));
+            Long userId = getCurrentUserId();
+            return Result.success(communityAnnouncementService.list(userId, queryDTO));
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());
         }
@@ -38,7 +39,8 @@ public class CommunityAnnouncementController {
     @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
     public Result<AnnouncementVO> detail(@PathVariable("id") Long id) {
         try {
-            return Result.success(communityAnnouncementService.detail(id));
+            Long userId = getCurrentUserId();
+            return Result.success(communityAnnouncementService.detail(userId, id));
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());
         }

@@ -31,6 +31,20 @@ interface BackendRegisterData {
   [key: string]: any
 }
 
+interface VerificationTicketData {
+  ticketId: number
+  scene: string
+  target: string
+  expiresAt: string
+  devCode?: string
+}
+
+interface OnboardingPayload {
+  skillTags?: string[]
+  preferredFeatures?: string[]
+  intentNote?: string
+}
+
 class AccountService {
   async login(loginInfo: LoginViewModel): Promise<LoginResponse> {
     const result = await apiService.post<BackendResult<BackendLoginData>>(
@@ -57,6 +71,21 @@ class AccountService {
       isSucceed: result.code === 200,
       identityType: result.data?.identityType,
     }
+  }
+
+  async sendVerificationCode(email: string, scene = 'REGISTER') {
+    return apiService.post<BackendResult<VerificationTicketData>>('verification/send', {
+      email,
+      scene,
+    })
+  }
+
+  async submitOnboarding(payload: OnboardingPayload) {
+    return apiService.post<BackendResult<any>>('onboarding', payload)
+  }
+
+  async getOnboarding() {
+    return apiService.get<BackendResult<any>>('onboarding')
   }
 
   async forgetPassword(

@@ -4,8 +4,12 @@ import com.community.platform.common.Result;
 import com.community.platform.dto.LoginRequest;
 import com.community.platform.dto.LoginResponse;
 import com.community.platform.dto.RegisterRequest;
+import com.community.platform.dto.SendVerificationCodeRequest;
 import com.community.platform.dto.UserInfo;
 import com.community.platform.dto.ChangePasswordRequest;
+import com.community.platform.dto.UserOnboardingProfileVO;
+import com.community.platform.dto.UserOnboardingSubmitRequest;
+import com.community.platform.dto.VerificationCodeTicketVO;
 import com.community.platform.security.UserDetailsImpl;
 import com.community.platform.service.AuthService;
 import jakarta.validation.Valid;
@@ -49,6 +53,16 @@ public class AuthController {
             return Result.error("注册失败: " + e.getMessage());
         }
     }
+
+    @PostMapping("/verification/send")
+    public Result<VerificationCodeTicketVO> sendVerificationCode(@Valid @RequestBody SendVerificationCodeRequest request) {
+        try {
+            VerificationCodeTicketVO ticket = authService.sendVerificationCode(request);
+            return Result.success("验证码已发送", ticket);
+        } catch (Exception e) {
+            return Result.error("发送验证码失败: " + e.getMessage());
+        }
+    }
     
     /**
      * 获取当前用户信息
@@ -81,5 +95,34 @@ public class AuthController {
         } catch (Exception e) {
             return Result.error("修改密码失败: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/onboarding")
+    public Result<UserOnboardingProfileVO> submitOnboarding(@Valid @RequestBody UserOnboardingSubmitRequest request) {
+        try {
+            Long userId = getCurrentUserId();
+            return Result.success("引导信息保存成功", authService.submitOnboarding(userId, request));
+        } catch (Exception e) {
+            return Result.error("保存失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/onboarding")
+    public Result<UserOnboardingProfileVO> getOnboarding() {
+        try {
+            Long userId = getCurrentUserId();
+            return Result.success(authService.getOnboarding(userId));
+        } catch (Exception e) {
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new RuntimeException("未登录");
+        }
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return userDetails.getUser().getId();
     }
 }

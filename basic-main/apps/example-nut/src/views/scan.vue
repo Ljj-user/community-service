@@ -128,6 +128,12 @@ function handleScanResult(text: string) {
       /* 非标准 URL，走外链 */
     }
     window.open(t, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  // 非 URL：若看起来像邀请码，则跳转到加入社区页
+  if (/^[A-Za-z0-9]{4,32}$/.test(t)) {
+    router.push({ path: '/join-community', query: { code: t } })
   }
 }
 </script>

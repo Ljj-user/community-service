@@ -18,6 +18,10 @@ export interface RegisterViewModel {
   identityType: number
   /** 1 男 2 女，对应默认头像 */
   gender?: number
+  email: string
+  verificationCode: string
+  verificationScene?: string
+  communityId?: number
 }
 
 export interface RegisterResponse {
