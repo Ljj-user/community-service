@@ -20,8 +20,12 @@ export interface AdminInviteCodeVO {
 
 const apiService = new ApiService('admin')
 
-export async function inviteCodeList() {
-  return apiService.get<BackendResult<AdminInviteCodeVO[]>>('invite-code/list')
+export async function inviteCodeList(params?: { communityId?: number }) {
+  const q = new URLSearchParams()
+  if (params?.communityId !== undefined && params.communityId !== null)
+    q.set('communityId', String(params.communityId))
+  const s = q.toString()
+  return apiService.get<BackendResult<AdminInviteCodeVO[]>>(`invite-code/list${s ? `?${s}` : ''}`)
 }
 
 export async function inviteCodeCreate(payload: {

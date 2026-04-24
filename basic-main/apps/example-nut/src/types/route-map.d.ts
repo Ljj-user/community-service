@@ -41,6 +41,13 @@ declare module 'vue-router/auto-routes' {
       { all: ParamValue<false> },
       | never
     >,
+    '/ai-assistant': RouteRecordInfo<
+      '/ai-assistant',
+      '/ai-assistant',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/hall': RouteRecordInfo<
       '/hall',
       '/hall',
@@ -118,6 +125,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/service-evaluate': RouteRecordInfo<
+      '/service-evaluate',
+      '/service-evaluate',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/user/': RouteRecordInfo<
       '/user/',
       '/user',
@@ -147,6 +161,12 @@ declare module 'vue-router/auto-routes' {
     'src/views/[...all].vue': {
       routes:
         | '/[...all]'
+      views:
+        | never
+    }
+    'src/views/ai-assistant.vue': {
+      routes:
+        | '/ai-assistant'
       views:
         | never
     }
@@ -213,6 +233,12 @@ declare module 'vue-router/auto-routes' {
     'src/views/scan.vue': {
       routes:
         | '/scan'
+      views:
+        | never
+    }
+    'src/views/service-evaluate.vue': {
+      routes:
+        | '/service-evaluate'
       views:
         | never
     }

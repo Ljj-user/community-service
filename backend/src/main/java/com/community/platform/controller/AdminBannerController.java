@@ -7,13 +7,22 @@ import com.community.platform.dto.BannerVO;
 import com.community.platform.security.UserDetailsImpl;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Locale;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * 管理端：轮播图管理（社区管理员/系统管理员）
@@ -21,9 +30,14 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/banner")
 public class AdminBannerController {
+    private static final Set<String> ALLOWED_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp");
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Value("${app.banner-base-url:/static/banner/}")
+    private String bannerBaseUrl;
+    @Value("${app.banner-upload-dir:uploads/banner}")
+    private String bannerUploadDir;
 
     @GetMapping("/list")
     @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
@@ -93,14 +107,52 @@ public class AdminBannerController {
         }
     }
 
+    @PostMapping("/upload-image")
+    @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
+    public Result<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return Result.error("上传文件为空");
+        }
+        String ext = StringUtils.getFilenameExtension(file.getOriginalFilename());
+        String extLower = ext == null ? "" : ext.toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType();
+        boolean extAllowed = !extLower.isEmpty() && ALLOWED_EXT.contains(extLower);
+        boolean mimeLooksImage = contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("image/");
+        if (!mimeLooksImage && !extAllowed) {
+            return Result.error("仅支持图片类型文件");
+        }
+        String filename = UUID.randomUUID().toString().replace("-", "");
+        if (extAllowed) filename = filename + "." + extLower;
+
+        File uploadRoot = new File(bannerUploadDir).getAbsoluteFile();
+        if (!uploadRoot.exists() && !uploadRoot.mkdirs()) {
+            return Result.error("上传失败：无法创建目录");
+        }
+        File dest = new File(uploadRoot, filename);
+        try {
+            file.transferTo(dest);
+        } catch (IOException e) {
+            return Result.error("上传失败: " + e.getMessage());
+        }
+
+        String base = bannerBaseUrl == null ? "/static/banner/" : bannerBaseUrl.trim();
+        if (!base.endsWith("/")) base = base + "/";
+        String imageUrl = base + filename;
+        return Result.success(Map.of("imageUrl", imageUrl));
+    }
+
     private List<BannerVO> query(Long scopeCommunityId) {
         return jdbcTemplate.query(
-                "SELECT id,title,subtitle,image_url,link_url FROM community_banner " +
-                        "WHERE ((? IS NULL AND community_id IS NULL) OR community_id=?) " +
+                "SELECT b.id,b.community_id,r.name AS community_name,b.title,b.subtitle,b.image_url,b.link_url FROM community_banner b " +
+                        "LEFT JOIN sys_region r ON r.id=b.community_id " +
+                        "WHERE ((? IS NULL AND b.community_id IS NULL) OR b.community_id=?) " +
                         "ORDER BY sort_no ASC, id ASC LIMIT 50",
                 (rs, rowNum) -> {
                     BannerVO vo = new BannerVO();
                     vo.setId(rs.getLong("id"));
+                    Long cid = rs.getObject("community_id") == null ? null : rs.getLong("community_id");
+                    vo.setCommunityId(cid);
+                    vo.setCommunityName(rs.getString("community_name"));
                     vo.setTitle(rs.getString("title"));
                     vo.setSubtitle(rs.getString("subtitle"));
                     vo.setImageUrl(rs.getString("image_url"));

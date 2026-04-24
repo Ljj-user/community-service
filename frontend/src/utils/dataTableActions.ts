@@ -22,7 +22,10 @@ export function dtActionBtn(
       size: 'small',
       tertiary: true,
       type: opts.type ?? 'info',
-      onClick: opts.onClick,
+      onClick: (e: MouseEvent) => {
+        e.stopPropagation()
+        opts.onClick?.()
+      },
     },
     icon
       ? {
@@ -58,6 +61,7 @@ export function dtActionDelete(
             size: 'small',
             type: 'error',
             tertiary: true,
+            onClick: (e: MouseEvent) => e.stopPropagation(),
           },
           icon
             ? {

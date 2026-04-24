@@ -48,3 +48,6 @@ SOURCE backend/src/main/resources/db/migration_community_invite_code.sql;
 -- 11) 社区轮播图（移动端首页 Banner）
 SOURCE backend/src/main/resources/db/migration_community_banner.sql;
 
+-- 12) 异常预警与志愿信用精细化
+SOURCE backend/src/main/resources/db/migration_anomaly_credit.sql;
+

@@ -57,7 +57,12 @@ INSERT INTO sys_config (config_key, config_value) VALUES
   "enableUnclaimedAlert": true,
   "enableUnfinishedAlert": true,
   "enableFulfillmentAlert": true,
-  "enableComplaintAlert": true
+  "enableComplaintAlert": true,
+  "careInactivityDays": 3,
+  "surge24hMinRequests": 5,
+  "surgeMultiplier": 2,
+  "enableCareInactivityAlert": true,
+  "enableDemandSurgeAlert": true
 }')
 ON DUPLICATE KEY UPDATE config_key = config_key;
 

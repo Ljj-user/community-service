@@ -8,6 +8,8 @@ export interface BackendResult<T> {
 
 export interface BannerVO {
   id: number
+  communityId?: number | null
+  communityName?: string
   title: string
   subtitle?: string
   imageUrl?: string
@@ -35,6 +37,12 @@ export async function bannerUpsert(payload: {
   status: 0 | 1
 }) {
   return apiService.post<BackendResult<null>>('banner', payload)
+}
+
+export async function bannerUploadImage(file: File) {
+  const fd = new FormData()
+  fd.append('file', file)
+  return apiService.post<BackendResult<{ imageUrl: string }>>('banner/upload-image', fd)
 }
 
 export async function bannerDelete(id: number, params?: { communityId?: number | null }) {

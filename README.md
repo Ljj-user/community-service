@@ -144,7 +144,24 @@ pnpm dev
 - 前端：[http://localhost:7000](http://localhost:7000)
 - 后端 API：[http://localhost:8080](http://localhost:8080)
 
-### 4. 代码生成（MyBatis-Plus）
+### 4. 移动端启动（basic-main）
+
+#### 4.1 安装依赖
+
+```bash
+cd basic-main
+pnpm install
+```
+
+#### 4.2 启动开发服务器
+
+```bash
+pnpm run dev
+```
+
+默认启动 `apps/example-nut`，移动端应用将在 `http://localhost:9000` 启动。
+
+### 5. 代码生成（MyBatis-Plus）
 
 如果需要重新生成 entity/mapper/service/controller：
 

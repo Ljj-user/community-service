@@ -34,6 +34,11 @@ public class ServiceRequestVO {
     private LocalDateTime claimedAt;
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
+    /**
+     * 最新认领记录（用于移动端“确认完成/评价”联动）
+     */
+    private Long latestClaimId;
+    private Byte latestClaimStatus;
     /** 志愿者视角的可解释匹配明细 */
     private MatchExplainVO matchExplain;
     /** 推荐理由标签 */

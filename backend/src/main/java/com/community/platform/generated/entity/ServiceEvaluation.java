@@ -58,6 +58,12 @@ public class ServiceEvaluation implements Serializable {
     private Long volunteerUserId;
 
     /**
+     * 评价方角色：1居民（需求方）2志愿者（服务方）
+     */
+    @TableField("evaluator_role")
+    private Byte evaluatorRole;
+
+    /**
      * 星级：1-5
      */
     @TableField("rating")

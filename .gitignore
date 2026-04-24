@@ -27,6 +27,9 @@ target/
 *.swo
 .DS_Store
 
+# Git worktrees (local)
+.worktrees/
+
 # 后端本地上传（若存在）
 uploads/
 **/uploads/

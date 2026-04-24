@@ -18,6 +18,8 @@ public class AdminUserVO {
     private String email;
     private String avatarUrl;
     private Byte status;
+    private Long communityId;
+    private String communityName;
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
 }

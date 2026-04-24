@@ -44,11 +44,22 @@ api.interceptors.request.use(
 
 // 处理错误信息的函数
 function handleError(error: any) {
-  if (error.status === 401) {
-    useAppAuthStore().logout()
+  // Axios 取消请求不提示（列表切换/页面卸载时很常见）
+  if (error?.code === 'ERR_CANCELED' || axios.isCancel?.(error)) {
+    return Promise.reject(error)
+  }
+
+  const status = error?.response?.status ?? error?.status
+  if (status === 401) {
+    const auth = useAppAuthStore()
+    // 仅在已登录时触发“登录失效”逻辑，避免登录/注册接口 401 导致跳转干扰
+    if (auth.isLogin && typeof auth.logoutToLogin === 'function')
+      auth.logoutToLogin()
     throw error
   }
-  let message = error.message
+
+  const backendMsg = error?.response?.data?.message
+  let message = backendMsg || error?.message || '请求失败'
   if (message === 'Network Error') {
     message = '后端网络故障'
   }
@@ -75,7 +86,13 @@ api.interceptors.response.use(
     const msg = payload?.message || '请求失败'
     toast.error('Error', { description: msg })
     // 约定：未授权则登出
-    if (payload?.code === 401) useAppAuthStore().logout()
+    if (payload?.code === 401) {
+      const auth = useAppAuthStore()
+      const url: string = String(response?.config?.url || '')
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register')
+      if (auth.isLogin && !isAuthEndpoint && typeof auth.logoutToLogin === 'function')
+        auth.logoutToLogin()
+    }
     return Promise.reject(new Error(msg))
   },
   async (error) => {

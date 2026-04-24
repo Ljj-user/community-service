@@ -18,6 +18,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 public class UserProfileServiceImpl implements UserProfileService {
 
@@ -26,6 +29,8 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     @Autowired
     private SysRegionMapper sysRegionMapper;
+
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Value("${app.avatar-base-url:http://localhost:8080/static/avatars/}")
     private String avatarBaseUrl;
@@ -175,9 +180,8 @@ public class UserProfileServiceImpl implements UserProfileService {
         }
         if (request.getSkillTags() != null
                 && user.getRole() != null
-                && user.getRole().equals(Constants.ROLE_NORMAL_USER)
-                && IdentityTypeUtil.normalize(user.getIdentityType()).equals(Constants.IDENTITY_VOLUNTEER)) {
-            user.setSkillTags(request.getSkillTags());
+                && user.getRole().equals(Constants.ROLE_NORMAL_USER)) {
+            user.setSkillTags(normalizeSkillTagsJson(request.getSkillTags()));
         }
         if (request.getIdentityTag() != null) {
             if (adminRole) {
@@ -188,6 +192,46 @@ public class UserProfileServiceImpl implements UserProfileService {
         user.setUpdatedAt(java.time.LocalDateTime.now());
         sysUserMapper.updateById(user);
         return convertToResponse(sysUserMapper.selectById(user.getId()));
+    }
+
+    private String normalizeSkillTagsJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "[]";
+        }
+        String text = raw.trim();
+        try {
+            List<String> parsed = objectMapper.readValue(text, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            return toJsonArray(parsed);
+        } catch (Exception ignored) {
+            // 兼容旧前端传入 "助老,陪诊" 这类 CSV
+            String[] parts = text.split(",");
+            List<String> tags = new ArrayList<>();
+            for (String p : parts) {
+                if (p == null) continue;
+                String t = p.trim();
+                if (!t.isEmpty()) tags.add(t);
+            }
+            return toJsonArray(tags);
+        }
+    }
+
+    private String toJsonArray(List<String> input) {
+        if (input == null || input.isEmpty()) {
+            return "[]";
+        }
+        List<String> cleaned = input.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (cleaned.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(cleaned);
+        } catch (Exception e) {
+            return "[]";
+        }
     }
 
     @Override

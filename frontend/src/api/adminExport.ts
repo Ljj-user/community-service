@@ -2,7 +2,15 @@ import HttpClient from '~/common/api/http-client'
 
 const client = HttpClient()
 
-export type ExportModule = 'service_request' | 'users' | 'audit'
+export type ExportModule =
+  | 'service_request'
+  | 'service_monitor'
+  | 'users'
+  | 'volunteers'
+  | 'audit'
+  | 'invite_code'
+  | 'announcement'
+  | 'banner'
 export type ExportFormat = 'excel' | 'pdf'
 
 export async function exportModule(params: {

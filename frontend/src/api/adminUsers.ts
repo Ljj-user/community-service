@@ -13,6 +13,8 @@ export interface AdminUserVO {
   email?: string
   avatarUrl?: string
   status: 0 | 1
+  communityId?: number
+  communityName?: string
   createdAt?: string
   lastLoginAt?: string
 }
@@ -37,6 +39,7 @@ export async function adminUserList(params?: {
   username?: string
   role?: number
   status?: number
+  communityId?: number
   page?: number
   size?: number
 }) {

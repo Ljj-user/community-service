@@ -35,9 +35,10 @@ public class AdminInviteCodeController {
 
     @GetMapping("/list")
     @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
-    public Result<List<AdminInviteCodeVO>> list() {
+    public Result<List<AdminInviteCodeVO>> list(@RequestParam(value = "communityId", required = false) Long communityId) {
         try {
             Operator op = currentOperator();
+            Long scopeCommunityId = resolveListScope(op, communityId);
             List<AdminInviteCodeVO> list = jdbcTemplate.query(
                     "SELECT c.id,c.community_id,r.name AS community_name,c.code,c.status,c.expires_at,c.max_uses,c.used_count,c.created_at " +
                             "FROM community_invite_code c " +
@@ -59,7 +60,7 @@ public class AdminInviteCodeController {
                         vo.setCreatedAt(ct == null ? null : ct.toLocalDateTime());
                         return vo;
                     },
-                    op.scopeCommunityId, op.scopeCommunityId
+                    scopeCommunityId, scopeCommunityId
             );
             return Result.success(list);
         } catch (Exception e) {
@@ -162,6 +163,19 @@ public class AdminInviteCodeController {
         // 超管：必须指定
         if (requestCommunityId == null) {
             throw new RuntimeException("communityId 不能为空（系统管理员生成邀请码需指定社区）");
+        }
+        return requestCommunityId;
+    }
+
+    private static Long resolveListScope(Operator op, Long requestCommunityId) {
+        if (op.role != null && op.role == Constants.ROLE_COMMUNITY_ADMIN) {
+            if (op.scopeCommunityId == null) {
+                throw new RuntimeException("当前社区管理员未绑定社区，无法查看邀请码");
+            }
+            if (requestCommunityId != null && !requestCommunityId.equals(op.scopeCommunityId)) {
+                throw new RuntimeException("社区管理员只能查看本社区邀请码");
+            }
+            return op.scopeCommunityId;
         }
         return requestCommunityId;
     }

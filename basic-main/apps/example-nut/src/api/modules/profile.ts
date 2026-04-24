@@ -1,5 +1,5 @@
 import api from '../index'
-import type { BackendResult, UserInfo } from '@/store/modules/app/auth'
+import type { BackendResult } from '@/store/modules/app/auth'
 
 export interface UserProfileResponse {
   id: number

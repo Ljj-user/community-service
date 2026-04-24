@@ -18,6 +18,8 @@ import {
   adminUserUpdate,
   type AdminUserVO,
 } from '~/api/adminUsers'
+import { adminCommunityOptions } from '~/api/adminCommunity'
+import { exportModule } from '~/api/adminExport'
 import {
   CheckmarkCircle20Regular,
   Delete20Regular,
@@ -29,6 +31,7 @@ const route = useRoute()
 const { t, locale } = useI18n()
 
 const message = useMessage()
+const exporting = ref(false)
 
 const loading = ref(false)
 
@@ -36,9 +39,11 @@ const query = reactive({
   username: '',
   role: null as null | number,
   status: null as null | number,
+  communityId: null as null | number,
   page: 1,
   size: 10,
 })
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const pageTotal = ref(0)
 const rows = ref<AdminUserVO[]>([])
@@ -113,6 +118,7 @@ async function fetchList() {
       username: query.username || undefined,
       role: query.role ?? undefined,
       status: query.status ?? undefined,
+      communityId: query.communityId ?? undefined,
       page: query.page,
       size: query.size,
     })
@@ -133,8 +139,18 @@ function resetQuery() {
   query.username = ''
   query.role = null
   query.status = null
+  query.communityId = null
   query.page = 1
   fetchList()
+}
+
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({
+    label: `${x.name}（${x.id}）`,
+    value: x.id,
+  }))
 }
 
 function openCreate() {
@@ -237,6 +253,25 @@ async function toggleStatus(row: AdminUserVO) {
   fetchList()
 }
 
+async function exportUsersData() {
+  exporting.value = true
+  try {
+    const res = await exportModule({ module: 'users', format: 'excel' })
+    const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `users-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('导出成功')
+  } catch (e: any) {
+    message.error(e?.message || '导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
 const columns = computed<DataTableColumns<AdminUserVO>>(() => {
   void locale.value
   return [
@@ -255,6 +290,12 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
       render: (row) => (row.role === 3 ? identityText(row.identityType!) : '-'),
     },
     { title: t('community.users.colRealName'), key: 'realName', minWidth: 120 },
+    {
+      title: '所属社区',
+      key: 'communityName',
+      minWidth: 180,
+      render: (row) => row.communityName ? `${row.communityName}（${row.communityId ?? '-'}）` : '-',
+    },
     { title: t('community.users.colPhone'), key: 'phone', minWidth: 140 },
     { title: t('community.users.colEmail'), key: 'email', minWidth: 180 },
     {
@@ -275,7 +316,10 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
               size: 'small',
               type: 'info',
               tertiary: true,
-              onClick: () => openEdit(row),
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation()
+                openEdit(row)
+              },
             },
             {
               default: () => t('community.users.edit'),
@@ -288,7 +332,10 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
               size: 'small',
               type: row.status === 1 ? 'warning' : 'success',
               tertiary: true,
-              onClick: () => toggleStatus(row),
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation()
+                toggleStatus(row)
+              },
             },
             {
               default: () =>
@@ -315,6 +362,7 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
                     size: 'small',
                     type: 'error',
                     tertiary: true,
+                    onClick: (e: MouseEvent) => e.stopPropagation(),
                   },
                   {
                     default: () => t('community.users.delete'),
@@ -331,6 +379,7 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
 })
 
 onMounted(() => fetchList())
+onMounted(() => loadCommunities())
 
 watch(
   () => route.query.create,
@@ -356,6 +405,9 @@ watch(
       <n-button type="primary" @click="openCreate">
         {{ t('community.users.addUser') }}
       </n-button>
+      <n-button :loading="exporting" @click="exportUsersData">
+        导出数据
+      </n-button>
     </div>
 
     <Card>
@@ -363,6 +415,7 @@ watch(
         <n-input v-model:value="query.username" :placeholder="t('community.users.searchUser')" clearable />
         <n-select v-model:value="query.role" :options="roleOptions" :placeholder="t('community.users.role')" clearable />
         <n-select v-model:value="query.status" :options="statusOptions" :placeholder="t('community.users.status')" clearable />
+        <n-select v-model:value="query.communityId" :options="communityOptions" placeholder="所属社区" clearable filterable />
         <div class="flex gap-2">
           <n-button type="primary" :loading="loading" @click="() => { query.page = 1; fetchList() }">
             {{ t('community.users.query') }}
@@ -379,6 +432,7 @@ watch(
         :columns="columns"
         :data="rows"
         :loading="loading"
+        :row-props="(row) => ({ onClick: () => openEdit(row), style: 'cursor: pointer;' })"
         :pagination="{
           page: query.page,
           pageSize: query.size,

@@ -53,6 +53,7 @@ export interface ServiceRequestQuery {
   status?: number
   serviceType?: string
   urgencyLevel?: number
+  communityId?: number
   current?: number
   size?: number
 }

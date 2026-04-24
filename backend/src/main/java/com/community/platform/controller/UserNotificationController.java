@@ -2,6 +2,7 @@ package com.community.platform.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.community.platform.common.Result;
+import com.community.platform.dto.MobileAlertCardVO;
 import com.community.platform.dto.NotificationUnreadCountVO;
 import com.community.platform.dto.UserNotificationVO;
 import com.community.platform.security.UserDetailsImpl;
@@ -40,6 +41,25 @@ public class UserNotificationController {
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size) {
         return Result.success(userNotificationService.pageMine(currentUserId(), category, page, size));
+    }
+
+    /**
+     * 移动端预警消息入口（仅返回异常检测相关站内信）
+     */
+    @GetMapping("/mobile/alerts")
+    public Result<IPage<MobileAlertCardVO>> mobileAlerts(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "20") long size,
+            @RequestParam(required = false) Boolean unreadOnly) {
+        return Result.success(userNotificationService.pageMyAlertNotifications(currentUserId(), page, size, unreadOnly));
+    }
+
+    /**
+     * 移动端预警未读数量
+     */
+    @GetMapping("/mobile/alerts/unread-count")
+    public Result<Long> mobileAlertUnreadCount() {
+        return Result.success(userNotificationService.countMyAlertUnread(currentUserId()));
     }
 
     @PutMapping("/{id}/read")

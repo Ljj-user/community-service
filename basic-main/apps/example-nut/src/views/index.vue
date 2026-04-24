@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { getUserAnnouncementDetail, listUserAnnouncements, type AnnouncementVO } from '@/api/modules/announcements'
-import { getPublishedRequests, type ServiceRequestVO } from '@/api/modules/serviceRequests'
 import { listBanners, type BannerVO } from '@/api/modules/banner'
 
 definePage({
@@ -15,17 +14,6 @@ const router = useRouter()
 
 const loading = ref(false)
 const error = ref('')
-const rows = ref<ServiceRequestVO[]>([])
-const activeCategory = ref('全部需求')
-const showPublishModal = ref(false)
-const publishLoading = ref(false)
-const publishForm = reactive({
-  serviceType: '助老',
-  urgencyLevel: 2,
-  expectedHours: 2,
-})
-
-const categories = ['全部需求', '助老', '代买跑腿', '清洁', '陪诊', '维修']
 const communityOptions = ['幸福里社区', '阳光社区', '和谐社区']
 /** 仅用于公告区演示数据；顶部社区显示以“后端绑定社区”为准 */
 const noticeCommunity = ref(communityOptions[0])
@@ -57,11 +45,6 @@ const bannerLocationSubtitle = computed(() => {
 })
 const bannerUserName = computed(() => displayName.value || '邻里用户')
 const accountAvatarUrl = computed(() => appAuthStore.user?.avatarUrl || '')
-/** 与 sys_user.time_coins 一致，由 /auth/me 刷新 */
-const coins = computed(() => {
-  const t = appAuthStore.user?.timeCoins
-  return Number(t ?? 0).toFixed(2)
-})
 /** 与 sys_user.points 一致（信用分/积分） */
 const creditScore = computed(() => Number(appAuthStore.user?.points ?? 0))
 // 顶部不再模拟“距离”，避免与绑定社区逻辑冲突；展示占位
@@ -69,8 +52,6 @@ const headerDistance = computed(() => (appAuthStore.user?.communityName ? '已�
 /** 需求卡片上展示的距离仍跟公告切换社区（演示）一致 */
 const listDistance = computed(() => communityDistanceMap[noticeCommunity.value] ?? '—')
 const announcementRows = ref<AnnouncementVO[]>([])
-/** 附近需求列表单页条数 */
-const LIST_PAGE_SIZE = 10
 
 const showAnnouncementModal = ref(false)
 const announcementDetailLoading = ref(false)
@@ -78,46 +59,28 @@ const announcementDetailError = ref('')
 const announcementDetail = ref<AnnouncementVO | null>(null)
 /** 点击列表时暂存，用于详情加载前展示标题 */
 const announcementListItem = ref<AnnouncementVO | null>(null)
+let loadSeq = 0
 
 function fmtAnnounceTime(v?: string) {
   if (!v) return ''
   return v.replace('T', ' ').slice(0, 16)
 }
 
-function urgencyText(v: number) {
-  if (v >= 4) return '极紧急'
-  if (v === 3) return '紧急'
-  if (v === 2) return '中等'
-  return '普通'
-}
-
-function urgencyClass(v: number) {
-  if (v >= 4) return 'urgent-high'
-  if (v >= 2) return 'urgent-mid'
-  return 'urgent-low'
-}
-
-function tagClass(type: string) {
-  if (type.includes('陪')) return 'tag-red'
-  if (type.includes('买') || type.includes('跑腿')) return 'tag-orange'
-  if (type.includes('维修')) return 'tag-blue'
-  if (type.includes('助老')) return 'tag-purple'
-  return 'tag-green'
-}
-
 async function loadData() {
+  const seq = ++loadSeq
   loading.value = true
   error.value = ''
   try {
-    await appAuthStore.hydrateUser()
+    await appAuthStore.hydrateUserThrottled?.()
     const bound = appAuthStore.user?.communityName
     if (bound && communityOptions.includes(bound))
       noticeCommunity.value = bound
-    const [bannerRes, annRes, reqRes] = await Promise.all([
+    const [bannerRes, annRes] = await Promise.all([
       listBanners(),
       listUserAnnouncements(1, 30),
-      getPublishedRequests(1, LIST_PAGE_SIZE, activeCategory.value),
     ])
+    // 若用户快速切换分类/刷新，只应用最后一次请求结果
+    if (seq !== loadSeq) return
     if (bannerRes.code === 200 && Array.isArray(bannerRes.data)) {
       const mapped = (bannerRes.data as BannerVO[])
         .filter(x => x && x.title)
@@ -131,24 +94,15 @@ async function loadData() {
       announcementRows.value = annRes.data.records || []
     else
       announcementRows.value = []
-    if (reqRes.code !== 200) throw new Error(reqRes.message || '加载失败')
-    rows.value = reqRes.data.records || []
   }
   catch (e: any) {
+    if (seq !== loadSeq) return
     error.value = e?.message || '加载失败'
   }
   finally {
+    if (seq !== loadSeq) return
     loading.value = false
   }
-}
-
-function onSwitchCategory(category: string) {
-  activeCategory.value = category
-  loadData()
-}
-
-function onRobOrder(item: ServiceRequestVO) {
-  window.alert(`已发起抢单：${item.serviceType}`)
 }
 
 function onGotoMe() {
@@ -159,17 +113,32 @@ function onScan() {
   router.push('/scan')
 }
 
+function onOpenAiAssistant() {
+  router.push('/ai-assistant')
+}
+
 function onChangeCommunity() {
   router.push('/join-community')
 }
 
-function onSelectCommunity(name: string) {
-  noticeCommunity.value = name
-  loadData()
-}
-
 function onViewAllAnnouncements() {
   router.push({ path: '/notices' })
+}
+
+function onGotoHelp() {
+  router.push('/hall-take')
+}
+
+function onGotoPublish() {
+  router.push('/hall-publish')
+}
+
+function onGotoTasks() {
+  router.push('/hall')
+}
+
+function onGotoOverview(kind: 'reviews' | 'stats') {
+  router.push({ path: '/hall-overview', query: { kind } })
 }
 
 async function openAnnouncementDetail(n: AnnouncementVO) {
@@ -201,18 +170,6 @@ watch(showAnnouncementModal, (open) => {
   }
 })
 
-async function onPublish() {
-  publishLoading.value = true
-  try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    showPublishModal.value = false
-    window.alert('发布成功（演示）')
-  }
-  finally {
-    publishLoading.value = false
-  }
-}
-
 onMounted(loadData)
 </script>
 
@@ -222,12 +179,16 @@ onMounted(loadData)
       <header class="biz-header">
         <button class="community-switch" @click="onChangeCommunity">
           <FmIcon name="i-carbon:location-filled" class="community-icon" />
-          <span>{{ resolvedCommunityName }}</span>
+          <span class="community-main">{{ resolvedCommunityName }}</span>
+          <span class="community-tip">点击切换社区</span>
           <span class="distance">{{ headerDistance }}</span>
           <FmIcon name="i-carbon:chevron-right" />
         </button>
         <button type="button" class="scan-btn" aria-label="扫一扫" @click="onScan">
-          <FmIcon name="i-carbon:qr-code" />
+          <span class="scan-glyph" aria-hidden="true" />
+        </button>
+        <button type="button" class="ai-btn" aria-label="AI助手" @click="onOpenAiAssistant">
+          AI
         </button>
       </header>
 
@@ -255,13 +216,13 @@ onMounted(loadData)
           </div>
           <div class="account-left">
             <div class="mini-label">
-              当前账户
+              我的账户
             </div>
             <div class="account-name">
               {{ displayName }}
             </div>
             <div class="account-sub">
-              {{ resolvedCommunityName }} · 信用分 {{ creditScore }}
+              {{ resolvedCommunityName }}
             </div>
           </div>
           <div class="account-right">
@@ -276,6 +237,33 @@ onMounted(loadData)
             </div>
           </div>
         </button>
+
+        <section class="quick-panel">
+          <div class="quick-head">
+            <h3>快捷入口</h3>
+            <button class="quick-more" @click="onGotoTasks">
+              去任务中心
+            </button>
+          </div>
+          <div class="quick-grid">
+            <button class="quick-item q-emerald" @click="onGotoHelp">
+              <div class="q-title">我要帮忙</div>
+              <div class="q-sub">浏览并接取任务</div>
+            </button>
+            <button class="quick-item q-green" @click="onGotoPublish">
+              <div class="q-title">我要发布</div>
+              <div class="q-sub">一键发布求助</div>
+            </button>
+            <button class="quick-item q-cyan" @click="onGotoOverview('reviews')">
+              <div class="q-title">评价反馈</div>
+              <div class="q-sub">查看评价记录</div>
+            </button>
+            <button class="quick-item q-amber" @click="onGotoOverview('stats')">
+              <div class="q-title">服务统计</div>
+              <div class="q-sub">查看我的进度</div>
+            </button>
+          </div>
+        </section>
 
         <section class="notice-card">
           <div class="notice-head">
@@ -307,119 +295,14 @@ onMounted(loadData)
           </div>
         </section>
 
-        <div class="category-tabs">
-          <button
-            v-for="c in categories"
-            :key="c"
-            class="tab-item"
-            :class="{ 'tab-active': activeCategory === c }"
-            @click="onSwitchCategory(c)"
-          >
-            {{ c }}
-          </button>
-        </div>
-
-        <div class="section-head">
-          <h3>附近需求</h3>
-          <button class="refresh-btn" @click="loadData">
-            刷新
-          </button>
-        </div>
-
         <div v-if="loading" class="status-text">
           加载中...
         </div>
         <div v-else-if="error" class="status-text error">
           {{ error }}
         </div>
-        <div v-else class="card-list">
-          <article v-for="r in rows" :key="r.id" class="req-card">
-            <div class="urgency-corner" :class="urgencyClass(r.urgencyLevel)">
-              {{ urgencyText(r.urgencyLevel) }}
-            </div>
-
-            <div class="row-1">
-              <div class="left">
-                <span class="biz-tag" :class="tagClass(r.serviceType)">{{ r.serviceType }}</span>
-                <span class="title">{{ r.requesterName || `${r.serviceType}需求` }}</span>
-              </div>
-              <!-- 时间币概念暂时隐藏：不在主流程列表中展示奖励 -->
-            </div>
-
-            <div class="row-2">
-              {{ r.description || '需要邻里协助，欢迎认领' }}
-            </div>
-
-            <div class="row-3">
-              <div class="meta">
-                <span><FmIcon name="i-carbon:time" />预计 {{ publishForm.expectedHours }}小时</span>
-                <span><FmIcon name="i-carbon:pedestrian" />距离 {{ listDistance }}</span>
-              </div>
-              <NutButton type="primary" size="small" @click="onRobOrder(r)">
-                立即抢单
-              </NutButton>
-            </div>
-          </article>
-        </div>
         <div class="safe-space" />
       </main>
-
-      <button class="fab-publish" @click="showPublishModal = true">
-        <FmIcon name="i-carbon:add" />
-        <span>发布</span>
-      </button>
-
-      <NutPopup v-model:visible="showPublishModal" position="bottom" round>
-        <div id="publishModal" class="publish-drawer">
-          <div class="drawer-handle" />
-          <h3>发布互助需求</h3>
-
-          <div class="form-block">
-            <div class="label">
-              服务类型
-            </div>
-            <NutRadioGroup v-model="publishForm.serviceType" direction="horizontal">
-              <NutRadio label="助老">
-                助老
-              </NutRadio>
-              <NutRadio label="代买跑腿">
-                代买跑腿
-              </NutRadio>
-              <NutRadio label="清洁">
-                清洁
-              </NutRadio>
-            </NutRadioGroup>
-          </div>
-
-          <div class="form-block">
-            <div class="label">
-              紧急程度
-            </div>
-            <div class="urgency-choose">
-              <button :class="{ active: publishForm.urgencyLevel === 1 }" @click="publishForm.urgencyLevel = 1">
-                普通
-              </button>
-              <button :class="{ active: publishForm.urgencyLevel === 2 }" @click="publishForm.urgencyLevel = 2">
-                中等
-              </button>
-              <button :class="{ active: publishForm.urgencyLevel >= 3 }" @click="publishForm.urgencyLevel = 4">
-                极紧急
-              </button>
-            </div>
-          </div>
-
-          <div class="form-block">
-            <div class="label">
-              预计时长（小时）
-            </div>
-            <NutInputNumber v-model="publishForm.expectedHours" :min="1" :max="12" />
-          </div>
-
-          <NutButton block type="primary" :loading="publishLoading" @click="onPublish">
-            立即发布
-          </NutButton>
-        </div>
-      </NutPopup>
 
       <!-- 社区绑定已改为邀请码/扫码；不再提供“直接切换社区”抽屉 -->
 
@@ -482,41 +365,69 @@ onMounted(loadData)
           </div>
         </div>
       </NutPopup>
+
     </div>
   </AppPageLayout>
 </template>
 
 <style scoped>
-.home-page { position: relative; height: 100%; background: #f4f6f8; }
-.biz-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 12px 8px; background: #fff; }
+.home-page {
+  position: relative;
+  height: 100%;
+  width: min(100vw, 430px);
+  margin: 0 auto;
+  background: var(--m-color-bg);
+}
+.biz-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 12px 8px; background: var(--m-color-card); }
 .community-switch { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; font-weight: 700; padding: 0; margin: 0; min-width: 0; flex: 1; }
-.scan-btn { flex-shrink: 0; width: 40px; height: 40px; border: 0; border-radius: 999px; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-.scan-btn :deep(svg) { font-size: 22px; }
+.community-main { font-weight: 800; color: var(--m-color-text); }
+.community-tip { font-size: 11px; color: #10b981; font-weight: 700; }
+.scan-btn { flex-shrink: 0; width: 40px; height: 40px; border: 1px solid var(--m-color-border); border-radius: 999px; background: var(--m-color-card); color: var(--m-color-primary); display: inline-flex; align-items: center; justify-content: center; padding: 0; position: relative; }
+.scan-glyph {
+  width: 17px;
+  height: 17px;
+  border: 2px solid #0f766e;
+  border-radius: 2px;
+  position: relative;
+  box-sizing: border-box;
+}
+.scan-glyph::before,
+.scan-glyph::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #0f766e;
+  border-radius: 1px;
+}
+.scan-glyph::before { left: 2px; top: 2px; box-shadow: 9px 0 0 #0f766e, 0 9px 0 #0f766e; }
+.scan-glyph::after { right: 2px; bottom: 2px; }
 .scan-btn:active { transform: scale(0.96); }
+.ai-btn { flex-shrink: 0; height: 40px; min-width: 40px; border: 1px solid #86efac; border-radius: 999px; background: #ecfdf5; color: #166534; font-weight: 900; padding: 0 10px; }
 .community-icon { color: #059669; font-size: 18px; }
-.distance { font-size: 12px; color: #9ca3af; margin-left: 2px; }
+.distance { font-size: var(--m-font-sub); color: var(--m-color-muted); margin-left: 2px; }
 
 .content-scroll { overflow-y: auto; height: calc(100% - 56px); padding: 10px 12px 0; }
 .hero-swiper { border-radius: 16px; overflow: hidden; height: 148px; }
 .hero-swiper :deep(.nut-swiper-inner) { height: 148px; }
 .hero-swiper :deep(.nut-swiper-item) { height: 148px; }
-.hero-item { height: 148px; padding: 16px; color: #fff; background: linear-gradient(135deg, #047857, #10b981); display: flex; flex-direction: column; }
-.hero-title { font-size: 20px; font-weight: 900; }
-.hero-sub { margin-top: 6px; opacity: .95; font-size: 14px; }
-.hero-user { margin-top: auto; opacity: .92; font-size: 12px; }
+.hero-item { height: 148px; padding: 16px; color: var(--m-color-text); background: var(--m-color-primary-soft); border: 1px solid var(--m-color-border); display: flex; flex-direction: column; }
+.hero-title { font-size: 20px; font-weight: 800; color: var(--m-color-primary); }
+.hero-sub { margin-top: 6px; font-size: 14px; color: var(--m-color-subtext); }
+.hero-user { margin-top: auto; font-size: var(--m-font-sub); color: var(--m-color-subtext); }
 
-.account-card { margin-top: 10px; border-radius: 14px; background: #fff; border: 1px solid #e5e7eb; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.account-card { margin-top: 10px; border-radius: var(--m-radius-card); background: var(--m-color-card); border: 1px solid var(--m-color-border); padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; box-shadow: var(--m-shadow-card); }
 .avatar-wrap { width: 46px; height: 46px; border-radius: 999px; overflow: hidden; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
 .avatar-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .account-left { min-width: 0; }
-.mini-label { font-size: 12px; color: #6b7280; }
-.account-name { margin-top: 2px; font-size: 16px; font-weight: 900; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.account-sub { margin-top: 3px; font-size: 12px; color: #9ca3af; }
+.mini-label { font-size: var(--m-font-sub); color: var(--m-color-subtext); }
+.account-name { margin-top: 2px; font-size: 16px; font-weight: 800; color: var(--m-color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-sub { margin-top: 3px; font-size: var(--m-font-sub); color: var(--m-color-muted); }
 .account-right { text-align: right; }
 .account-coins { margin-top: 2px; font-size: 20px; font-weight: 900; color: #047857; }
 .to-me { margin-top: 2px; font-size: 12px; color: #10b981; font-weight: 700; }
 
-.notice-card { margin-top: 10px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; padding: 12px; }
+.notice-card { margin-top: 10px; border-radius: var(--m-radius-card); border: 1px solid var(--m-color-border); background: var(--m-color-card); padding: 12px; box-shadow: var(--m-shadow-card); }
 .notice-head { display: flex; align-items: center; justify-content: space-between; }
 .notice-head h3 { margin: 0; font-size: 15px; font-weight: 900; }
 .notice-head button { border: 0; background: transparent; color: #10b981; font-size: 13px; font-weight: 700; }
@@ -610,66 +521,38 @@ onMounted(loadData)
 .announce-html :deep(img) { max-width: 100%; height: auto; border-radius: 8px; }
 .announce-html :deep(a) { color: #059669; }
 
-.category-tabs { margin-top: 12px; display: flex; overflow-x: auto; white-space: nowrap; gap: 8px; padding-bottom: 2px; }
-.tab-item { border: 0; background: #fff; padding: 8px 10px; border-radius: 10px; color: #6b7280; border-bottom: 2px solid transparent; }
-.tab-active { color: #059669; border-bottom-color: #059669; font-weight: 800; }
-
-.section-head { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
-.section-head h3 { margin: 0; font-size: 16px; font-weight: 900; }
-.refresh-btn { border: 0; background: transparent; color: #059669; font-weight: 700; }
-.status-text { margin-top: 10px; color: #6b7280; font-size: 13px; }
+.status-text { margin-top: 10px; color: var(--m-color-subtext); font-size: var(--m-font-body); }
 .status-text.error { color: #dc2626; }
-.card-list { margin-top: 10px; display: grid; gap: 10px; }
 
-.req-card { position: relative; background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 1px 8px rgba(15, 23, 42, .05); border: 1px solid #f3f4f6; overflow: hidden; }
-.urgency-corner { position: absolute; top: 0; right: 0; padding: 5px 10px; font-size: 12px; color: #fff; border-bottom-left-radius: 12px; border-top-right-radius: 16px; }
-.urgent-high { background: linear-gradient(135deg, #dc2626, #f97316); }
-.urgent-mid { background: linear-gradient(135deg, #d97706, #f59e0b); }
-.urgent-low { background: linear-gradient(135deg, #059669, #10b981); }
-
-.row-1 { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-right: 60px; margin-bottom: 2px; }
-.row-1 .left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.biz-tag { font-size: 10px; padding: 3px 8px; border-radius: 999px; font-weight: 800; white-space: nowrap; }
-.tag-red { background: #fef2f2; color: #dc2626; }
-.tag-orange { background: #fff7ed; color: #ea580c; }
-.tag-blue { background: #eff6ff; color: #2563eb; }
-.tag-purple { background: #faf5ff; color: #9333ea; }
-.tag-green { background: #ecfdf5; color: #059669; }
-.title { font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.reward { font-weight: 900; color: #047857; white-space: nowrap; }
-.row-2 { margin-top: 6px; color: #6b7280; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-3 { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.meta { color: #9ca3af; font-size: 11px; display: inline-flex; gap: 10px; align-items: center; }
-.meta span { display: inline-flex; align-items: center; gap: 3px; }
-
-/* 相对视口悬浮：内容区滚动时按钮不随内部列表移动，始终浮在底栏上方 */
-.fab-publish {
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--g-tabbar-height, 60px) + 16px);
-  z-index: 50;
-  width: 64px;
-  height: 64px;
-  border-radius: 999px;
-  border: 0;
-  background: linear-gradient(135deg, #34d399, #10b981);
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(52, 211, 153, .42), 0 2px 8px rgba(15, 23, 42, .08);
-  transition: transform .12s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
+.quick-panel { margin-top: 10px; border-radius: var(--m-radius-card); border: 1px solid var(--m-color-border); background: var(--m-color-card); padding: 12px; box-shadow: var(--m-shadow-card); }
+.quick-head { display: flex; align-items: center; justify-content: space-between; }
+.quick-head h3 { margin: 0; font-size: 15px; font-weight: 900; }
+.quick-more { border: 0; background: transparent; color: #10b981; font-size: 13px; font-weight: 800; }
+.quick-grid { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.quick-item {
+  border: 1px solid var(--m-color-border);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
 }
-.fab-publish :deep(svg) { font-size: 24px; }
-.fab-publish span { font-size: 14px; font-weight: 800; line-height: 1; }
-.fab-publish:hover { transform: scale(1.05); }
-.fab-publish:active { transform: scale(0.96); }
+.q-title { font-size: 15px; font-weight: 900; color: #111827; }
+.q-sub { margin-top: 4px; font-size: 12px; color: #6b7280; font-weight: 600; }
+.q-emerald { background: linear-gradient(160deg, #ffffff 10%, #ecfdf5 96%); border-color: #bbf7d0; }
+.q-green { background: linear-gradient(160deg, #ffffff 10%, #f0fdf4 96%); border-color: #dcfce7; }
+.q-cyan { background: linear-gradient(160deg, #ffffff 10%, #ecfeff 96%); border-color: #a5f3fc; }
+.q-amber { background: linear-gradient(160deg, #ffffff 10%, #fffbeb 96%); border-color: #fde68a; }
 
 .publish-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
+.publish-drawer {
+  width: min(100vw, 430px);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
 .drawer-handle { width: 42px; height: 4px; border-radius: 4px; background: #d1d5db; margin: 0 auto 10px; }
 .publish-drawer h3 { margin: 0 0 10px; font-size: 18px; font-weight: 900; }
+.detail-content p { margin: 0 0 8px; font-size: 13px; color: #374151; }
 .community-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
 .community-drawer h3 { margin: 0 0 10px; font-size: 18px; font-weight: 900; }
 .community-list { display: grid; gap: 8px; }
@@ -710,6 +593,7 @@ onMounted(loadData)
 :global(.dark) .mini-label,
 :global(.dark) .account-sub,
 :global(.dark) .notice-item .time,
+:global(.dark) .row-publisher,
 :global(.dark) .row-2,
 :global(.dark) .meta,
 :global(.dark) .label { color: #9ca3af; }
@@ -722,4 +606,12 @@ onMounted(loadData)
 :global(.dark) .tab-item { color: #d1d5db; }
 :global(.dark) .section-head h3 { color: #f3f4f6; }
 :global(.dark) .urgency-choose button { background: #111827; border-color: #4b5563; color: #d1d5db; }
+::global(.dark) .quick-panel { background: #1f2937; border-color: #374151; }
+::global(.dark) .quick-item { background: #111827; border-color: #374151; }
+::global(.dark) .q-title { color: #f3f4f6; }
+::global(.dark) .q-sub { color: #9ca3af; }
+::global(.dark) .q-emerald { background: linear-gradient(160deg, #0f172a 12%, #052e26 95%); border-color: #14532d; }
+::global(.dark) .q-green { background: linear-gradient(160deg, #0f172a 12%, #112b21 95%); border-color: #14532d; }
+::global(.dark) .q-cyan { background: linear-gradient(160deg, #0f172a 12%, #082f39 95%); border-color: #164e63; }
+::global(.dark) .q-amber { background: linear-gradient(160deg, #0f172a 12%, #3b2b11 95%); border-color: #78350f; }
 </style>

@@ -81,6 +81,11 @@ public class DashboardServiceImpl implements DashboardService {
             Long claimedRequests = serviceRequestMapper.selectCount(
                     baseRequestWrapper(communityId).eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_CLAIMED));
             stats.setClaimedRequests(claimedRequests != null ? claimedRequests : 0L);
+
+            // 待确认需求数（志愿者已提交完成，等待需求方确认）
+            Long pendingConfirmRequests = serviceRequestMapper.selectCount(
+                    baseRequestWrapper(communityId).eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_PENDING_CONFIRM));
+            stats.setPendingConfirmRequests(pendingConfirmRequests != null ? pendingConfirmRequests : 0L);
             
             // 已完成需求数
             Long completedRequests = serviceRequestMapper.selectCount(
@@ -196,7 +201,7 @@ public class DashboardServiceImpl implements DashboardService {
             );
             Long riskIncomplete = serviceRequestMapper.selectCount(
                     baseRequestWrapper(communityId)
-                            .eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_CLAIMED)
+                            .in(ServiceRequest::getStatus, Constants.REQUEST_STATUS_CLAIMED, Constants.REQUEST_STATUS_PENDING_CONFIRM)
                             .lt(ServiceRequest::getExpectedTime, now)
             );
             long denom = Math.max(1, stats.getTotalRequests() == null ? 1 : stats.getTotalRequests());
@@ -308,7 +313,7 @@ public class DashboardServiceImpl implements DashboardService {
         vo.setFundOut(BigDecimal.ZERO);
         vo.setMaterialIn(BigDecimal.ZERO);
         vo.setMaterialOut(BigDecimal.ZERO);
-        vo.setNote("演示占位：后续可对接财务/物资子系统，汇总捐赠与物资流转。");
+        vo.setNote("当前展示为平台统计口径预留项：未接入独立财务/物资子系统前默认记为 0。");
         return vo;
     }
 
@@ -321,7 +326,8 @@ public class DashboardServiceImpl implements DashboardService {
                         .in(ServiceRequest::getStatus, Arrays.asList(
                                 Constants.REQUEST_STATUS_PENDING,
                                 Constants.REQUEST_STATUS_PUBLISHED,
-                                Constants.REQUEST_STATUS_CLAIMED))
+                                Constants.REQUEST_STATUS_CLAIMED,
+                                Constants.REQUEST_STATUS_PENDING_CONFIRM))
                         .orderByAsc(ServiceRequest::getExpectedTime)
                         .last("LIMIT " + Math.max(1, Math.min(limit, 50))));
         List<ScheduleBriefVO> out = new ArrayList<>();

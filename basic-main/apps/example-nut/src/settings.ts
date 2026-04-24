@@ -8,13 +8,13 @@ export default setSettings({
         path: '/',
         icon: 'mdi:home-outline',
         activeIcon: 'mdi:home',
-        text: '主页',
+        text: '首页',
       },
       {
         path: '/hall',
-        icon: 'mdi:view-grid-outline',
-        activeIcon: 'mdi:view-grid',
-        text: '大厅',
+        icon: 'mdi:clipboard-text-outline',
+        activeIcon: 'mdi:clipboard-text',
+        text: '任务',
       },
       {
         path: '/user/',

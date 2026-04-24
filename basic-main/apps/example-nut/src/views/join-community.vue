@@ -65,7 +65,7 @@ async function join() {
 }
 
 function goScan() {
-  router.push('/scan')
+  toast.info('暂未开放扫码功能，请先输入邀请码加入社区')
 }
 
 watch(
@@ -87,13 +87,21 @@ onMounted(() => {
 
 <template>
   <AppPageLayout :navbar="false" tabbar>
-    <div class="mx-4 flex flex-1 flex-col gap-4 justify-center">
+    <div class="join-page">
+      <header class="top">
+        <button type="button" class="back-btn" aria-label="返回" @click="router.back()">
+          <FmIcon name="i-carbon:arrow-left" />
+        </button>
+        <h2>加入社区</h2>
+      </header>
+
+      <div class="mx-4 flex flex-1 flex-col gap-4 justify-center">
       <div class="text-center space-y-2">
         <div class="text-7 font-black">
-          加入社区
+          输入邀请码
         </div>
         <div class="text-stone-5 text-sm">
-          请输入邀请码或扫码加入；后续再次输入新码可改绑社区
+          请输入邀请码加入；后续再次输入新码可改绑社区
         </div>
       </div>
 
@@ -113,7 +121,7 @@ onMounted(() => {
             校验
           </FmButton>
           <FmButton variant="outline" type="button" @click="goScan">
-            扫码
+            扫码（暂未开放）
           </FmButton>
         </div>
         <FmButton class="w-full" type="button" :loading="joining" @click="join">
@@ -124,6 +132,17 @@ onMounted(() => {
         </FmButton>
       </div>
     </div>
+    </div>
   </AppPageLayout>
 </template>
+
+<style scoped>
+.join-page { min-height: 100%; background: #f4f6f8; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; }
+.back-btn { border: 0; background: #fff; width: 34px; height: 34px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: #111827; }
+.top h2 { margin: 0; font-size: 18px; font-weight: 900; color: #111827; }
+:global(.dark) .join-page { background: #111827; }
+:global(.dark) .back-btn { background: #1f2937; color: #f3f4f6; border: 1px solid #374151; }
+:global(.dark) .top h2 { color: #f3f4f6; }
+</style>
 

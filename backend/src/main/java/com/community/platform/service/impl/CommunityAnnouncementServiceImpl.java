@@ -10,7 +10,9 @@ import com.community.platform.dto.AnnouncementVO;
 import com.community.platform.generated.entity.Announcement;
 import com.community.platform.generated.entity.SysUser;
 import com.community.platform.generated.mapper.AnnouncementMapper;
+import com.community.platform.generated.entity.SysRegion;
 import com.community.platform.generated.mapper.SysUserMapper;
+import com.community.platform.generated.mapper.SysRegionMapper;
 import com.community.platform.service.CommunityAnnouncementService;
 import com.community.platform.service.UserNotificationService;
 import org.springframework.beans.BeanUtils;
@@ -32,6 +34,8 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
 
     @Autowired
     private SysUserMapper sysUserMapper;
+    @Autowired
+    private SysRegionMapper sysRegionMapper;
 
     @Autowired
     private UserNotificationService userNotificationService;
@@ -78,6 +82,7 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
 
         List<AnnouncementVO> records = entityPage.getRecords().stream().map(this::toVO).toList();
         fillPublisher(records);
+        fillCommunity(records);
 
         Page<AnnouncementVO> voPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
         voPage.setRecords(records);
@@ -94,6 +99,7 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
         assertScope(operator, a.getTargetCommunityId());
         AnnouncementVO vo = toVO(a);
         fillPublisher(List.of(vo));
+        fillCommunity(List.of(vo));
         return vo;
     }
 
@@ -267,6 +273,23 @@ public class CommunityAnnouncementServiceImpl implements CommunityAnnouncementSe
         for (AnnouncementVO vo : vos) {
             SysUser u = map.get(vo.getPublisherUserId());
             if (u != null) vo.setPublisherName(u.getRealName());
+        }
+    }
+
+    private void fillCommunity(List<AnnouncementVO> vos) {
+        if (vos == null || vos.isEmpty()) return;
+        List<Long> ids = vos.stream()
+                .map(AnnouncementVO::getTargetCommunityId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) return;
+        Map<Long, SysRegion> map = sysRegionMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(SysRegion::getId, r -> r, (a, b) -> a));
+        for (AnnouncementVO vo : vos) {
+            if (vo.getTargetCommunityId() == null) continue;
+            SysRegion r = map.get(vo.getTargetCommunityId());
+            if (r != null) vo.setTargetCommunityName(r.getName());
         }
     }
 

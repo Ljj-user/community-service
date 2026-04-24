@@ -71,6 +71,24 @@ const monthlyTrendChart = computed<ChartData | null>(() => {
 
 const riskChart = ref<SimpleChartSeries[]>([])
 
+const funnelChartData = computed<ChartData | null>(() => {
+  if (!stats.value) return null
+  return {
+    labels: ['待审核', '已发布', '已认领', '已完成'],
+    series: [
+      {
+        name: '需求数量',
+        data: [
+          Number(stats.value.pendingRequests ?? 0),
+          Number(stats.value.publishedRequests ?? 0),
+          Number(stats.value.claimedRequests ?? 0),
+          Number(stats.value.completedRequests ?? 0),
+        ],
+      },
+    ],
+  }
+})
+
 async function loadData() {
   loading.value = true
   try {
@@ -215,12 +233,16 @@ onMounted(loadData)
 
     <div class="grid gap-4 lg:grid-cols-2">
       <Card title="服务对接全链路漏斗">
-        <BaseChart v-if="stats" :data="[
-          { name: '待审核', value: stats.pendingRequests ?? 0 },
-          { name: '已发布', value: stats.publishedRequests ?? 0 },
-          { name: '已认领', value: stats.claimedRequests ?? 0 },
-          { name: '已完成', value: stats.completedRequests ?? 0 },
-        ]" type="bar" :height="260" :options="{ plotOptions: { bar: { horizontal: true } } }" />
+        <BaseChart
+          v-if="funnelChartData"
+          :data="funnelChartData"
+          type="bar"
+          :height="260"
+          :options="{ plotOptions: { bar: { horizontal: true } } }"
+        />
+        <p v-else class="text-xs text-slate-500">
+          {{ t('community.globalDashboard.chartNoData') }}
+        </p>
       </Card>
 
       <Card title="系统操作风险分布">

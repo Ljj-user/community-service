@@ -28,6 +28,8 @@ const form = reactive({
   identityTag: '',
   address: '',
 })
+const selectedSkills = ref<string[]>([])
+const customSkill = ref('')
 
 const genderOptions = [
   { label: '未知', value: 0 },
@@ -37,6 +39,34 @@ const genderOptions = [
 
 const currentAvatarUrl = computed(() => localAvatarPreview.value || appAuthStore.user?.avatarUrl || '')
 const communityText = computed(() => appAuthStore.user?.communityName || '未绑定社区')
+
+const identityTagOptions = [
+  { label: '普通居民', value: '普通居民' },
+  { label: '活力老人', value: '活力老人' },
+  { label: '孤寡老人', value: '孤寡老人' },
+  { label: '残疾人', value: '残疾人' },
+]
+
+const skillTemplates = ['陪诊', '助老照护', '跑腿代办', '家电维修', '心理陪伴']
+
+function parseSkillTags(raw?: string) {
+  if (!raw) return [] as string[]
+  const s = raw.trim()
+  if (!s) return [] as string[]
+  try {
+    const arr = JSON.parse(s)
+    if (Array.isArray(arr)) return arr.map(x => String(x).trim()).filter(Boolean)
+  }
+  catch {}
+  return s.split(',').map(x => x.trim()).filter(Boolean)
+}
+
+function skillTagsToPayload() {
+  const fixed = selectedSkills.value.filter(x => skillTemplates.includes(x))
+  const extra = customSkill.value.trim()
+  const merged = Array.from(new Set(extra ? [...fixed, extra] : fixed))
+  return JSON.stringify(merged)
+}
 
 async function load() {
   loading.value = true
@@ -49,6 +79,9 @@ async function load() {
     form.gender = (res.data.gender ?? 0) as any
     form.identityTag = res.data.identityTag || ''
     form.address = res.data.address || ''
+    const tags = parseSkillTags(res.data.skillTags)
+    selectedSkills.value = tags.filter(x => skillTemplates.includes(x))
+    customSkill.value = tags.find(x => !skillTemplates.includes(x)) || ''
     // 同步一次 store
     await appAuthStore.hydrateUser()
   } catch (e: any) {
@@ -76,7 +109,7 @@ function onPickAvatar(e: Event) {
 async function uploadAvatar(file: File) {
   uploading.value = true
   try {
-    const res = await uploadMyAvatar(file)
+    await uploadMyAvatar(file)
     toast.success('头像已更新')
     // 后端已写入 avatar_url，再 hydrate 一次让全局头像/昵称同步
     await appAuthStore.hydrateUser()
@@ -103,6 +136,7 @@ async function save() {
       gender: form.gender,
       identityTag: form.identityTag || undefined,
       address: form.address || undefined,
+      skillTags: skillTagsToPayload(),
     })
     toast.success('资料已保存')
     await appAuthStore.hydrateUser()
@@ -162,6 +196,9 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="card">
+          <h3 class="section-title">
+            基础信息
+          </h3>
           <div class="row">
             <div class="label">账号</div>
             <div class="value">{{ form.username }}</div>
@@ -187,12 +224,32 @@ onBeforeUnmount(() => {
             </NutRadioGroup>
           </div>
           <div class="row">
-            <div class="label">身份标签</div>
-            <FmInput v-model="form.identityTag" class="input" placeholder="如：普通居民/孤寡老人/残疾人" />
-          </div>
-          <div class="row">
             <div class="label">地址</div>
             <FmInput v-model="form.address" class="input" placeholder="常住地址（可选）" />
+          </div>
+          <div class="row">
+            <div class="label">居民标签</div>
+            <NutRadioGroup v-model="form.identityTag" direction="horizontal">
+              <NutRadio v-for="x in identityTagOptions" :key="x.value" :label="x.value">
+                {{ x.label }}
+              </NutRadio>
+            </NutRadioGroup>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3 class="section-title">
+            志愿者技能（可选）
+          </h3>
+          <div class="row skills-row">
+            <div class="label">服务技能</div>
+            <div class="skills-box">
+              <label v-for="s in skillTemplates" :key="s" class="skill-item">
+                <input v-model="selectedSkills" :value="s" type="checkbox">
+                <span>{{ s }}</span>
+              </label>
+              <FmInput v-model="customSkill" class="input" placeholder="其他技能（可选）" />
+            </div>
           </div>
         </section>
 
@@ -214,6 +271,7 @@ onBeforeUnmount(() => {
 .status { font-size: 13px; color: #6b7280; text-align: center; margin-top: 30px; }
 
 .card { background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 1px 10px rgba(15, 23, 42, 0.06); }
+.section-title { margin: 0 0 8px; font-size: 14px; font-weight: 900; color: #0f172a; }
 .avatar-row { display: flex; gap: 12px; align-items: center; }
 .avatar { width: 72px; height: 72px; border-radius: 999px; overflow: hidden; background: #f1f5f9; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -230,6 +288,9 @@ onBeforeUnmount(() => {
 .label { font-size: 12px; color: #64748b; font-weight: 800; }
 .value { font-size: 13px; color: #111827; font-weight: 800; }
 .input { width: 100%; }
+.skills-row { align-items: start; }
+.skills-box { display: grid; gap: 8px; }
+.skill-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; }
 .actions { padding: 0 2px; }
 </style>
 

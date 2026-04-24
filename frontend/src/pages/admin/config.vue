@@ -78,6 +78,16 @@ const alertRules = reactive({
   enableFulfillmentAlert: true,
   // 启用投诉率预警
   enableComplaintAlert: true,
+  // 重点人群连续未登录预警（天）
+  careInactivityDays: 3,
+  // 社区24小时求助骤增预警：最低触发数量
+  surge24hMinRequests: 5,
+  // 社区24小时求助骤增预警：相对7天均值倍数
+  surgeMultiplier: 2,
+  // 启用重点人群连续未登录预警
+  enableCareInactivityAlert: true,
+  // 启用社区求助骤增预警
+  enableDemandSurgeAlert: true,
 })
 
 const saving = ref(false)
@@ -347,6 +357,40 @@ onMounted(loadConfig)
             <p class="text-xs text-slate-500 mt-1">
               {{ t('community.systemConfig.noShowFreezeHint') }}
             </p>
+          </div>
+        </Card>
+        <Card :title="t('community.systemConfig.cardAnomaly')" class="mt-4">
+          <div class="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            <n-form-item label="启用重点人群连续未登录预警" label-placement="top" :show-feedback="false">
+              <n-switch v-model:value="alertRules.enableCareInactivityAlert" />
+            </n-form-item>
+            <n-form-item label="启用社区求助骤增预警" label-placement="top" :show-feedback="false">
+              <n-switch v-model:value="alertRules.enableDemandSurgeAlert" />
+            </n-form-item>
+            <div class="config-field">
+              <n-form-item :label="t('community.systemConfig.careInactivityDays')" label-placement="top" :show-feedback="false">
+                <n-input-number v-model:value="alertRules.careInactivityDays" :min="1" :max="30" class="w-full" />
+              </n-form-item>
+              <p class="text-xs text-slate-500 mt-1">
+                {{ t('community.systemConfig.careInactivityDaysHint') }}
+              </p>
+            </div>
+            <div class="config-field">
+              <n-form-item :label="t('community.systemConfig.surge24hMinRequests')" label-placement="top" :show-feedback="false">
+                <n-input-number v-model:value="alertRules.surge24hMinRequests" :min="1" :max="200" class="w-full" />
+              </n-form-item>
+              <p class="text-xs text-slate-500 mt-1">
+                {{ t('community.systemConfig.surge24hMinRequestsHint') }}
+              </p>
+            </div>
+            <div class="config-field">
+              <n-form-item :label="t('community.systemConfig.surgeMultiplier')" label-placement="top" :show-feedback="false">
+                <n-input-number v-model:value="alertRules.surgeMultiplier" :min="1" :max="10" :step="0.1" :precision="1" class="w-full" />
+              </n-form-item>
+              <p class="text-xs text-slate-500 mt-1">
+                {{ t('community.systemConfig.surgeMultiplierHint') }}
+              </p>
+            </div>
           </div>
         </Card>
       </n-collapse-item>

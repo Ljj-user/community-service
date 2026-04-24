@@ -19,7 +19,6 @@ import com.community.platform.security.UserDetailsImpl;
 import com.community.platform.service.AuthService;
 import com.community.platform.util.DefaultAvatarUtil;
 import com.community.platform.util.IdentityTypeUtil;
-import com.community.platform.util.MD5Util;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +27,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +52,9 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.avatar-base-url:http://localhost:8080/static/avatars/}")
     private String avatarBaseUrl;
 
+    @Value("${app.auth.expose-dev-code:false}")
+    private boolean exposeDevCode;
+
     private String normalizeAvatarUrl(String raw) {
         if (raw == null || raw.isBlank()) {
             return raw;
@@ -74,6 +77,9 @@ public class AuthServiceImpl implements AuthService {
     private AuthenticationManager authenticationManager;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
     
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -129,7 +135,7 @@ public class AuthServiceImpl implements AuthService {
         // 创建新用户
         SysUser user = new SysUser();
         user.setUsername(request.getUsername());
-        user.setPasswordMd5(MD5Util.encrypt(request.getPassword()));
+        user.setPasswordMd5(passwordEncoder.encode(request.getPassword()));
         user.setRealName(request.getRealName());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
@@ -186,7 +192,9 @@ public class AuthServiceImpl implements AuthService {
         vo.setScene(scene);
         vo.setTarget(maskEmail(request.getEmail().trim()));
         vo.setExpiresAt(expiresAt);
-        vo.setDevCode(code);
+        if (exposeDevCode) {
+            vo.setDevCode(code);
+        }
         return vo;
     }
 
@@ -261,14 +269,14 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("用户不存在");
         }
 
-        // 校验旧密码（MD5）
-        boolean match = MD5Util.verify(request.getOldPassword(), user.getPasswordMd5());
+        // 校验旧密码（兼容历史 MD5，新增使用 BCrypt）
+        boolean match = passwordEncoder.matches(request.getOldPassword(), user.getPasswordMd5());
         if (!match) {
             throw new RuntimeException("旧密码不正确");
         }
 
         // 更新新密码
-        user.setPasswordMd5(MD5Util.encrypt(request.getNewPassword()));
+        user.setPasswordMd5(passwordEncoder.encode(request.getNewPassword()));
         user.setUpdatedAt(LocalDateTime.now());
         sysUserMapper.updateById(user);
     }

@@ -2,8 +2,13 @@ import { ApiService } from '~/common/api/api-service'
 
 export interface ServiceMonitorItem {
   requestId: number
+  communityId?: number
+  communityName?: string
   status: number
   riskType: number
+  alertSource?: string
+  triggerRule?: string
+  suggestionAction?: string
   serviceType: string
   serviceAddress: string
   expectedTime: string
@@ -22,6 +27,7 @@ export interface ServiceMonitorQuery {
   current?: number
   size?: number
   riskType?: number
+  communityId?: number
 }
 
 export interface BackendResult<T> {

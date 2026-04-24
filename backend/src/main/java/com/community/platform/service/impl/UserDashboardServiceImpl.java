@@ -18,6 +18,7 @@ import com.community.platform.generated.mapper.ServiceRequestMapper;
 import com.community.platform.generated.mapper.SysUserMapper;
 import com.community.platform.service.UserDashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -45,6 +46,9 @@ public class UserDashboardServiceImpl implements UserDashboardService {
 
     @Autowired
     private AnnouncementMapper announcementMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Override
     public UserDashboardSummaryVO buildSummary(Long userId) {
@@ -167,7 +171,25 @@ public class UserDashboardServiceImpl implements UserDashboardService {
             }
         }
         vo.setRecentProjectTitles(titles);
-        vo.setHonorNote("荣誉与排名为演示占位，后续可对接积分与榜单。");
+        List<BigDecimal> snapshot = jdbcTemplate.query("""
+                SELECT credit_score, avg_rating_30d, completion_rate_30d
+                FROM volunteer_credit_snapshot
+                WHERE user_id=?
+                """, (rs, rowNum) -> List.of(
+                rs.getBigDecimal("credit_score"),
+                rs.getBigDecimal("avg_rating_30d"),
+                rs.getBigDecimal("completion_rate_30d")
+        ), userId).stream().findFirst().orElse(null);
+        if (snapshot != null) {
+            vo.setCreditScore(snapshot.get(0));
+            vo.setAvgRating30d(snapshot.get(1));
+            vo.setCompletionRate30d(snapshot.get(2));
+        } else {
+            vo.setCreditScore(BigDecimal.ZERO);
+            vo.setAvgRating30d(null);
+            vo.setCompletionRate30d(BigDecimal.ZERO);
+        }
+        vo.setHonorNote("荣誉值由累计服务时长、近30天评价与履约率综合计算，按统一信用规则动态更新。");
         return vo;
     }
 }

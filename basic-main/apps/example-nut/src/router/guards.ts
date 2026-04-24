@@ -4,19 +4,35 @@ import '@/assets/styles/nprogress.css'
 
 // 鉴权
 function setupAuth(router: Router) {
+  const withTimeout = async <T>(promise: Promise<T>, ms = 1800): Promise<T | null> => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), ms)
+        }),
+      ])
+    }
+    finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
+
   router.beforeEach(async (to) => {
     const appSettingsStore = useAppSettingsStore()
     const appAuthStore = useAppAuthStore()
     // 登录态下尽量刷新一次 userInfo，便于社区绑定判断
     if (appAuthStore.isLogin) {
-      await appAuthStore.hydrateUser()
+      // 不阻塞路由导航，避免接口超时导致页面卡住
+      void withTimeout(appAuthStore.hydrateUserThrottled?.(), 1500).catch(() => null)
     }
     if (to.meta.auth) {
       if (appAuthStore.isLogin) {
         try {
           // 获取用户权限
           if (appSettingsStore.settings.app.auth) {
-            !appAuthStore.isGetPermissions && await appAuthStore.getPermissions()
+            await withTimeout(appAuthStore.ensurePermissionsChecked?.(), 1500)
           }
         }
         catch {}

@@ -4,8 +4,34 @@
   --g-navbar-min-height: 50px;
   --g-tabbar-min-height: 60px;
 
+  /* Mobile civic design tokens */
+  --m-color-primary: #1f7a4c;
+  --m-color-primary-soft: #eef8f1;
+  --m-color-bg: #f5f7f6;
+  --m-color-card: #ffffff;
+  --m-color-border: #e5ece8;
+  --m-color-text: #1f2937;
+  --m-color-subtext: #6b7280;
+  --m-color-muted: #9ca3af;
+  --m-radius-card: 12px;
+  --m-shadow-card: 0 1px 4px rgba(15, 23, 42, 0.03);
+  --m-font-title: 18px;
+  --m-font-body: 13px;
+  --m-font-sub: 12px;
+  --m-space-page: 14px;
+  --m-space-block: 10px;
+
   &.dark {
     color-scheme: dark;
+    --m-color-primary: #67c58d;
+    --m-color-primary-soft: #11281b;
+    --m-color-bg: #111827;
+    --m-color-card: #1f2937;
+    --m-color-border: #334155;
+    --m-color-text: #f3f4f6;
+    --m-color-subtext: #cbd5e1;
+    --m-color-muted: #94a3b8;
+    --m-shadow-card: 0 1px 4px rgba(0, 0, 0, 0.25);
   }
 }
 
@@ -33,73 +59,97 @@ body {
   background-color: var(--g-bg);
 }
 
-/* ---- Custom pages dark-mode fallback ----
-   Some business pages use hardcoded light colors.
-   Force a consistent dark palette when html.dark is enabled.
-*/
-html.dark .home-page,
-html.dark .hall-page,
-html.dark .notice-page,
-html.dark .profile-page {
-  background: #0b0b0b !important;
+/* ---- Mobile base primitives (optional) ---- */
+.m-page {
+  min-height: 100%;
+  background: var(--m-color-bg);
+  padding: var(--m-space-page);
+  box-sizing: border-box;
 }
 
-html.dark .biz-header,
-html.dark .head,
-html.dark .account-card,
-html.dark .notice-card,
-html.dark .req-card,
-html.dark .item,
-html.dark .tab,
-html.dark .tab-item,
-html.dark .community-item,
-html.dark .publish-drawer,
-html.dark .community-drawer,
-html.dark .settings-drawer,
-html.dark .form-block,
-html.dark .back-btn,
-html.dark .setting-btn {
-  background: #0b0b0b !important;
-  border-color: #232323 !important;
+.m-card {
+  border-radius: var(--m-radius-card);
+  border: 1px solid var(--m-color-border);
+  background: var(--m-color-card);
+  box-shadow: var(--m-shadow-card);
 }
 
-html.dark .title,
-html.dark .title2,
-html.dark .account-name,
-html.dark .notice-head h3,
-html.dark .community-item .left,
-html.dark .publish-drawer h3,
-html.dark .community-drawer h3,
-html.dark .settings-drawer h3,
-html.dark .top h2,
-html.dark .top-header h2,
-html.dark .section-head h3 {
-  color: #f3f4f6 !important;
+.m-soft-card {
+  border-radius: var(--m-radius-card);
+  border: 1px solid var(--m-color-border);
+  background: var(--m-color-primary-soft);
+  box-shadow: var(--m-shadow-card);
 }
 
-html.dark .mini-label,
-html.dark .account-sub,
-html.dark .notice-item .time,
-html.dark .row-2,
-html.dark .meta,
-html.dark .label,
-html.dark .desc,
-html.dark .sub,
-html.dark .status,
-html.dark .time,
-html.dark .distance,
-html.dark .func-item {
-  color: #9ca3af !important;
+.m-title {
+  color: var(--m-color-text);
+  font-weight: 900;
 }
 
-html.dark .setting-item {
-  background: #0b0b0b !important;
-  border-color: #232323 !important;
-  color: #e5e7eb !important;
+.m-subtitle {
+  color: var(--m-color-subtext);
+  font-weight: 700;
 }
 
-html.dark .setting-item.danger {
-  background: #3f1d28 !important;
-  border-color: #7f1d1d !important;
-  color: #fecdd3 !important;
+.m-muted {
+  color: var(--m-color-muted);
+}
+
+/* ---- A-style layout kit (stable, civic) ---- */
+.m-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.m-back {
+  border: 1px solid var(--m-color-border);
+  border-radius: 10px;
+  background: var(--m-color-card);
+  padding: 6px 10px;
+  color: var(--m-color-text);
+  font-weight: 800;
+}
+
+.m-top-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--m-color-text);
+}
+
+.m-panel {
+  background: var(--m-color-card);
+  border: 1px solid var(--m-color-border);
+  border-radius: var(--m-radius-card);
+  box-shadow: var(--m-shadow-card);
+}
+
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--m-color-border);
+  background: var(--m-color-primary-soft);
+  color: var(--m-color-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.m-cta {
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+}
+
+.m-soft-btn {
+  border: 1px solid var(--m-color-border);
+  background: var(--m-color-primary-soft);
+  color: var(--m-color-primary);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 800;
+  font-size: 12px;
 }

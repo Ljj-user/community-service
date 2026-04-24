@@ -15,6 +15,7 @@ public class AnnouncementVO {
 
     private Byte targetScope;
     private Long targetCommunityId;
+    private String targetCommunityName;
     private Long targetBuildingId;
 
     private Byte status;

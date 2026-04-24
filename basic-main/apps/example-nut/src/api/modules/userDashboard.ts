@@ -12,6 +12,9 @@ export interface VolunteerDashboardVO {
   completedClaimCount?: number
   averageRating?: number | string | null
   evaluationCount?: number
+  creditScore?: number | string | null
+  avgRating30d?: number | string | null
+  completionRate30d?: number | string | null
   recentProjectTitles?: string[]
   honorNote?: string
 }

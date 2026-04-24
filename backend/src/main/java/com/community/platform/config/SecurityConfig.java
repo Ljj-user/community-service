@@ -1,6 +1,7 @@
 package com.community.platform.config;
 
 import com.community.platform.common.Result;
+import com.community.platform.security.HybridPasswordEncoder;
 import com.community.platform.security.TokenFilter;
 import com.community.platform.security.UserDetailsServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,11 +55,11 @@ public class SecurityConfig {
     private ObjectMapper objectMapper;
 
     /**
-     * 密码加密器（使用 MD5，按需求文档技术选型）
+     * 密码加密器（新写入使用 BCrypt，登录兼容历史 MD5）
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new MD5PasswordEncoder();
+        return new HybridPasswordEncoder();
     }
 
     /**
@@ -165,7 +166,7 @@ public class SecurityConfig {
                         .requestMatchers("/community/**", "/dashboard/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
                         
                         // 普通用户：发布需求、认领服务、评价、个人待办、全局点赞
-                        .requestMatchers("/user/**", "/request/**", "/service/**", "/service-request/**", "/service-claim/**", "/service-evaluation/**", "/todo/**", "/support/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/user/**", "/request/**", "/service/**", "/service-request/**", "/service-claim/**", "/service-evaluation/**", "/todo/**", "/support/**", "/ai/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
                         
                         // 其他接口需要认证
                         .anyRequest().authenticated()
@@ -178,21 +179,6 @@ public class SecurityConfig {
                 .addFilterBefore(tokenFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
-    }
-
-    /**
-     * MD5 密码加密器实现（按需求文档技术选型）
-     */
-    private static class MD5PasswordEncoder implements PasswordEncoder {
-        @Override
-        public String encode(CharSequence rawPassword) {
-            return com.community.platform.util.MD5Util.encrypt(rawPassword.toString());
-        }
-
-        @Override
-        public boolean matches(CharSequence rawPassword, String encodedPassword) {
-            return com.community.platform.util.MD5Util.verify(rawPassword.toString(), encodedPassword);
-        }
     }
 }
 

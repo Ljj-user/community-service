@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import {
+  disputeByRequest,
   getHallSummary,
   getMyClaimRecords,
   getMyPublishHistory,
   getMyReceivedReviews,
   getMyReviewHistory,
 } from '@/api/modules/hall'
-import type { ServiceRequestVO } from '@/api/modules/serviceRequests'
+import { confirmClaimService, getServiceRequestDetail, type ServiceRequestVO } from '@/api/modules/serviceRequests'
+import { toast } from 'vue-sonner'
 
 definePage({
   meta: {
@@ -30,6 +32,9 @@ const publishRows = ref<ServiceRequestVO[]>([])
 const claimRows = ref<any[]>([])
 const reviewMode = ref<'received' | 'history'>('received')
 const reviewRows = ref<any[]>([])
+const progressVisible = ref(false)
+const progressLoading = ref(false)
+const progressOrder = ref<ServiceRequestVO | null>(null)
 const stats = reactive({
   myPublishedCount: 0,
   myCompletedCount: 0,
@@ -78,15 +83,93 @@ function tagClass(type: string) {
 }
 
 function publishStatusText(v: number) {
-  if (v === 2) return '已完成'
-  if (v === 1) return '进行中'
-  return '待处理'
+  if (v === 3) return '已完成'
+  if (v === 5) return '待确认'
+  if (v === 2) return '进行中'
+  if (v === 1) return '可接单'
+  if (v === 0) return '待审核'
+  return '已驳回'
 }
 
 function publishStatusClass(v: number) {
-  if (v === 2) return 'status-done'
-  if (v === 1) return 'status-going'
+  if (v === 3) return 'status-done'
+  if (v === 5) return 'status-pending'
+  if (v === 2) return 'status-going'
   return 'status-pending'
+}
+
+function claimStatusText(v: number) {
+  if (v === 4) return '待确认'
+  return '进行中'
+}
+
+const flowSteps = ['发布', '审核', '进行中', '完成']
+
+function mapStatusToStep(status?: number) {
+  if (status === 0) return 0
+  if (status === 1) return 1
+  if (status === 2) return 2
+  if (status === 3) return 3
+  if (status === 5) return 3
+  return 0
+}
+
+function stateCodeText(status?: number) {
+  if (status === 0) return 'CREATED'
+  if (status === 1) return 'APPROVED'
+  if (status === 2) return 'IN_PROGRESS'
+  if (status === 5) return 'PENDING_CONFIRM'
+  if (status === 3) return 'COMPLETED'
+  if (status === 4) return 'CANCELLED'
+  return 'CREATED'
+}
+
+async function onConfirmComplete(item: ServiceRequestVO) {
+  const claimId = Number(item.latestClaimId || 0)
+  if (!claimId) {
+    toast.error('缺少认领记录，无法确认')
+    return
+  }
+  try {
+    const res = await confirmClaimService({ claimId })
+    if (res.code !== 200) throw new Error(res.message || '确认失败')
+    toast.success('已确认完成，请进行评价')
+    await loadData()
+    router.push({ path: '/service-evaluate', query: { claimId: String(claimId) } })
+  }
+  catch (e: any) {
+    toast.error(e?.message || '确认失败')
+  }
+}
+
+async function openProgress(item: any) {
+  if (!item?.requestId) return
+  progressVisible.value = true
+  progressLoading.value = true
+  progressOrder.value = null
+  try {
+    const res = await getServiceRequestDetail(Number(item.requestId))
+    if (res.code !== 200) throw new Error(res.message || '加载失败')
+    progressOrder.value = res.data
+  }
+  catch (e: any) {
+    toast.error(e?.message || '加载失败')
+  }
+  finally {
+    progressLoading.value = false
+  }
+}
+
+async function onDispute(item: ServiceRequestVO) {
+  if (!item?.id) return
+  const reason = window.prompt('请填写申诉内容（例如：服务未到场、时长异常等）')
+  if (!reason?.trim()) return
+  const res = await disputeByRequest(item.id, reason.trim())
+  if (res.code !== 200) {
+    toast.error(res.message || '提交申诉失败')
+    return
+  }
+  toast.success('已提交申诉，社区管理员将介入处理')
 }
 
 function scoreText(v?: number) {
@@ -125,7 +208,7 @@ async function loadData() {
     if (kind.value === 'in-progress') {
       const res = await getMyClaimRecords(page.current, page.size)
       if (res.code !== 200) throw new Error(res.message || '加载失败')
-      const records = (res.data.records || []).filter((item: any) => Number(item.claimStatus) === 1)
+      const records = (res.data.records || []).filter((item: any) => [1, 4].includes(Number(item.claimStatus)))
       claimRows.value = records
       total.value = Number(res.data.total || records.length)
       return
@@ -243,15 +326,31 @@ watch(() => route.query.kind, () => {
                 </div>
                 <p>{{ item.description || '暂无描述' }}</p>
                 <small>发布时间 {{ fmtTime(item.publishedAt || item.createdAt) }}</small>
+                <button
+                  v-if="Number(item.status) === 5"
+                  type="button"
+                  class="confirm-btn"
+                  @click.stop="onConfirmComplete(item)"
+                >
+                  确认完成
+                </button>
+                <button
+                  v-if="Number(item.status) === 2"
+                  type="button"
+                  class="dispute-btn"
+                  @click="onDispute(item)"
+                >
+                  有问题？点这里反馈
+                </button>
               </article>
               <p v-if="publishRows.length === 0" class="empty">暂无发布记录</p>
             </div>
 
             <div v-else-if="kind === 'in-progress'" class="list in-progress-list">
-              <article v-for="item in claimRows" :key="item.id" class="claim-card">
+              <article v-for="item in claimRows" :key="item.id" class="claim-card" @click="openProgress(item)">
                 <div class="claim-card-top">
                   <span class="biz-tag" :class="tagClass(item.requestTitle || '')">{{ item.requestTitle || '服务' }}</span>
-                  <span class="claim-pill">进行中</span>
+                  <span class="claim-pill">{{ claimStatusText(Number(item.claimStatus || 0)) }}</span>
                 </div>
                 <div class="claim-address-line">
                   <FmIcon name="i-carbon:location" class="claim-address-ico" aria-hidden="true" />
@@ -266,7 +365,7 @@ watch(() => route.query.kind, () => {
                   </span>
                 </div>
                 <p class="claim-desc">
-                  {{ item.completionNote || '任务进行中，等待服务完成后提交时长。' }}
+                  {{ item.completionNote || (Number(item.claimStatus) === 4 ? '已提交完成，等待需求方确认（24小时无异议自动完成）。' : '任务进行中，等待服务完成后提交时长。') }}
                 </p>
                 <div class="claim-foot">
                   <span class="claim-time">
@@ -310,6 +409,36 @@ watch(() => route.query.kind, () => {
           </div>
         </template>
       </div>
+      <NutPopup
+        v-model:visible="progressVisible"
+        position="bottom"
+        round
+        pop-class="progress-popup"
+        :style="{ width: '100vw', maxWidth: '100vw' }"
+      >
+        <div class="publish-drawer">
+          <div class="drawer-handle" />
+          <h3>订单进度</h3>
+          <div v-if="progressLoading" class="status">加载中...</div>
+          <div v-else-if="progressOrder" class="progress-wrap">
+            <div class="state-code">{{ stateCodeText(Number(progressOrder.status || 0)) }}</div>
+            <div class="steps">
+              <div
+                v-for="(s, idx) in flowSteps"
+                :key="s"
+                class="step"
+                :class="{ active: idx <= mapStatusToStep(Number(progressOrder.status || 0)) }"
+              >
+                <span class="dot">{{ idx + 1 }}</span>
+                <span class="txt">{{ s }}</span>
+              </div>
+            </div>
+            <p class="progress-desc">
+              当前状态：{{ publishStatusText(Number(progressOrder.status || 0)) }}
+            </p>
+          </div>
+        </div>
+      </NutPopup>
     </div>
   </AppPageLayout>
 </template>
@@ -321,23 +450,23 @@ watch(() => route.query.kind, () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f4f6f8;
-  padding: 14px;
+  background: var(--m-color-bg);
+  padding: var(--m-space-page);
   box-sizing: border-box;
 }
 .top { flex-shrink: 0; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.back { border: 0; border-radius: 8px; background: #fff; padding: 6px 10px; }
+.back { border: 1px solid var(--m-color-border); border-radius: 10px; background: var(--m-color-card); padding: 6px 10px; color: var(--m-color-text); }
 .top h2 { margin: 0; font-size: 18px; font-weight: 900; }
 .panel {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  background: var(--m-color-card);
+  border: 1px solid var(--m-color-border);
+  border-radius: var(--m-radius-card);
   padding: 12px;
-  color: #4b5563;
+  color: var(--m-color-subtext);
   line-height: 1.6;
 }
 .panel-scroll {
@@ -349,15 +478,15 @@ watch(() => route.query.kind, () => {
 }
 .switch-row { flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 .status-bar { flex-shrink: 0; }
-.switch-row button { border: 1px solid #d1d5db; background: #fff; border-radius: 10px; padding: 8px; color: #4b5563; }
+.switch-row button { border: 1px solid var(--m-color-border); background: var(--m-color-card); border-radius: 10px; padding: 8px; color: var(--m-color-subtext); }
 .switch-row button.active { background: #ecfdf5; border-color: #10b981; color: #047857; font-weight: 800; }
-.status { color: #6b7280; }
+.status { color: var(--m-color-subtext); }
 .status.error { color: #dc2626; }
 .list { display: grid; gap: 10px; }
-.card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; background: #fff; }
-.card h4 { margin: 0; color: #111827; font-size: 14px; }
+.card { border: 1px solid var(--m-color-border); border-radius: 10px; padding: 10px; background: var(--m-color-card); }
+.card h4 { margin: 0; color: var(--m-color-text); font-size: 14px; }
 .card p { margin: 6px 0; font-size: 13px; }
-.card small { color: #6b7280; }
+.card small { color: var(--m-color-muted); }
 .row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .empty { color: #9ca3af; text-align: center; margin: 14px 0; }
 .publish-list,
@@ -398,6 +527,26 @@ watch(() => route.query.kind, () => {
 .publish-status.status-done { background: #dcfce7; color: #166534; }
 .publish-status.status-going { background: #dbeafe; color: #1d4ed8; }
 .publish-status.status-pending { background: #fef3c7; color: #92400e; }
+.dispute-btn {
+  margin-top: 8px;
+  border: 1px solid #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.confirm-btn {
+  margin-top: 8px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #047857;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 800;
+}
 .score-badge { background: #cffafe; color: #155e75; }
 .score-tip {
   margin-top: 8px;
@@ -422,6 +571,7 @@ watch(() => route.query.kind, () => {
   border: 1px solid #a7f3d0;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
   overflow: hidden;
+  cursor: pointer;
 }
 .claim-card::before {
   content: '';
@@ -541,6 +691,64 @@ watch(() => route.query.kind, () => {
 .in-progress-empty {
   padding: 28px 12px;
   font-size: 13px;
+}
+.progress-wrap { margin-top: 8px; }
+.state-code {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f766e;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.steps {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.step {
+  text-align: center;
+  color: #94a3b8;
+}
+.step .dot {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+}
+.step .txt {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.step.active { color: #047857; }
+.step.active .dot {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+.progress-desc {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.publish-drawer {
+  width: 100%;
+  box-sizing: border-box;
+}
+:global(.progress-popup) {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  left: 0 !important;
+  right: 0 !important;
 }
 .pager {
   flex-shrink: 0;
@@ -689,6 +897,16 @@ watch(() => route.query.kind, () => {
 ::global(.dark) .publish-status.status-done { background: rgba(34, 197, 94, 0.2); color: #86efac; }
 ::global(.dark) .publish-status.status-going { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
 ::global(.dark) .publish-status.status-pending { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+::global(.dark) .dispute-btn {
+  background: rgba(13, 148, 136, 0.2);
+  border-color: rgba(45, 212, 191, 0.4);
+  color: #99f6e4;
+}
+::global(.dark) .confirm-btn {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(134, 239, 172, 0.35);
+  color: #86efac;
+}
 ::global(.dark) .score-badge { background: rgba(6, 182, 212, 0.2); color: #67e8f9; }
 ::global(.dark) .score-tip {
   background: rgba(2, 6, 23, 0.45);

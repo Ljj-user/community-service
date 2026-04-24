@@ -26,9 +26,26 @@ public class ServiceMonitorVO {
     private Integer riskType;
 
     /**
+     * 告警来源编码：TIMEOUT_UNCLAIMED / TIMEOUT_INCOMPLETE / CARE_INACTIVE / DEMAND_SURGE
+     */
+    private String alertSource;
+
+    /**
+     * 触发规则摘要
+     */
+    private String triggerRule;
+
+    /**
+     * 建议动作
+     */
+    private String suggestionAction;
+
+    /**
      * 服务类型
      */
     private String serviceType;
+    private Long communityId;
+    private String communityName;
 
     /**
      * 服务地址

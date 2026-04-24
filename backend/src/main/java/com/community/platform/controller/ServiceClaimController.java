@@ -4,6 +4,7 @@ import com.community.platform.common.Result;
 import com.community.platform.dto.ServiceClaimDTO;
 import com.community.platform.dto.ServiceCompleteDTO;
 import com.community.platform.dto.ServiceConfirmDTO;
+import com.community.platform.dto.ServiceDisputeDTO;
 import com.community.platform.security.UserDetailsImpl;
 import com.community.platform.service.ServiceClaimService;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
 
 /**
  * 服务认领控制器
@@ -47,7 +49,7 @@ public class ServiceClaimController {
         try {
             Long volunteerId = getCurrentUserId();
             serviceClaimService.completeService(volunteerId, dto);
-            return Result.success("服务完成，时长已记录", null);
+            return Result.success("服务已提交，等待需求方确认（24小时无异议将自动完成）", null);
         } catch (Exception e) {
             return Result.error("完成失败: " + e.getMessage());
         }
@@ -65,6 +67,37 @@ public class ServiceClaimController {
             return Result.success("核销成功，时间币已结算", null);
         } catch (Exception e) {
             return Result.error("核销失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 需求方申诉（防作弊反馈）
+     */
+    @PostMapping("/dispute")
+    @PreAuthorize("hasRole('USER')")
+    public Result<Void> dispute(@Valid @RequestBody ServiceDisputeDTO dto) {
+        try {
+            Long requesterUserId = getCurrentUserId();
+            serviceClaimService.disputeService(requesterUserId, dto);
+            return Result.success("已提交申诉，社区管理员将介入处理", null);
+        } catch (Exception e) {
+            return Result.error("申诉失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/dispute-by-request/{requestId}")
+    @PreAuthorize("hasRole('USER')")
+    public Result<Void> disputeByRequest(@PathVariable("requestId") Long requestId,
+                                         @RequestParam("reason") String reason) {
+        try {
+            if (!StringUtils.hasText(reason)) {
+                return Result.error("申诉内容不能为空");
+            }
+            Long requesterUserId = getCurrentUserId();
+            serviceClaimService.disputeByRequest(requesterUserId, requestId, reason.trim());
+            return Result.success("已提交申诉，社区管理员将介入处理", null);
+        } catch (Exception e) {
+            return Result.error("申诉失败: " + e.getMessage());
         }
     }
 

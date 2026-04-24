@@ -20,6 +20,7 @@ export interface AnnouncementVO {
   contentHtml: string
   targetScope: number
   targetCommunityId?: number
+  targetCommunityName?: string
   targetBuildingId?: number
   status: number
   isTop: 0 | 1

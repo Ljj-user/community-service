@@ -33,6 +33,14 @@ meta:
           class="w-40"
         />
         <n-select
+          v-model:value="query.targetCommunityId"
+          :options="communityOptions"
+          placeholder="所属社区"
+          clearable
+          filterable
+          class="w-56"
+        />
+        <n-select
           v-model:value="query.status"
           :options="statusOptions"
           :placeholder="t('community.announcements.statusPlaceholder')"
@@ -66,6 +74,7 @@ meta:
         :loading="loading"
         :bordered="false"
         :pagination="pagination"
+        :row-props="(row) => ({ onClick: () => openPreview(row), style: 'cursor: pointer;' })"
       />
     </Card>
 
@@ -93,7 +102,7 @@ meta:
               :label="t('community.announcements.labelCommunityId')"
               path="targetCommunityId"
             >
-              <n-input-number v-model:value="form.targetCommunityId" :min="1" class="w-full" />
+              <n-select v-model:value="form.targetCommunityId" :options="communityOptions" clearable filterable />
             </n-form-item>
             <n-form-item
               v-if="form.targetScope === 2"
@@ -178,6 +187,7 @@ import {
   announcementUpdate,
   type AnnouncementVO,
 } from '~/api/communityAnnouncements'
+import { adminCommunityOptions } from '~/api/adminCommunity'
 import {
   Delete20Regular,
   Edit20Regular,
@@ -196,11 +206,13 @@ const saving = ref(false)
 const query = reactive({
   keyword: '',
   targetScope: null as number | null,
+  targetCommunityId: null as number | null,
   status: null as number | null,
   isTop: null as number | null,
   current: 1,
   size: 10,
 })
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const rows = ref<AnnouncementVO[]>([])
 const pageTotal = ref(0)
@@ -260,6 +272,7 @@ async function fetchList() {
     const res = await announcementList({
       keyword: query.keyword || undefined,
       targetScope: query.targetScope ?? undefined,
+      targetCommunityId: query.targetCommunityId ?? undefined,
       status: query.status ?? undefined,
       isTop: query.isTop ?? undefined,
       current: query.current,
@@ -282,6 +295,7 @@ async function fetchList() {
 function resetQuery() {
   query.keyword = ''
   query.targetScope = null
+  query.targetCommunityId = null
   query.status = null
   query.isTop = null
   query.current = 1
@@ -289,6 +303,12 @@ function resetQuery() {
   pagination.page = 1
   pagination.pageSize = 10
   fetchList()
+}
+
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({ label: `${x.name}（${x.id}）`, value: x.id }))
 }
 
 const showEditor = ref(false)
@@ -457,6 +477,7 @@ const columns = computed<DataTableColumns<AnnouncementVO>>(() => {
         ),
     },
     { title: t('community.announcements.colScope'), key: 'targetScope', width: 120, render: (r) => scopeText(r.targetScope) },
+    { title: '所属社区', key: 'targetCommunityName', width: 180, render: (r) => r.targetCommunityName ? `${r.targetCommunityName}（${r.targetCommunityId ?? '-'}）` : '-' },
     { title: t('community.announcements.colStatus'), key: 'status', width: 110, render: (r) => statusText(r.status) },
     { title: t('community.announcements.colPublisher'), key: 'publisherName', width: 120, render: (r) => r.publisherName || '-' },
     { title: t('community.announcements.colPublishedAt'), key: 'publishedAt', width: 170, render: (r) => formatTime(r.publishedAt) },
@@ -495,5 +516,6 @@ const columns = computed<DataTableColumns<AnnouncementVO>>(() => {
 
 onMounted(() => {
   fetchList()
+  loadCommunities()
 })
 </script>

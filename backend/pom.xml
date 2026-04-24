@@ -79,6 +79,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- PDF export -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.43</version>
+        </dependency>
+
         <!-- MyBatis-Plus Code Generator（放在 test 范围，运行 main 生成代码） -->
         <dependency>
             <groupId>com.baomidou</groupId>

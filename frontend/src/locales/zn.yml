@@ -604,6 +604,8 @@ community:
     labelVolunteer: 认领志愿者
     volunteerNone: 暂未认领
     labelStatus: 当前状态
+    labelRule: 触发规则
+    labelAdvice: 建议动作
     labelRisk: 风险类型
     labelOvertime: 超时时长
     labelRating: 居民评价
@@ -613,6 +615,8 @@ community:
     unknownRisk: 未知
     colRequestId: 需求ID
     colRisk: 风险类型
+    colRule: 触发规则
+    colAdvice: 建议动作
     colServiceType: 服务类型
     colAddress: 服务地址
     colExpected: 期望时间
@@ -865,6 +869,7 @@ community:
     cardTimeout: 超时预警
     cardKpi: 核心理标预警
     cardCredit: 居民信用与冻结
+    cardAnomaly: 异常预警创新规则
     pointsPerHour: 积分换算（每小时服务）
     pointsPerHourHint: 服务1小时兑换积分，用于社区食堂、家政抵扣等
     demandClassifyHours: 需求分类标注时效（小时）
@@ -907,6 +912,12 @@ community:
     enableComplaintAlert: 启用投诉率预警
     noShowFreezeCount: 爽约次数触发服务冻结
     noShowFreezeHint: 居民恶意爽约达此次数后，触发服务冻结（双向互评机制）
+    careInactivityDays: 重点人群未登录预警天数
+    careInactivityDaysHint: 连续未登录达到该天数后触发主动关怀预警
+    surge24hMinRequests: 24小时求助骤增最小阈值
+    surge24hMinRequestsHint: 当天求助量达到该值且超过倍数阈值时触发
+    surgeMultiplier: 求助骤增倍数阈值
+    surgeMultiplierHint: 相对近7天日均值的倍数（例如 2.0）
   globalDashboard:
     title: 全局数据看板
     subtitle: 从全局视角查看社区需求对接率、服务覆盖率与区域服务热度。
@@ -930,7 +941,7 @@ community:
     chartMonthly: 本月需求流转（新增 vs 完成）
     chartMonthlyNoData: 暂无本月统计数据。
     chartHeatmap: 服务区域热力图
-    heatmapHint: 根据已完成服务统计区域热度（当前示例以中国整体 CN 为单一区域演示，可后续细化到省市）。
+    heatmapHint: 根据已完成服务按省级行政区统计热度（中国地图），数据会随业务记录实时更新。
     legendMatched: 已对接
     legendUnmatched: 未对接
     seriesNew: 本月新增
