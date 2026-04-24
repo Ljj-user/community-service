@@ -45,17 +45,17 @@ function quickFill(username: string, password: string) {
 
 <template>
   <AppPageLayout :navbar="false" copyright>
-    <div class="mx-4 flex flex-1 flex-col gap-8 justify-center">
+    <div class="login-wrap mx-4 flex flex-1 flex-col gap-8 justify-center">
       <div class="text-center space-y-2">
-        <div class="text-7 font-black">
+        <div class="text-7 font-black text-main">
           邻里时光（移动端）
         </div>
-        <div class="text-stone-5 text-sm">
-          仅普通用户登录，管理员请使用 PC 后台
+        <div class="text-sub text-sm">
+          社区居民与志愿者办理入口
         </div>
       </div>
       <form @submit="onSubmit">
-        <div class="mx-4 border rounded-xl bg-card overflow-hidden divide-y">
+        <div class="mx-4 border rounded-xl bg-card overflow-hidden divide-y form-card">
           <FormField v-slot="{ componentField }" name="account">
             <FormItem class="p-1 space-y-0">
               <FormControl>
@@ -79,27 +79,31 @@ function quickFill(username: string, password: string) {
         </div>
         <div class="mt-8 px-4">
           <FmButton :loading class="w-full" type="submit">
-            登录
+            进入办理大厅
           </FmButton>
           <FmButton class="w-full mt-3" variant="outline" type="button" @click="router.push('/register')">
-            没有账号？去注册
+            没有账号？去办理注册
           </FmButton>
           <FmDivider>
-            快速填充（可改成你的测试账号）
+            测试账号快捷填充
           </FmDivider>
           <div class="text-center space-x-4">
             <FmButton size="sm" variant="outline" @click="quickFill('resident1', '123456')">
-              填充用户账号
+              填充测试账号
             </FmButton>
           </div>
         </div>
       </form>
     </div>
-    <svg width="100%" viewBox="0 0 1440 590" xmlns="http://www.w3.org/2000/svg" class="svg pointer-events-none transition duration-300 delay-150 ease-in-out"><defs><linearGradient id="gradient" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="5%" stop-color="#F78DA7" /><stop offset="95%" stop-color="#8ED1FC" /></linearGradient></defs><path d="M 0,600 L 0,150 C 154.10714285714283,165.39285714285714 308.21428571428567,180.78571428571428 424,163 C 539.7857142857143,145.21428571428572 617.2500000000001,94.25 735,94 C 852.7499999999999,93.75 1010.7857142857142,144.21428571428572 1135,162 C 1259.2142857142858,179.78571428571428 1349.607142857143,164.89285714285714 1440,150 L 1440,600 L 0,600 Z" stroke="none" stroke-width="0" fill="url(#gradient)" fill-opacity="0.53" class="path-1 transition-all duration-300 delay-150 ease-in-out" /><defs><linearGradient id="gradient" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="5%" stop-color="#F78DA7" /><stop offset="95%" stop-color="#8ED1FC" /></linearGradient></defs><path d="M 0,600 L 0,350 C 144.10714285714286,333.7857142857143 288.2142857142857,317.57142857142856 389,313 C 489.7857142857143,308.42857142857144 547.25,315.5 657,321 C 766.75,326.5 928.7857142857142,330.42857142857144 1068,335 C 1207.2142857142858,339.57142857142856 1323.607142857143,344.7857142857143 1440,350 L 1440,600 L 0,600 Z" stroke="none" stroke-width="0" fill="url(#gradient)" fill-opacity="1" class="path-2 transition-all duration-300 delay-150 ease-in-out" /></svg>
+    <svg width="100%" viewBox="0 0 1440 590" xmlns="http://www.w3.org/2000/svg" class="svg pointer-events-none transition duration-300 delay-150 ease-in-out"><defs><linearGradient id="gradientGov" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="5%" stop-color="#0f766e" /><stop offset="95%" stop-color="#16a34a" /></linearGradient></defs><path d="M 0,600 L 0,150 C 154.10714285714283,165.39285714285714 308.21428571428567,180.78571428571428 424,163 C 539.7857142857143,145.21428571428572 617.2500000000001,94.25 735,94 C 852.7499999999999,93.75 1010.7857142857142,144.21428571428572 1135,162 C 1259.2142857142858,179.78571428571428 1349.607142857143,164.89285714285714 1440,150 L 1440,600 L 0,600 Z" stroke="none" stroke-width="0" fill="url(#gradientGov)" fill-opacity="0.3" class="path-1 transition-all duration-300 delay-150 ease-in-out" /><path d="M 0,600 L 0,350 C 144.10714285714286,333.7857142857143 288.2142857142857,317.57142857142856 389,313 C 489.7857142857143,308.42857142857144 547.25,315.5 657,321 C 766.75,326.5 928.7857142857142,330.42857142857144 1068,335 C 1207.2142857142858,339.57142857142856 1323.607142857143,344.7857142857143 1440,350 L 1440,600 L 0,600 Z" stroke="none" stroke-width="0" fill="url(#gradientGov)" fill-opacity="0.88" class="path-2 transition-all duration-300 delay-150 ease-in-out" /></svg>
   </AppPageLayout>
 </template>
 
 <style scoped>
+.login-wrap { position: relative; z-index: 1; }
+.text-main { color: var(--m-color-text); }
+.text-sub { color: var(--m-color-subtext); }
+.form-card { background: var(--m-color-card); border-color: var(--m-color-border); box-shadow: var(--m-shadow-card); }
 .svg {
   position: absolute;
   bottom: 0;
@@ -111,6 +115,9 @@ function quickFill(username: string, password: string) {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
+
+:global(.dark) .text-main { color: var(--m-color-text); }
+:global(.dark) .text-sub { color: var(--m-color-subtext); }
 
 @keyframes path-anim-1 {
   0% {

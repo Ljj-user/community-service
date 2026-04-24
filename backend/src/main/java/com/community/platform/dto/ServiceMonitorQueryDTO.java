@@ -24,5 +24,6 @@ public class ServiceMonitorQueryDTO {
      * 2 - 超时未完成
      */
     private Integer riskType;
+    private Long communityId;
 }
 

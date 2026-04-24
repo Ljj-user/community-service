@@ -9,133 +9,9 @@ definePage({
 })
 
 const router = useRouter()
-const videoRef = ref<HTMLVideoElement | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const cameraError = ref('')
-const scanning = ref(false)
-
-let stream: MediaStream | null = null
-
-/** 浏览器 BarcodeDetector（部分 TS lib 未包含类型） */
-interface BarcodeDetectorLike {
-  detect(image: ImageBitmapSource): Promise<Array<{ rawValue: string }>>
-}
-interface BarcodeDetectorCtor {
-  new (options?: { formats?: string[] }): BarcodeDetectorLike
-}
-
-function getBarcodeCtor(): BarcodeDetectorCtor | null {
-  if (typeof globalThis === 'undefined')
-    return null
-  return (globalThis as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector ?? null
-}
-
-async function startCamera() {
-  cameraError.value = ''
-  if (!navigator.mediaDevices?.getUserMedia) {
-    cameraError.value = '当前环境不支持摄像头'
-    return
-  }
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
-      audio: false,
-    })
-    const el = videoRef.value
-    if (el) {
-      el.srcObject = stream
-      await el.play()
-    }
-  }
-  catch (e: unknown) {
-    cameraError.value = e instanceof Error ? e.message : '无法打开摄像头'
-  }
-}
-
-onMounted(startCamera)
-
-onBeforeUnmount(() => {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop())
-    stream = null
-  }
+onMounted(() => {
+  toast.info('暂未开放扫码功能，请在上一页输入邀请码加入社区')
 })
-
-function openAlbum() {
-  fileInputRef.value?.click()
-}
-
-async function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file)
-    return
-
-  const BarcodeDetectorCtor = getBarcodeCtor()
-  if (!BarcodeDetectorCtor) {
-    toast.error('当前浏览器不支持二维码识别', {
-      description: '请使用 Chrome / Edge 等支持 BarcodeDetector 的浏览器',
-    })
-    return
-  }
-
-  scanning.value = true
-  try {
-    const bmp = await createImageBitmap(file)
-    const canvas = document.createElement('canvas')
-    canvas.width = bmp.width
-    canvas.height = bmp.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      toast.error('无法处理图片')
-      return
-    }
-    ctx.drawImage(bmp, 0, 0)
-    bmp.close()
-
-    const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] })
-    const codes = await detector.detect(canvas)
-    if (!codes.length) {
-      toast.error('未识别到二维码')
-      return
-    }
-    const raw = codes[0].rawValue
-    handleScanResult(raw)
-  }
-  catch (err: unknown) {
-    toast.error(err instanceof Error ? err.message : '识别失败')
-  }
-  finally {
-    scanning.value = false
-  }
-}
-
-function handleScanResult(text: string) {
-  const t = text.trim()
-  toast.success('识别成功', { description: t.length > 96 ? `${t.slice(0, 96)}…` : t })
-
-  if (/^https?:\/\//i.test(t)) {
-    try {
-      const u = new URL(t)
-      const hashPath = u.hash?.replace(/^#/, '') || ''
-      if (hashPath.startsWith('/')) {
-        router.push(hashPath)
-        return
-      }
-    }
-    catch {
-      /* 非标准 URL，走外链 */
-    }
-    window.open(t, '_blank', 'noopener,noreferrer')
-    return
-  }
-
-  // 非 URL：若看起来像邀请码，则跳转到加入社区页
-  if (/^[A-Za-z0-9]{4,32}$/.test(t)) {
-    router.push({ path: '/join-community', query: { code: t } })
-  }
-}
 </script>
 
 <template>
@@ -149,20 +25,19 @@ function handleScanResult(text: string) {
       </header>
 
       <p class="hint">
-        对准二维码扫描，或从相册选择含码图片（需浏览器支持识别 API）
+        暂未开放扫码功能，请返回后输入邀请码加入社区
       </p>
 
       <div class="viewport">
-        <video
-          v-show="!cameraError"
-          ref="videoRef"
-          class="camera"
-          playsinline
-          muted
-        />
-        <div v-if="cameraError" class="camera-fallback">
-          <FmIcon name="i-carbon:qr-code" class="big-ico" />
-          <span>{{ cameraError }}</span>
+        <div class="camera-fallback">
+          <div class="qr-placeholder" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <span>扫码功能暂未开放</span>
         </div>
 
         <div class="scan-frame" aria-hidden="true">
@@ -173,21 +48,11 @@ function handleScanResult(text: string) {
           <span class="scan-line" />
         </div>
 
-        <div v-if="scanning" class="scan-mask">
-          识别中…
-        </div>
       </div>
 
-      <NutButton block type="primary" class="album-btn" :disabled="scanning" @click="openAlbum">
-        从相册识别
+      <NutButton block type="primary" class="album-btn" @click="router.replace('/join-community')">
+        去输入邀请码
       </NutButton>
-      <input
-        ref="fileInputRef"
-        type="file"
-        accept="image/*"
-        class="hidden-input"
-        @change="onFileChange"
-      >
     </div>
   </AppPageLayout>
 </template>
@@ -224,7 +89,26 @@ function handleScanResult(text: string) {
   text-align: center;
   padding: 16px;
 }
-.big-ico { font-size: 48px; opacity: .85; }
+.qr-placeholder {
+  width: 72px;
+  height: 72px;
+  border: 2px solid #67e8f9;
+  border-radius: 8px;
+  position: relative;
+  box-sizing: border-box;
+}
+.qr-placeholder span {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #67e8f9;
+  border-radius: 2px;
+}
+.qr-placeholder span:nth-child(1) { left: 8px; top: 8px; }
+.qr-placeholder span:nth-child(2) { right: 8px; top: 8px; }
+.qr-placeholder span:nth-child(3) { left: 8px; bottom: 8px; }
+.qr-placeholder span:nth-child(4) { right: 8px; bottom: 8px; }
+.qr-placeholder span:nth-child(5) { left: 31px; top: 31px; }
 
 .scan-frame {
   position: absolute;

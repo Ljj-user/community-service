@@ -13,6 +13,7 @@ import { h, onMounted, reactive, ref, computed } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
 import { NTag, useMessage } from 'naive-ui'
 import { serviceMonitorList, type ServiceMonitorItem } from '~/api/serviceMonitor'
+import { adminCommunityOptions } from '~/api/adminCommunity'
 import httpClient from '~/common/api/http-client'
 import { dtActionBtn, dtActionRowClass } from '~/utils/dataTableActions'
 
@@ -24,7 +25,9 @@ const nowText = ref('')
 
 const filters = reactive({
   riskType: 1 as 1 | 2,
+  communityId: null as null | number,
 })
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const tableData = ref<ServiceMonitorItem[]>([])
 
@@ -68,6 +71,23 @@ function formatDateTime(value?: string) {
   return value.replace('T', ' ')
 }
 
+function statusCodeText(status?: number) {
+  if (status === 0) return 'CREATED'
+  if (status === 1) return 'APPROVED'
+  if (status === 2) return 'IN_PROGRESS'
+  if (status === 3) return 'COMPLETED'
+  if (status === 4) return 'CANCELLED'
+  return 'CREATED'
+}
+
+function statusStepIndex(status?: number) {
+  if (status === 0) return 1
+  if (status === 1) return 2
+  if (status === 2) return 3
+  if (status === 3 || status === 4) return 4
+  return 1
+}
+
 function updateNow() {
   const loc = locale.value === 'zn' ? 'zh-CN' : 'en-US'
   nowText.value = new Date().toLocaleString(loc)
@@ -80,6 +100,7 @@ async function fetchData() {
       current: pagination.page,
       size: pagination.pageSize,
       riskType: filters.riskType,
+      communityId: filters.communityId ?? undefined,
     })
     if (resp.code === 200) {
       const page = resp.data
@@ -113,6 +134,12 @@ async function handleRemind(row: ServiceMonitorItem) {
   }
 }
 
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({ label: `${x.name}（${x.id}）`, value: x.id }))
+}
+
 const columns = computed<DataTableColumns<ServiceMonitorItem>>(() => {
   void locale.value
   return [
@@ -133,6 +160,32 @@ const columns = computed<DataTableColumns<ServiceMonitorItem>>(() => {
           { type, size: 'small', bordered: false },
           { default: () => text },
         )
+      },
+    },
+    {
+      title: '所属社区',
+      key: 'communityName',
+      width: 180,
+      render(row) {
+        return row.communityName ? `${row.communityName}（${row.communityId ?? '-'}）` : '-'
+      },
+    },
+    {
+      title: t('community.monitor.colRule'),
+      key: 'triggerRule',
+      width: 220,
+      ellipsis: true,
+      render(row) {
+        return row.triggerRule || '-'
+      },
+    },
+    {
+      title: t('community.monitor.colAdvice'),
+      key: 'suggestionAction',
+      width: 220,
+      ellipsis: true,
+      render(row) {
+        return row.suggestionAction || '-'
       },
     },
     {
@@ -216,6 +269,7 @@ const columns = computed<DataTableColumns<ServiceMonitorItem>>(() => {
 
 onMounted(() => {
   fetchData()
+  loadCommunities()
 })
 </script>
 
@@ -238,6 +292,14 @@ onMounted(() => {
             {{ t('community.monitor.riskIncomplete') }}
           </n-radio-button>
         </n-radio-group>
+        <n-select
+          v-model:value="filters.communityId"
+          :options="communityOptions"
+          placeholder="所属社区"
+          clearable
+          filterable
+          class="w-56"
+        />
         <n-space size="small">
           <n-button type="primary" size="small" :loading="loading" @click="fetchData">
             {{ t('community.monitor.refresh') }}
@@ -255,12 +317,30 @@ onMounted(() => {
         :loading="loading"
         :pagination="pagination"
         :bordered="false"
+        :row-props="(row) => ({ onClick: () => handleViewDetail(row), style: 'cursor: pointer;' })"
       />
     </Card>
 
     <n-drawer v-model:show="detailVisible" :width="420">
       <n-drawer-content :title="`${t('community.monitor.detailTitle')} #${currentRow?.requestId ?? ''}`">
         <div v-if="currentRow" class="space-y-2 text-sm">
+          <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-3 mb-2">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-slate-500">状态编码</span>
+              <n-tag :type="currentRow.status === 4 ? 'error' : 'info'" size="small" :bordered="false">
+                {{ statusCodeText(currentRow.status) }}
+              </n-tag>
+            </div>
+            <n-steps :current="statusStepIndex(currentRow.status)" size="small">
+              <n-step title="发布" />
+              <n-step title="审核" />
+              <n-step title="进行中" />
+              <n-step title="完成" />
+            </n-steps>
+          </div>
+          <div>
+            <span class="text-slate-500">所属社区：</span>{{ currentRow.communityName ? `${currentRow.communityName}（${currentRow.communityId ?? '-'}）` : '-' }}
+          </div>
           <div>
             <span class="text-slate-500">{{ t('community.monitor.labelServiceType') }}：</span>{{ currentRow.serviceType }}
           </div>
@@ -281,6 +361,12 @@ onMounted(() => {
           </div>
           <div>
             <span class="text-slate-500">{{ t('community.monitor.labelStatus') }}：</span>{{ renderRiskType(currentRow.riskType) }}
+          </div>
+          <div>
+            <span class="text-slate-500">{{ t('community.monitor.labelRule') }}：</span>{{ currentRow.triggerRule || '-' }}
+          </div>
+          <div>
+            <span class="text-slate-500">{{ t('community.monitor.labelAdvice') }}：</span>{{ currentRow.suggestionAction || '-' }}
           </div>
           <div>
             <span class="text-slate-500">{{ t('community.monitor.labelOvertime') }}：</span>{{ currentRow.overtimeMinutes }} {{ t('community.monitor.minutes') }}

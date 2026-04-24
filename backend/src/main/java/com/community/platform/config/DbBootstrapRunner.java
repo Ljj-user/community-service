@@ -3,6 +3,7 @@ package com.community.platform.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -19,12 +20,35 @@ public class DbBootstrapRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        ensurePasswordHashColumn();
         ensureSysNotification();
         ensureVerificationAndOnboarding();
         ensureMatchingTags();
         ensureMutualAidPostAndBarter();
         ensureCommunityInviteCode();
         ensureCommunityBanner();
+        ensureAnomalyAlertAndCredit();
+        ensureDualEvaluationSchema();
+    }
+
+    private void ensurePasswordHashColumn() {
+        Integer cnt = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name='sys_user'
+                  AND column_name='password_md5'
+                  AND (
+                    data_type <> 'varchar'
+                    OR character_maximum_length < 60
+                  )
+                """, Integer.class);
+        if (cnt != null && cnt > 0) {
+            jdbcTemplate.execute("""
+                    ALTER TABLE sys_user
+                    MODIFY COLUMN password_md5 VARCHAR(100) NOT NULL COMMENT '密码哈希（字段名沿用；兼容历史MD5与当前BCrypt）'
+                    """);
+        }
     }
 
     private void ensureSysNotification() {
@@ -254,6 +278,123 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   KEY idx_banner_comm_time (community_id, created_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='社区轮播图';
                 """);
+    }
+
+    private void ensureAnomalyAlertAndCredit() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS anomaly_alert_event (
+                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                  alert_code VARCHAR(64) NOT NULL,
+                  community_id BIGINT UNSIGNED NULL,
+                  request_id BIGINT UNSIGNED NULL,
+                  target_user_id BIGINT UNSIGNED NULL,
+                  severity TINYINT UNSIGNED NOT NULL DEFAULT 2,
+                  trigger_rule VARCHAR(255) NOT NULL,
+                  suggestion_action VARCHAR(255) NULL,
+                  rule_snapshot TEXT NULL,
+                  dedup_key VARCHAR(128) NOT NULL,
+                  occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  KEY idx_alert_code_time (alert_code, occurred_at),
+                  KEY idx_alert_comm_time (community_id, occurred_at),
+                  KEY idx_alert_req_time (request_id, occurred_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异常预警事件';
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS volunteer_credit_ledger (
+                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                  user_id BIGINT UNSIGNED NOT NULL,
+                  request_id BIGINT UNSIGNED NOT NULL,
+                  claim_id BIGINT UNSIGNED NOT NULL,
+                  hours DECIMAL(10,2) NOT NULL DEFAULT 0,
+                  rating TINYINT NULL,
+                  overtime_penalty DECIMAL(5,2) NOT NULL DEFAULT 1.00,
+                  credit_delta DECIMAL(10,2) NOT NULL DEFAULT 0,
+                  calc_version VARCHAR(32) NOT NULL DEFAULT 'v1',
+                  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_credit_claim (claim_id),
+                  KEY idx_credit_user_time (user_id, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='志愿者信用明细账本';
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS volunteer_credit_snapshot (
+                  user_id BIGINT UNSIGNED NOT NULL,
+                  total_hours DECIMAL(10,2) NOT NULL DEFAULT 0,
+                  avg_rating_30d DECIMAL(4,2) NULL,
+                  completion_rate_30d DECIMAL(5,2) NOT NULL DEFAULT 0,
+                  credit_score DECIMAL(12,2) NOT NULL DEFAULT 0,
+                  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  PRIMARY KEY (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='志愿者信用快照';
+                """);
+    }
+
+    /**
+     * 双向评价字段/索引兜底：
+     * - evaluator_role 列
+     * - 唯一索引由 uk_eval_claim 升级为 uk_eval_claim_role(claim_id, evaluator_role)
+     */
+    private void ensureDualEvaluationSchema() {
+        Integer hasColumn = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name='service_evaluation'
+                  AND column_name='evaluator_role'
+                """, Integer.class);
+        if (hasColumn == null || hasColumn == 0) {
+            jdbcTemplate.execute("""
+                    ALTER TABLE service_evaluation
+                    ADD COLUMN evaluator_role TINYINT UNSIGNED NOT NULL DEFAULT 1
+                    COMMENT '评价方角色：1居民 2志愿者'
+                    AFTER volunteer_user_id
+                    """);
+        }
+
+        Integer hasOldUk = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name='service_evaluation'
+                  AND index_name='uk_eval_claim'
+                """, Integer.class);
+        if (hasOldUk != null && hasOldUk > 0) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE service_evaluation DROP INDEX uk_eval_claim");
+            } catch (DataAccessException ex) {
+                // 历史库可能存在“外键依赖同名索引”的场景，此时跳过删除，保证应用可启动
+            }
+        }
+
+        Integer hasNewUk = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name='service_evaluation'
+                  AND index_name='uk_eval_claim_role'
+                """, Integer.class);
+        if (hasNewUk == null || hasNewUk == 0) {
+            jdbcTemplate.execute("""
+                    ALTER TABLE service_evaluation
+                    ADD UNIQUE KEY uk_eval_claim_role (claim_id, evaluator_role)
+                    """);
+        }
+
+        Integer hasRoleIndex = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name='service_evaluation'
+                  AND index_name='idx_eval_evaluator_role'
+                """, Integer.class);
+        if (hasRoleIndex == null || hasRoleIndex == 0) {
+            jdbcTemplate.execute("""
+                    CREATE INDEX idx_eval_evaluator_role
+                    ON service_evaluation (evaluator_role)
+                    """);
+        }
     }
 }
 

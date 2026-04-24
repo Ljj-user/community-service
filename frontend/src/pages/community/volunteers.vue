@@ -14,6 +14,7 @@ import {
   adminUserSetStatus,
   type AdminUserVO,
 } from '~/api/adminUsers'
+import { adminCommunityOptions } from '~/api/adminCommunity'
 import {
   CheckmarkCircle20Regular,
   Eye20Regular,
@@ -31,9 +32,11 @@ const loading = ref(false)
 const query = reactive({
   username: '',
   status: null as null | number,
+  communityId: null as null | number,
   page: 1,
   size: 10,
 })
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const pageTotal = ref(0)
 const rows = ref<AdminUserVO[]>([])
@@ -68,6 +71,7 @@ async function fetchList() {
       username: query.username || undefined,
       role: 3, // 普通用户
       status: query.status ?? undefined,
+      communityId: query.communityId ?? undefined,
       page: query.page,
       size: query.size,
     })
@@ -90,8 +94,15 @@ async function fetchList() {
 function resetQuery() {
   query.username = ''
   query.status = null
+  query.communityId = null
   query.page = 1
   fetchList()
+}
+
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({ label: `${x.name}（${x.id}）`, value: x.id }))
 }
 
 function openDetail(row: AdminUserVO) {
@@ -143,6 +154,7 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
     { title: t('community.volunteers.colName'), key: 'realName', minWidth: 120, render: (r) => r.realName || '-' },
     { title: t('community.volunteers.colPhone'), key: 'phone', minWidth: 130, render: (r) => r.phone || '-' },
     { title: t('community.volunteers.colEmail'), key: 'email', minWidth: 170, render: (r) => r.email || '-' },
+    { title: '所属社区', key: 'communityName', minWidth: 180, render: (r) => r.communityName ? `${r.communityName}（${r.communityId ?? '-'}）` : '-' },
     {
       title: t('community.volunteers.colIdentity'),
       key: 'identityType',
@@ -191,7 +203,10 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
   ]
 })
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchList()
+  loadCommunities()
+})
 </script>
 
 <template>
@@ -211,6 +226,7 @@ onMounted(fetchList)
       <div class="grid gap-3 md:grid-cols-4">
         <n-input v-model:value="query.username" :placeholder="t('community.volunteers.searchUser')" clearable />
         <n-select v-model:value="query.status" :options="statusOptions" :placeholder="t('community.volunteers.auditStatus')" clearable />
+        <n-select v-model:value="query.communityId" :options="communityOptions" placeholder="所属社区" clearable filterable />
         <div class="flex gap-2">
           <n-button type="primary" :loading="loading" @click="() => { query.page = 1; fetchList() }">
             {{ t('community.volunteers.query') }}
@@ -227,6 +243,7 @@ onMounted(fetchList)
         :columns="columns"
         :data="rows"
         :loading="loading"
+        :row-props="(row) => ({ onClick: () => openDetail(row), style: 'cursor: pointer;' })"
         :pagination="{
           page: query.page,
           pageSize: query.size,

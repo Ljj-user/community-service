@@ -8,10 +8,11 @@ meta:
 </route>
 
 <script setup lang="ts">
-import type { DataTableColumns, FormInst } from 'naive-ui'
+import type { DataTableColumns, FormInst, UploadCustomRequestOptions } from 'naive-ui'
 import { NButton, NPopconfirm } from 'naive-ui'
 import { h } from 'vue'
-import { bannerDelete, bannerList, bannerUpsert, type BannerVO } from '~/api/adminBanners'
+import { bannerDelete, bannerList, bannerUploadImage, bannerUpsert, type BannerVO } from '~/api/adminBanners'
+import { adminCommunityOptions } from '~/api/adminCommunity'
 import { storeToRefs } from 'pinia'
 
 const { t, locale } = useI18n()
@@ -23,11 +24,13 @@ const isSuperAdmin = computed(() => user.value?.role === 1)
 
 const loading = ref(false)
 const rows = ref<BannerVO[]>([])
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
 const formRef = ref<FormInst | null>(null)
 const saving = ref(false)
+const uploading = ref(false)
 
 const form = reactive({
   id: null as null | number,
@@ -52,6 +55,12 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({ label: `${x.name}（${x.id}）`, value: x.id }))
 }
 
 function openCreate() {
@@ -109,6 +118,29 @@ async function submit() {
   }
 }
 
+async function handleBannerUpload(options: UploadCustomRequestOptions) {
+  const file = options.file.file
+  if (!file) {
+    options.onError()
+    return
+  }
+  uploading.value = true
+  try {
+    const res = await bannerUploadImage(file)
+    if (res.code !== 200 || !res.data?.imageUrl) {
+      throw new Error(res.message || '上传失败')
+    }
+    form.imageUrl = res.data.imageUrl
+    message.success('图片上传成功')
+    options.onFinish()
+  } catch (e: any) {
+    message.error(e?.message || '上传失败')
+    options.onError()
+  } finally {
+    uploading.value = false
+  }
+}
+
 async function remove(r: BannerVO) {
   try {
     const res = await bannerDelete(r.id, isSuperAdmin.value ? { communityId: form.communityId } : undefined)
@@ -124,6 +156,7 @@ async function remove(r: BannerVO) {
 const columns = computed<DataTableColumns<BannerVO>>(() => {
   void locale.value
   return [
+    { title: '所属社区', key: 'communityName', render: r => r.communityName ? `${r.communityName}（${r.communityId ?? '-'}）` : '全局默认' },
     { title: '标题', key: 'title' },
     { title: '副标题', key: 'subtitle' },
     { title: '图片', key: 'imageUrl', ellipsis: { tooltip: true } },
@@ -135,7 +168,14 @@ const columns = computed<DataTableColumns<BannerVO>>(() => {
         return h('div', { class: 'flex gap-2' }, [
           h(
             NButton,
-            { size: 'small', tertiary: true, onClick: () => openEdit(r, idx) },
+            {
+              size: 'small',
+              tertiary: true,
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation()
+                openEdit(r, idx)
+              },
+            },
             { default: () => '编辑' },
           ),
           h(
@@ -146,7 +186,7 @@ const columns = computed<DataTableColumns<BannerVO>>(() => {
               trigger: () =>
                 h(
                   NButton,
-                  { size: 'small', tertiary: true, type: 'error' },
+                  { size: 'small', tertiary: true, type: 'error', onClick: (e: MouseEvent) => e.stopPropagation() },
                   { default: () => '删除' },
                 ),
             },
@@ -157,7 +197,10 @@ const columns = computed<DataTableColumns<BannerVO>>(() => {
   ]
 })
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadCommunities()
+})
 </script>
 
 <template>
@@ -177,23 +220,36 @@ onMounted(load)
 
     <n-card :bordered="false">
       <div v-if="isSuperAdmin" class="mb-3 flex items-center gap-2">
-        <span class="text-sm text-slate-500">超管可按 communityId 查看/管理：</span>
-        <n-input-number v-model:value="form.communityId" :min="0" placeholder="空=全局默认" />
+        <span class="text-sm text-slate-500">按社区筛选：</span>
+        <n-select v-model:value="form.communityId" :options="communityOptions" clearable filterable placeholder="空=全局默认" class="w-64" />
         <n-button size="small" @click="load">切换</n-button>
       </div>
-      <n-data-table :bordered="false" size="small" :columns="columns" :data="rows" :loading="loading" />
+      <n-data-table :bordered="false" size="small" :columns="columns" :data="rows" :loading="loading" :row-props="(row, idx) => ({ onClick: () => openEdit(row, idx), style: 'cursor: pointer;' })" />
     </n-card>
 
     <n-modal v-model:show="showModal" preset="card" :title="modalMode==='create' ? '新增轮播' : '编辑轮播'" style="width: min(720px, 92vw);">
       <n-form ref="formRef" :model="form" label-placement="top">
+        <n-form-item v-if="isSuperAdmin" label="所属社区">
+          <n-select v-model:value="form.communityId" :options="communityOptions" clearable filterable placeholder="空=全局默认" />
+        </n-form-item>
         <n-form-item label="标题">
           <n-input v-model:value="form.title" placeholder="例如：社区关怀日" />
         </n-form-item>
         <n-form-item label="副标题">
           <n-input v-model:value="form.subtitle" placeholder="例如：优先帮助独居老人…" />
         </n-form-item>
-        <n-form-item label="图片URL（可空）">
-          <n-input v-model:value="form.imageUrl" placeholder="https://..." />
+        <n-form-item label="轮播图片">
+          <div class="w-full space-y-2">
+            <n-upload
+              :default-upload="false"
+              :custom-request="handleBannerUpload"
+              accept="image/*"
+            >
+              <n-button :loading="uploading">上传图片</n-button>
+            </n-upload>
+            <n-input v-model:value="form.imageUrl" placeholder="上传后自动回填，可手工微调" />
+            <img v-if="form.imageUrl" :src="form.imageUrl" alt="banner preview" class="max-h-36 rounded border border-slate-200" />
+          </div>
         </n-form-item>
         <n-form-item label="点击跳转URL（可空）">
           <n-input v-model:value="form.linkUrl" placeholder="https:// 或 #/ 路由" />

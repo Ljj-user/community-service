@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.community.platform.common.Constants;
+import com.community.platform.dto.MobileAlertCardVO;
 import com.community.platform.dto.NotificationUnreadCountVO;
 import com.community.platform.dto.UserNotificationVO;
 import com.community.platform.generated.entity.Announcement;
@@ -146,9 +147,64 @@ public class UserNotificationServiceImpl implements UserNotificationService {
         return voPage;
     }
 
+    @Override
+    public IPage<MobileAlertCardVO> pageMyAlertNotifications(Long userId, long page, long size, Boolean unreadOnly) {
+        LambdaQueryWrapper<SysNotification> w = new LambdaQueryWrapper<>();
+        w.eq(SysNotification::getRecipientUserId, userId)
+                .eq(SysNotification::getMsgCategory, Constants.NOTIFICATION_CATEGORY_BUSINESS)
+                .in(SysNotification::getRefType, Constants.NOTIF_REF_CARE_ALERT, Constants.NOTIF_REF_ANOMALY_ALERT);
+        if (Boolean.TRUE.equals(unreadOnly)) {
+            w.eq(SysNotification::getReadStatus, Constants.NOTIFICATION_UNREAD);
+        }
+        w.orderByDesc(SysNotification::getCreatedAt);
+        Page<SysNotification> p = new Page<>(page, size);
+        IPage<SysNotification> entityPage = sysNotificationMapper.selectPage(p, w);
+        Page<MobileAlertCardVO> voPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
+        voPage.setRecords(entityPage.getRecords().stream().map(this::toMobileAlertCard).toList());
+        return voPage;
+    }
+
+    @Override
+    public long countMyAlertUnread(Long userId) {
+        LambdaQueryWrapper<SysNotification> w = new LambdaQueryWrapper<>();
+        w.eq(SysNotification::getRecipientUserId, userId)
+                .eq(SysNotification::getMsgCategory, Constants.NOTIFICATION_CATEGORY_BUSINESS)
+                .eq(SysNotification::getReadStatus, Constants.NOTIFICATION_UNREAD)
+                .in(SysNotification::getRefType, Constants.NOTIF_REF_CARE_ALERT, Constants.NOTIF_REF_ANOMALY_ALERT);
+        return sysNotificationMapper.selectCount(w);
+    }
+
     private UserNotificationVO toVO(SysNotification n) {
         UserNotificationVO vo = new UserNotificationVO();
         BeanUtils.copyProperties(n, vo);
+        return vo;
+    }
+
+    private MobileAlertCardVO toMobileAlertCard(SysNotification n) {
+        MobileAlertCardVO vo = new MobileAlertCardVO();
+        vo.setId(n.getId());
+        vo.setTitle(n.getTitle());
+        vo.setSummary(n.getSummary());
+        vo.setReadStatus(n.getReadStatus());
+        vo.setCreatedAt(n.getCreatedAt());
+        vo.setRefType(n.getRefType());
+        vo.setRefId(n.getRefId());
+        vo.setActionType("OPEN_ALERT_DETAIL");
+        vo.setActionTarget("/mobile/admin/alerts/" + n.getRefId());
+
+        if (Constants.NOTIF_REF_CARE_ALERT.equals(n.getRefType())) {
+            vo.setAlertType("CARE_INACTIVE");
+            vo.setAlertTypeLabel("关怀预警");
+            vo.setSeverityLevel(2);
+            vo.setSeverityLabel("中");
+            vo.setSeverityColor("#FF9800");
+        } else {
+            vo.setAlertType("DEMAND_SURGE");
+            vo.setAlertTypeLabel("需求激增预警");
+            vo.setSeverityLevel(3);
+            vo.setSeverityLabel("高");
+            vo.setSeverityColor("#F44336");
+        }
         return vo;
     }
 

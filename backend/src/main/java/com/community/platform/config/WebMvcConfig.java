@@ -15,22 +15,31 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Value("${app.avatar-upload-dir:uploads/avatars}")
     private String avatarUploadDir;
+    @Value("${app.banner-upload-dir:uploads/banner}")
+    private String bannerUploadDir;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        File dir = new File(avatarUploadDir).getAbsoluteFile();
+        String location = normalizeDir(avatarUploadDir);
+        registry.addResourceHandler("/static/avatars/**")
+                .addResourceLocations("file:" + location);
+
+        String bannerLocation = normalizeDir(bannerUploadDir);
+        registry.addResourceHandler("/static/banner/**")
+                .addResourceLocations("file:" + bannerLocation);
+    }
+
+    private String normalizeDir(String path) {
+        File dir = new File(path).getAbsoluteFile();
         if (!dir.exists()) {
             // best effort; failures will surface on upload
             dir.mkdirs();
         }
-
         String location = dir.getPath().replace("\\", "/");
         if (!location.endsWith("/")) {
             location = location + "/";
         }
-
-        registry.addResourceHandler("/static/avatars/**")
-                .addResourceLocations("file:" + location);
+        return location;
     }
 }
 

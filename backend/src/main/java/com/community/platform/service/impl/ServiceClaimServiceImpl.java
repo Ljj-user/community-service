@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.community.platform.common.Constants;
+import com.community.platform.common.ServiceRequestStateMachine;
 import com.community.platform.dto.ServiceClaimDTO;
 import com.community.platform.dto.ServiceClaimVO;
 import com.community.platform.dto.ServiceCompleteDTO;
+import com.community.platform.dto.ServiceDisputeDTO;
 import com.community.platform.generated.entity.ServiceClaim;
 import com.community.platform.generated.entity.ServiceOrder;
 import com.community.platform.generated.entity.ServiceRequest;
@@ -28,6 +30,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +56,9 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
 
     @Autowired
     private UserNotificationService userNotificationService;
+
+    @Autowired
+    private VolunteerCreditService volunteerCreditService;
 
     @Override
     @Transactional
@@ -91,7 +97,7 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
                         .eq(ServiceClaim::getRequestId, dto.getRequestId())
                         .eq(ServiceClaim::getVolunteerUserId, volunteerId)
                         .eq(ServiceClaim::getIsDeleted, 0)
-                        .in(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_CLAIMED, Constants.CLAIM_STATUS_COMPLETED)
+                        .in(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_CLAIMED, Constants.CLAIM_STATUS_COMPLETED, Constants.CLAIM_STATUS_PENDING_CONFIRM)
                         .last("LIMIT 1")
         );
         
@@ -105,7 +111,7 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
                         .eq(ServiceClaim::getRequestId, dto.getRequestId())
                         .ne(ServiceClaim::getVolunteerUserId, volunteerId)
                         .eq(ServiceClaim::getIsDeleted, 0)
-                        .in(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_CLAIMED, Constants.CLAIM_STATUS_COMPLETED)
+                        .in(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_CLAIMED, Constants.CLAIM_STATUS_COMPLETED, Constants.CLAIM_STATUS_PENDING_CONFIRM)
                         .last("LIMIT 1")
         );
         
@@ -126,6 +132,7 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         serviceClaimMapper.insert(claim);
         
         // 更新需求状态为已认领
+        ServiceRequestStateMachine.assertTransition(request.getStatus(), Constants.REQUEST_STATUS_CLAIMED);
         request.setStatus(Constants.REQUEST_STATUS_CLAIMED);
         request.setClaimedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
@@ -173,8 +180,8 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             throw new RuntimeException("只能完成已认领的服务");
         }
         
-        // 更新认领记录
-        claim.setClaimStatus(Constants.CLAIM_STATUS_COMPLETED);  // 已完成
+        // 更新认领记录为“待确认”
+        claim.setClaimStatus(Constants.CLAIM_STATUS_PENDING_CONFIRM);
         claim.setServiceHours(dto.getServiceHours());
         claim.setHoursSubmittedAt(LocalDateTime.now());
         claim.setCompletionNote(dto.getCompletionNote());
@@ -182,11 +189,11 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         
         serviceClaimMapper.updateById(claim);
         
-        // 更新需求状态为已完成
+        // 需求进入“待确认”，等待需求方确认或超时自动完成
         ServiceRequest request = serviceRequestMapper.selectById(claim.getRequestId());
         if (request != null && request.getIsDeleted() == 0) {
-            request.setStatus(Constants.REQUEST_STATUS_COMPLETED);
-            request.setCompletedAt(LocalDateTime.now());
+            ServiceRequestStateMachine.assertTransition(request.getStatus(), Constants.REQUEST_STATUS_PENDING_CONFIRM);
+            request.setStatus(Constants.REQUEST_STATUS_PENDING_CONFIRM);
             request.setUpdatedAt(LocalDateTime.now());
             serviceRequestMapper.updateById(request);
         }
@@ -211,8 +218,8 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         if (claim == null || claim.getIsDeleted() == 1) {
             throw new RuntimeException("认领记录不存在");
         }
-        if (claim.getClaimStatus() == null || !claim.getClaimStatus().equals(Constants.CLAIM_STATUS_COMPLETED)) {
-            throw new RuntimeException("只能核销已完成的服务");
+        if (claim.getClaimStatus() == null || !claim.getClaimStatus().equals(Constants.CLAIM_STATUS_PENDING_CONFIRM)) {
+            throw new RuntimeException("只能确认待确认的服务");
         }
         if (claim.getServiceHours() == null) {
             throw new RuntimeException("服务时长为空，无法核销");
@@ -226,7 +233,83 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             throw new RuntimeException("无权核销该需求");
         }
 
-        SysUser requester = sysUserMapper.selectById(requesterUserId);
+        settleAndFinalize(request, claim);
+    }
+
+    @Override
+    @Transactional
+    public void disputeService(Long requesterUserId, ServiceDisputeDTO dto) {
+        ServiceClaim claim = serviceClaimMapper.selectById(dto.getClaimId());
+        if (claim == null || claim.getIsDeleted() == 1) {
+            throw new RuntimeException("认领记录不存在");
+        }
+        if (!Set.of(Constants.CLAIM_STATUS_PENDING_CONFIRM, Constants.CLAIM_STATUS_CLAIMED).contains(claim.getClaimStatus())) {
+            throw new RuntimeException("当前状态不可申诉");
+        }
+        ServiceRequest request = serviceRequestMapper.selectById(claim.getRequestId());
+        if (request == null || request.getIsDeleted() == 1) {
+            throw new RuntimeException("需求不存在");
+        }
+        if (!request.getRequesterUserId().equals(requesterUserId)) {
+            throw new RuntimeException("无权申诉该需求");
+        }
+        claim.setClaimStatus(Constants.CLAIM_STATUS_DISPUTED);
+        claim.setCompletionNote(String.format("【申诉】%s", dto.getReason().trim()));
+        claim.setUpdatedAt(LocalDateTime.now());
+        serviceClaimMapper.updateById(claim);
+    }
+
+    @Override
+    @Transactional
+    public void disputeByRequest(Long requesterUserId, Long requestId, String reason) {
+        ServiceRequest request = serviceRequestMapper.selectById(requestId);
+        if (request == null || request.getIsDeleted() == 1) {
+            throw new RuntimeException("需求不存在");
+        }
+        if (!request.getRequesterUserId().equals(requesterUserId)) {
+            throw new RuntimeException("无权申诉该需求");
+        }
+        ServiceClaim claim = serviceClaimMapper.selectOne(new LambdaQueryWrapper<ServiceClaim>()
+                .eq(ServiceClaim::getRequestId, requestId)
+                .eq(ServiceClaim::getIsDeleted, 0)
+                .orderByDesc(ServiceClaim::getId)
+                .last("LIMIT 1"));
+        if (claim == null) {
+            throw new RuntimeException("未找到关联认领记录");
+        }
+        ServiceDisputeDTO dto = new ServiceDisputeDTO();
+        dto.setClaimId(claim.getId());
+        dto.setReason(reason);
+        disputeService(requesterUserId, dto);
+    }
+
+    @Transactional
+    public int autoCompletePendingClaims(int timeoutHours) {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(timeoutHours);
+        List<ServiceClaim> pendingClaims = serviceClaimMapper.selectList(
+                new LambdaQueryWrapper<ServiceClaim>()
+                        .eq(ServiceClaim::getIsDeleted, 0)
+                        .eq(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_PENDING_CONFIRM)
+                        .le(ServiceClaim::getHoursSubmittedAt, cutoff)
+        );
+        int success = 0;
+        for (ServiceClaim claim : pendingClaims) {
+            ServiceRequest request = serviceRequestMapper.selectById(claim.getRequestId());
+            if (request == null || request.getIsDeleted() == 1) {
+                continue;
+            }
+            try {
+                settleAndFinalize(request, claim);
+                success++;
+            } catch (Exception ignored) {
+                // 失败时保留“待确认”，等待管理员干预
+            }
+        }
+        return success;
+    }
+
+    private void settleAndFinalize(ServiceRequest request, ServiceClaim claim) {
+        SysUser requester = sysUserMapper.selectById(request.getRequesterUserId());
         SysUser volunteer = sysUserMapper.selectById(claim.getVolunteerUserId());
         if (requester == null || volunteer == null) {
             throw new RuntimeException("用户不存在");
@@ -243,7 +326,6 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             throw new RuntimeException("时间币余额不足，无法核销");
         }
 
-        // 订单存在性
         LambdaQueryWrapper<ServiceOrder> ow = new LambdaQueryWrapper<>();
         ow.eq(ServiceOrder::getRequestId, request.getId()).eq(ServiceOrder::getIsDeleted, 0).last("LIMIT 1");
         ServiceOrder order = serviceOrderMapper.selectOne(ow);
@@ -259,7 +341,6 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             serviceOrderMapper.insert(order);
         }
 
-        // 结算：志愿者 +coins；需求方 -coins（或系统补贴）
         volunteer.setTimeCoins((volunteer.getTimeCoins() == null ? 0 : volunteer.getTimeCoins()) + coins);
         sysUserMapper.updateById(volunteer);
 
@@ -268,11 +349,10 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             sysUserMapper.updateById(requester);
         }
 
-        // 记录流水
         com.community.platform.generated.entity.TimeTransaction tVol = new com.community.platform.generated.entity.TimeTransaction();
         tVol.setUserId(volunteer.getId());
         tVol.setAmount(coins);
-        tVol.setType((byte) 1); // 服务所得
+        tVol.setType((byte) 1);
         tVol.setOrderId(order.getId());
         tVol.setCreateTime(LocalDateTime.now());
         timeTransactionMapper.insert(tVol);
@@ -281,19 +361,30 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         tReq.setUserId(requester.getId());
         if (subsidized) {
             tReq.setAmount(coins);
-            tReq.setType((byte) 3); // 系统补贴
+            tReq.setType((byte) 3);
         } else {
             tReq.setAmount(-coins);
-            tReq.setType((byte) 2); // 兑换消耗
+            tReq.setType((byte) 2);
         }
         tReq.setOrderId(order.getId());
         tReq.setCreateTime(LocalDateTime.now());
         timeTransactionMapper.insert(tReq);
 
-        // 订单状态：已核销结算
-        order.setStatus((byte) 3); // 3=已核销
+        order.setStatus((byte) 3);
         order.setUpdatedAt(LocalDateTime.now());
         serviceOrderMapper.updateById(order);
+
+        claim.setClaimStatus(Constants.CLAIM_STATUS_COMPLETED);
+        claim.setUpdatedAt(LocalDateTime.now());
+        serviceClaimMapper.updateById(claim);
+
+        ServiceRequestStateMachine.assertTransition(request.getStatus(), Constants.REQUEST_STATUS_COMPLETED);
+        request.setStatus(Constants.REQUEST_STATUS_COMPLETED);
+        request.setCompletedAt(LocalDateTime.now());
+        request.setUpdatedAt(LocalDateTime.now());
+        serviceRequestMapper.updateById(request);
+
+        volunteerCreditService.onServiceConfirmed(request, claim);
     }
     
     @Override

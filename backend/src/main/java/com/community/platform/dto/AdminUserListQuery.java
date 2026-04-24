@@ -10,6 +10,7 @@ public class AdminUserListQuery {
     private String username;
     private Byte role;
     private Byte status;
+    private Long communityId;
     private Integer page = 1;
     private Integer size = 10;
 }

@@ -40,7 +40,7 @@ public class SysUser implements Serializable {
     private String username;
 
     /**
-     * 密码MD5（按需求文档技术选型；建议后续升级为强哈希）
+     * 密码哈希（字段名沿用 password_md5，值可为 BCrypt/历史 MD5）
      */
     @TableField("password_md5")
     private String passwordMd5;

@@ -15,3 +15,8 @@ app:
   avatar-base-url: http://localhost:8080/static/avatars/
   auth:
     expose-dev-code: true
+  ai:
+    enabled: false
+    base-url: https://api.deepseek.com
+    model: deepseek-chat
+    api-key:

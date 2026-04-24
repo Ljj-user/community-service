@@ -86,3 +86,8 @@ export function getMyReviewHistory(current = 1, size = 10) {
   })
   return api.get<any, BackendResult<IPage<ServiceEvaluationHistoryVO>>>(`/service-evaluation/my-history?${query.toString()}`)
 }
+
+export function disputeByRequest(requestId: number, reason: string) {
+  const query = new URLSearchParams({ reason })
+  return api.post<any, BackendResult<null>>(`/service-claim/dispute-by-request/${requestId}?${query.toString()}`)
+}

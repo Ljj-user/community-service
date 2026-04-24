@@ -50,7 +50,7 @@ public class HallServiceImpl implements HallService {
         Long inProgress = serviceClaimMapper.selectCount(new LambdaQueryWrapper<ServiceClaim>()
                 .eq(ServiceClaim::getIsDeleted, 0)
                 .eq(ServiceClaim::getVolunteerUserId, userId)
-                .eq(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_CLAIMED));
+                .in(ServiceClaim::getClaimStatus, Constants.CLAIM_STATUS_CLAIMED, Constants.CLAIM_STATUS_PENDING_CONFIRM));
         vo.setInProgressCount(inProgress == null ? 0L : inProgress);
 
         // 我收到的评价：volunteer_user_id = userId

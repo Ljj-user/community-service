@@ -12,6 +12,8 @@ import type { DataTableColumns, FormInst } from 'naive-ui'
 import { NButton, NPopconfirm } from 'naive-ui'
 import { h } from 'vue'
 import { inviteCodeCreate, inviteCodeDisable, inviteCodeList, type AdminInviteCodeVO } from '~/api/adminInviteCode'
+import { adminCommunityOptions } from '~/api/adminCommunity'
+import { exportModule } from '~/api/adminExport'
 import { storeToRefs } from 'pinia'
 
 const { t, locale } = useI18n()
@@ -22,6 +24,10 @@ const { user } = storeToRefs(accountStore)
 
 const loading = ref(false)
 const rows = ref<AdminInviteCodeVO[]>([])
+const query = reactive({
+  communityId: null as number | null,
+})
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const showModal = ref(false)
 const formRef = ref<FormInst | null>(null)
@@ -34,11 +40,14 @@ const form = reactive({
 })
 
 const isSuperAdmin = computed(() => user.value?.role === 1)
+const exporting = ref(false)
 
 async function load() {
   loading.value = true
   try {
-    const res = await inviteCodeList()
+    const res = await inviteCodeList({
+      communityId: query.communityId ?? undefined,
+    })
     if (res.code !== 200)
       throw new Error(res.message || '加载失败')
     rows.value = res.data || []
@@ -47,6 +56,12 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({ label: `${x.name}（${x.id}）`, value: x.id }))
 }
 
 function openCreate() {
@@ -92,6 +107,25 @@ async function disableRow(r: AdminInviteCodeVO) {
   }
 }
 
+async function exportInviteCodeData() {
+  exporting.value = true
+  try {
+    const res = await exportModule({ module: 'invite_code', format: 'excel' })
+    const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `invite-code-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('导出成功')
+  } catch (e: any) {
+    message.error(e?.message || '导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
 const columns = computed<DataTableColumns<AdminInviteCodeVO>>(() => {
   void locale.value
   return [
@@ -123,7 +157,10 @@ const columns = computed<DataTableColumns<AdminInviteCodeVO>>(() => {
   ]
 })
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadCommunities()
+})
 </script>
 
 <template>
@@ -139,6 +176,9 @@ onMounted(load)
         <n-button :loading="loading" @click="load">
           刷新
         </n-button>
+        <n-button :loading="exporting" @click="exportInviteCodeData">
+          导出数据
+        </n-button>
         <n-button type="primary" @click="openCreate">
           生成邀请码
         </n-button>
@@ -146,6 +186,11 @@ onMounted(load)
     </div>
 
     <n-card :bordered="false">
+      <div class="mb-3 flex items-center gap-2">
+        <n-select v-model:value="query.communityId" :options="communityOptions" placeholder="所属社区" clearable filterable class="w-64" />
+        <n-button size="small" @click="load">筛选</n-button>
+        <n-button size="small" @click="() => { query.communityId = null; load() }">重置</n-button>
+      </div>
       <n-data-table
         :bordered="false"
         size="small"

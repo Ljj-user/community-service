@@ -16,6 +16,10 @@ function httpClient(baseApi: string | null = null): AxiosInstance {
       if (token && config.headers)
         config.headers.Authorization = `Bearer ${token}`
 
+      // FormData 上传时让浏览器自动带 boundary，避免被默认 application/json 覆盖导致后端收不到文件
+      if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers)
+        delete (config.headers as Record<string, string>)['Content-Type']
+
       return config
     },
     (error) => {

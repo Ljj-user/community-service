@@ -587,6 +587,8 @@ community:
     labelVolunteer: Volunteer
     volunteerNone: Not claimed yet
     labelStatus: Status
+    labelRule: Trigger rule
+    labelAdvice: Suggested action
     labelRisk: Risk type
     labelOvertime: Overtime
     labelRating: Resident rating
@@ -596,6 +598,8 @@ community:
     unknownRisk: Unknown
     colRequestId: Request ID
     colRisk: Risk
+    colRule: Trigger rule
+    colAdvice: Suggested action
     colServiceType: Service type
     colAddress: Address
     colExpected: Expected
@@ -848,6 +852,7 @@ community:
     cardTimeout: Timeout alerts
     cardKpi: KPI thresholds
     cardCredit: Resident credit & freeze
+    cardAnomaly: Anomaly innovation rules
     pointsPerHour: Points per service hour
     pointsPerHourHint: Points redeemable for canteen, housekeeping, etc.
     demandClassifyHours: Demand classification SLA (hours)
@@ -890,6 +895,12 @@ community:
     enableComplaintAlert: Enable complaint alert
     noShowFreezeCount: No-shows before service freeze
     noShowFreezeHint: Freeze after this many no-shows (two-way rating)
+    careInactivityDays: Inactive days threshold (care alert)
+    careInactivityDaysHint: Trigger proactive care alert when inactivity reaches this number of days
+    surge24hMinRequests: 24h demand surge minimum threshold
+    surge24hMinRequestsHint: Trigger when 24h requests exceed this and multiplier threshold
+    surgeMultiplier: Demand surge multiplier threshold
+    surgeMultiplierHint: Relative to the average of previous 7 days (e.g. 2.0)
   globalDashboard:
     title: Global dashboard
     subtitle: Platform match rate, volunteer coverage, and regional activity.

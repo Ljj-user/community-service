@@ -46,13 +46,13 @@ public class ServiceEvaluationServiceImpl implements ServiceEvaluationService {
     
     @Override
     @Transactional
-    public void evaluateService(Long residentId, ServiceEvaluationDTO dto) {
-        SysUser resident = sysUserMapper.selectById(residentId);
-        if (resident == null || resident.getIsDeleted() == 1) {
+    public void evaluateService(Long userId, ServiceEvaluationDTO dto) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || user.getIsDeleted() == 1) {
             throw new RuntimeException("用户不存在");
         }
 
-        if (resident.getRole() != Constants.ROLE_NORMAL_USER) {
+        if (user.getRole() != Constants.ROLE_NORMAL_USER) {
             throw new RuntimeException("只有普通用户可以评价服务");
         }
 
@@ -66,20 +66,26 @@ public class ServiceEvaluationServiceImpl implements ServiceEvaluationService {
             throw new RuntimeException("只能评价已完成的服务");
         }
         
-        // 查询需求，验证是否为该居民发布的需求
+        // 查询需求（确定双方身份）
         ServiceRequest request = serviceRequestMapper.selectById(claim.getRequestId());
         if (request == null || request.getIsDeleted() == 1) {
             throw new RuntimeException("需求不存在");
         }
-        
-        if (!request.getRequesterUserId().equals(residentId)) {
-            throw new RuntimeException("只能评价自己发布的需求");
+
+        Byte evaluatorRole;
+        if (request.getRequesterUserId() != null && request.getRequesterUserId().equals(userId)) {
+            evaluatorRole = Constants.EVAL_ROLE_RESIDENT;
+        } else if (claim.getVolunteerUserId() != null && claim.getVolunteerUserId().equals(userId)) {
+            evaluatorRole = Constants.EVAL_ROLE_VOLUNTEER;
+        } else {
+            throw new RuntimeException("无权评价该订单");
         }
         
-        // 检查是否已评价（一个认领记录只能评价一次）
+        // 检查是否已评价（同一认领：居民/志愿者各评价一次）
         ServiceEvaluation existingEvaluation = serviceEvaluationMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ServiceEvaluation>()
                         .eq(ServiceEvaluation::getClaimId, dto.getClaimId())
+                        .eq(ServiceEvaluation::getEvaluatorRole, evaluatorRole)
                         .eq(ServiceEvaluation::getIsDeleted, 0)
                         .last("LIMIT 1")
         );
@@ -92,8 +98,9 @@ public class ServiceEvaluationServiceImpl implements ServiceEvaluationService {
         ServiceEvaluation evaluation = new ServiceEvaluation();
         evaluation.setClaimId(dto.getClaimId());
         evaluation.setRequestId(claim.getRequestId());
-        evaluation.setResidentUserId(residentId);
+        evaluation.setResidentUserId(request.getRequesterUserId());
         evaluation.setVolunteerUserId(claim.getVolunteerUserId());
+        evaluation.setEvaluatorRole(evaluatorRole);
         evaluation.setRating(dto.getRating());
         evaluation.setContent(dto.getContent());
         evaluation.setCreatedAt(LocalDateTime.now());
@@ -130,6 +137,7 @@ public class ServiceEvaluationServiceImpl implements ServiceEvaluationService {
         List<ServiceEvaluation> evaluations = serviceEvaluationMapper.selectList(
                 new LambdaQueryWrapper<ServiceEvaluation>()
                         .in(ServiceEvaluation::getClaimId, claimIds)
+                        .eq(ServiceEvaluation::getEvaluatorRole, Constants.EVAL_ROLE_RESIDENT)
                         .eq(ServiceEvaluation::getIsDeleted, 0)
         );
         var evaluatedSet = evaluations.stream().map(ServiceEvaluation::getClaimId).collect(Collectors.toSet());
@@ -168,7 +176,10 @@ public class ServiceEvaluationServiceImpl implements ServiceEvaluationService {
         Page<ServiceEvaluation> page = new Page<>(current, size);
         LambdaQueryWrapper<ServiceEvaluation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ServiceEvaluation::getIsDeleted, 0);
-        wrapper.eq(ServiceEvaluation::getResidentUserId, residentId);
+        wrapper.and(w -> w.eq(ServiceEvaluation::getEvaluatorRole, Constants.EVAL_ROLE_RESIDENT)
+                        .eq(ServiceEvaluation::getResidentUserId, residentId)
+                .or(x -> x.eq(ServiceEvaluation::getEvaluatorRole, Constants.EVAL_ROLE_VOLUNTEER)
+                        .eq(ServiceEvaluation::getVolunteerUserId, residentId)));
         wrapper.orderByDesc(ServiceEvaluation::getCreatedAt);
 
         IPage<ServiceEvaluation> evalPage = serviceEvaluationMapper.selectPage(page, wrapper);
@@ -228,6 +239,7 @@ public class ServiceEvaluationServiceImpl implements ServiceEvaluationService {
         LambdaQueryWrapper<ServiceEvaluation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ServiceEvaluation::getIsDeleted, 0);
         wrapper.eq(ServiceEvaluation::getVolunteerUserId, volunteerId);
+        wrapper.eq(ServiceEvaluation::getEvaluatorRole, Constants.EVAL_ROLE_RESIDENT);
         wrapper.orderByDesc(ServiceEvaluation::getCreatedAt);
 
         IPage<ServiceEvaluation> evalPage = serviceEvaluationMapper.selectPage(page, wrapper);

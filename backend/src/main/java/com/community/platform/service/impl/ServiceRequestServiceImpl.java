@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.community.platform.common.Constants;
+import com.community.platform.common.ServiceRequestStateMachine;
 import com.community.platform.dto.ServiceRequestAuditDTO;
 import com.community.platform.dto.ServiceRequestCreateDTO;
 import com.community.platform.dto.ServiceRequestQueryDTO;
@@ -37,6 +38,7 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -75,17 +77,24 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
     @Override
     @Transactional
     public ServiceRequestVO createRequest(Long userId, ServiceRequestCreateDTO dto) {
+        if (dto == null) {
+            throw new RuntimeException("请求参数不能为空");
+        }
         // 普通用户（role=3）均可发布需求（全能互助）；但必须绑定社区，并满足时间币规则
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null || user.getIsDeleted() == 1) {
             throw new RuntimeException("用户不存在");
         }
         
-        if (user.getRole() != Constants.ROLE_NORMAL_USER) {
+        if (!Constants.ROLE_NORMAL_USER.equals(user.getRole())) {
             throw new RuntimeException("只有普通用户可以发布需求");
         }
         if (user.getCommunityId() == null) {
             throw new RuntimeException("请先在个人资料中选择所属社区");
+        }
+        String serviceType = dto.getServiceType() == null ? null : dto.getServiceType().trim();
+        if (!StringUtils.hasText(serviceType) || !Constants.ALLOWED_SERVICE_TYPES.contains(serviceType)) {
+            throw new RuntimeException("服务类型不支持");
         }
 
         boolean subsidized = SubsidyUtil.isSubsidized(user.getIdentityTag());
@@ -99,7 +108,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         ServiceRequest request = new ServiceRequest();
         request.setRequesterUserId(userId);
         request.setCommunityId(user.getCommunityId());
-        request.setServiceType(dto.getServiceType());
+        request.setServiceType(serviceType);
         request.setDescription(dto.getDescription());
         request.setServiceAddress(dto.getServiceAddress());
         request.setExpectedTime(dto.getExpectedTime());
@@ -161,11 +170,13 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         
         if (dto.getApproved()) {
             // 审核通过：状态改为已发布
+            ServiceRequestStateMachine.assertTransition(request.getStatus(), Constants.REQUEST_STATUS_PUBLISHED);
             request.setStatus(Constants.REQUEST_STATUS_PUBLISHED);
             request.setPublishedAt(LocalDateTime.now());
             request.setRejectReason(null);
         } else {
             // 审核驳回：状态改为已驳回
+            ServiceRequestStateMachine.assertTransition(request.getStatus(), Constants.REQUEST_STATUS_REJECTED);
             request.setStatus(Constants.REQUEST_STATUS_REJECTED);
             if (!StringUtils.hasText(dto.getRejectReason())) {
                 throw new RuntimeException("驳回时必须填写驳回原因");
@@ -184,6 +195,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         // 构建查询条件
         LambdaQueryWrapper<ServiceRequest> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ServiceRequest::getIsDeleted, 0);
+        boolean strictHallMode = false;
         
         if (queryDTO.getStatus() != null) {
             wrapper.eq(ServiceRequest::getStatus, queryDTO.getStatus());
@@ -195,6 +207,9 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         
         if (queryDTO.getUrgencyLevel() != null) {
             wrapper.eq(ServiceRequest::getUrgencyLevel, queryDTO.getUrgencyLevel());
+        }
+        if (queryDTO.getCommunityId() != null) {
+            wrapper.eq(ServiceRequest::getCommunityId, queryDTO.getCommunityId());
         }
         
         // 普通用户：需求池默认只展示同社区（网格化隔离） + 自己发布的需求
@@ -209,36 +224,61 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                     sameCommunityUserIds = sysUserMapper.selectList(uw).stream().map(SysUser::getId).toList();
                 }
 
-                List<Long> finalSameCommunityUserIds = sameCommunityUserIds;
-                wrapper.and(w -> w.eq(ServiceRequest::getRequesterUserId, currentUserId)
-                        .or(x -> x.eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_PUBLISHED)
-                                .in(finalSameCommunityUserIds != null && !finalSameCommunityUserIds.isEmpty(), ServiceRequest::getRequesterUserId, finalSameCommunityUserIds)));
+                if (queryDTO.getStatus() != null && queryDTO.getStatus().equals(Constants.REQUEST_STATUS_PUBLISHED)) {
+                    strictHallMode = true;
+                    wrapper.eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_PUBLISHED);
+                    wrapper.ne(ServiceRequest::getRequesterUserId, currentUserId);
+                    if (communityId != null) {
+                        wrapper.eq(ServiceRequest::getCommunityId, communityId);
+                    } else {
+                        wrapper.eq(ServiceRequest::getRequesterUserId, -1L);
+                    }
+                } else {
+                    List<Long> finalSameCommunityUserIds = sameCommunityUserIds;
+                    wrapper.and(w -> w.eq(ServiceRequest::getRequesterUserId, currentUserId)
+                            .or(x -> x.eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_PUBLISHED)
+                                    .in(finalSameCommunityUserIds != null && !finalSameCommunityUserIds.isEmpty(), ServiceRequest::getRequesterUserId, finalSameCommunityUserIds)));
+                }
             } else if (user != null && user.getRole() == Constants.ROLE_COMMUNITY_ADMIN) {
                 wrapper.eq(ServiceRequest::getCommunityId, user.getCommunityId());
             }
         }
-        
+
+        if (strictHallMode && currentUserId != null) {
+            wrapper.orderByDesc(ServiceRequest::getUrgencyLevel)
+                    .orderByDesc(ServiceRequest::getPublishedAt)
+                    .orderByDesc(ServiceRequest::getCreatedAt);
+            List<ServiceRequest> allRows = serviceRequestMapper.selectList(wrapper);
+            List<ServiceRequestVO> allVos = allRows.stream().map(this::convertToVO).collect(Collectors.toList());
+            fillUserInfo(allVos);
+            applyHallRuleMatching(allVos, currentUserId);
+            allVos.sort(Comparator
+                    .comparing((ServiceRequestVO x) -> x.getUrgencyLevel() == null ? 0 : x.getUrgencyLevel(), Comparator.reverseOrder())
+                    .thenComparing((ServiceRequestVO x) -> x.getPublishedAt() == null ? x.getCreatedAt() : x.getPublishedAt(), Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing((ServiceRequestVO x) -> isSkillMatched(x), Comparator.reverseOrder())
+                    .thenComparing(ServiceRequestVO::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+
+            long total = allVos.size();
+            int current = queryDTO.getCurrent() == null ? 1 : queryDTO.getCurrent();
+            int size = queryDTO.getSize() == null ? 10 : queryDTO.getSize();
+            int from = Math.max(0, (current - 1) * size);
+            int to = Math.min(allVos.size(), from + size);
+            List<ServiceRequestVO> pageRows = from >= to ? List.of() : allVos.subList(from, to);
+            Page<ServiceRequestVO> voPage = new Page<>(current, size, total);
+            voPage.setRecords(pageRows);
+            return voPage;
+        }
+
         wrapper.orderByDesc(ServiceRequest::getCreatedAt);
-        
-        // 分页查询
         Page<ServiceRequest> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());
         IPage<ServiceRequest> requestPage = serviceRequestMapper.selectPage(page, wrapper);
-        
-        // 转换为VO并填充用户信息
-        List<ServiceRequestVO> voList = requestPage.getRecords().stream()
-                .map(this::convertToVO)
-                .collect(Collectors.toList());
-        
-        // 批量查询用户信息
+        List<ServiceRequestVO> voList = requestPage.getRecords().stream().map(this::convertToVO).collect(Collectors.toList());
         fillUserInfo(voList);
         if (currentUserId != null) {
             fillMatchExplain(voList, currentUserId);
         }
-        
-        // 构建分页结果
         Page<ServiceRequestVO> voPage = new Page<>(requestPage.getCurrent(), requestPage.getSize(), requestPage.getTotal());
         voPage.setRecords(voList);
-        
         return voPage;
     }
 
@@ -281,6 +321,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 .collect(Collectors.toList());
         fillUserInfo(voList);
         fillCommunityInfo(voList);
+        fillLatestClaimInfo(voList);
 
         Page<ServiceRequestVO> voPage = new Page<>(requestPage.getCurrent(), requestPage.getSize(), requestPage.getTotal());
         voPage.setRecords(voList);
@@ -309,7 +350,10 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         wrapper.eq(ServiceRequest::getIsDeleted, 0);
 
         // 只关注已发布/已认领的需求
-        wrapper.in(ServiceRequest::getStatus, Constants.REQUEST_STATUS_PUBLISHED, Constants.REQUEST_STATUS_CLAIMED);
+        wrapper.in(ServiceRequest::getStatus,
+                Constants.REQUEST_STATUS_PUBLISHED,
+                Constants.REQUEST_STATUS_CLAIMED,
+                Constants.REQUEST_STATUS_PENDING_CONFIRM);
 
         // 超时规则：expected_time 早于当前时间
         wrapper.lt(ServiceRequest::getExpectedTime, now);
@@ -321,8 +365,11 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 wrapper.eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_PUBLISHED);
             } else if (queryDTO.getRiskType() == 2) {
                 // 超时未完成：已认领但未完成
-                wrapper.eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_CLAIMED);
+                wrapper.in(ServiceRequest::getStatus, Constants.REQUEST_STATUS_CLAIMED, Constants.REQUEST_STATUS_PENDING_CONFIRM);
             }
+        }
+        if (queryDTO.getCommunityId() != null) {
+            wrapper.eq(ServiceRequest::getCommunityId, queryDTO.getCommunityId());
         }
         if (currentUser != null && currentUser.getRole() != null
                 && currentUser.getRole().equals(Constants.ROLE_COMMUNITY_ADMIN)) {
@@ -364,6 +411,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
             );
             Map<Long, ServiceEvaluation> evaluationMap = evaluations.stream()
                     .collect(Collectors.toMap(ServiceEvaluation::getRequestId, e -> e, (e1, e2) -> e1));
+            Map<Long, AlertMeta> alertMetaMap = loadAlertMeta(requestIds);
 
             // 批量查询志愿者姓名
             List<Long> volunteerIds = claims.stream()
@@ -382,6 +430,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 vo.setRequestId(request.getId());
                 vo.setStatus(request.getStatus());
                 vo.setServiceType(request.getServiceType());
+                vo.setCommunityId(request.getCommunityId());
                 vo.setServiceAddress(request.getServiceAddress());
                 vo.setExpectedTime(request.getExpectedTime());
                 vo.setUrgencyLevel(request.getUrgencyLevel());
@@ -410,11 +459,52 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 // 风险类型：根据状态推断
                 if (request.getStatus() == Constants.REQUEST_STATUS_PUBLISHED) {
                     vo.setRiskType(1);
+                    vo.setAlertSource("TIMEOUT_UNCLAIMED");
+                    vo.setTriggerRule("期望服务时间已过且需求仍未被认领");
+                    vo.setSuggestionAction("建议优先提醒志愿者认领，必要时协调社区管理员人工派单");
                 } else if (request.getStatus() == Constants.REQUEST_STATUS_CLAIMED) {
                     vo.setRiskType(2);
+                    vo.setAlertSource("TIMEOUT_INCOMPLETE");
+                    vo.setTriggerRule("期望服务时间已过且服务仍未完成");
+                    vo.setSuggestionAction("建议联系志愿者确认进展，并评估是否需要转单或干预");
+                } else if (request.getStatus() == Constants.REQUEST_STATUS_PENDING_CONFIRM) {
+                    vo.setRiskType(2);
+                    vo.setAlertSource("PENDING_CONFIRM");
+                    vo.setTriggerRule("志愿者已提交完成信息，等待需求方确认（超时将自动完成）");
+                    vo.setSuggestionAction("建议提醒需求方尽快确认完成或申诉，避免长期滞留");
+                }
+
+                AlertMeta alertMeta = alertMetaMap.get(request.getId());
+                if (alertMeta != null) {
+                    if (alertMeta.alertCode != null && !alertMeta.alertCode.isBlank()) {
+                        vo.setAlertSource(alertMeta.alertCode);
+                    }
+                    if (alertMeta.triggerRule != null && !alertMeta.triggerRule.isBlank()) {
+                        vo.setTriggerRule(alertMeta.triggerRule);
+                    }
+                    if (alertMeta.suggestionAction != null && !alertMeta.suggestionAction.isBlank()) {
+                        vo.setSuggestionAction(alertMeta.suggestionAction);
+                    }
                 }
 
                 voList.add(vo);
+            }
+            List<Long> communityIds = requests.stream()
+                    .map(ServiceRequest::getCommunityId)
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .toList();
+            Map<Long, SysRegion> regionMap = communityIds.isEmpty()
+                    ? Map.of()
+                    : sysRegionMapper.selectBatchIds(communityIds).stream()
+                    .collect(Collectors.toMap(SysRegion::getId, r -> r, (a, b) -> a));
+            for (ServiceMonitorVO vo : voList) {
+                if (vo.getCommunityId() != null) {
+                    SysRegion r = regionMap.get(vo.getCommunityId());
+                    if (r != null) {
+                        vo.setCommunityName(r.getName());
+                    }
+                }
             }
         }
 
@@ -422,6 +512,32 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         voPage.setRecords(voList);
         return voPage;
     }
+
+    private Map<Long, AlertMeta> loadAlertMeta(List<Long> requestIds) {
+        if (requestIds == null || requestIds.isEmpty()) {
+            return Map.of();
+        }
+        String inSql = requestIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT request_id, alert_code, trigger_rule, suggestion_action " +
+                        "FROM anomaly_alert_event WHERE request_id IS NOT NULL AND request_id IN (" + inSql + ") " +
+                        "ORDER BY id DESC");
+        Map<Long, AlertMeta> out = new java.util.HashMap<>();
+        for (Map<String, Object> row : rows) {
+            Long requestId = row.get("request_id") instanceof Number n ? n.longValue() : null;
+            if (requestId == null || out.containsKey(requestId)) {
+                continue;
+            }
+            out.put(requestId, new AlertMeta(
+                    row.get("alert_code") == null ? null : String.valueOf(row.get("alert_code")),
+                    row.get("trigger_rule") == null ? null : String.valueOf(row.get("trigger_rule")),
+                    row.get("suggestion_action") == null ? null : String.valueOf(row.get("suggestion_action"))
+            ));
+        }
+        return out;
+    }
+
+    private record AlertMeta(String alertCode, String triggerRule, String suggestionAction) {}
     
     /**
      * 转换为VO
@@ -517,6 +633,39 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         }
     }
 
+    /**
+     * 填充最新认领记录（claimId/claimStatus），便于移动端做“确认完成/评价”动作。
+     */
+    private void fillLatestClaimInfo(List<ServiceRequestVO> voList) {
+        if (voList == null || voList.isEmpty()) {
+            return;
+        }
+        List<Long> requestIds = voList.stream()
+                .map(ServiceRequestVO::getId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (requestIds.isEmpty()) {
+            return;
+        }
+        List<ServiceClaim> claims = serviceClaimMapper.selectList(
+                new LambdaQueryWrapper<ServiceClaim>()
+                        .in(ServiceClaim::getRequestId, requestIds)
+                        .eq(ServiceClaim::getIsDeleted, 0)
+                        .orderByDesc(ServiceClaim::getId)
+        );
+        Map<Long, ServiceClaim> latest = claims.stream()
+                .filter(c -> c.getRequestId() != null)
+                .collect(Collectors.toMap(ServiceClaim::getRequestId, c -> c, (a, b) -> a));
+        for (ServiceRequestVO vo : voList) {
+            ServiceClaim c = vo.getId() == null ? null : latest.get(vo.getId());
+            if (c != null) {
+                vo.setLatestClaimId(c.getId());
+                vo.setLatestClaimStatus(c.getClaimStatus());
+            }
+        }
+    }
+
     private void fillMatchExplain(List<ServiceRequestVO> voList, Long currentUserId) {
         if (voList == null || voList.isEmpty() || currentUserId == null) {
             return;
@@ -530,7 +679,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         for (ServiceRequestVO vo : voList) {
             MatchExplainVO explain = new MatchExplainVO();
             List<String> requestTags = loadRequestTags(vo.getId(), vo.getSpecialTags());
-            double skillScore = calcSkillScore(volunteerSkills, requestTags);
+            double skillScore = calcSkillBinaryScore(volunteerSkills, requestTags, vo.getServiceType());
             double areaScore = calcAreaScore(volunteer.getCommunityId(), vo.getCommunityId());
             double priorityScore = calcPriorityScore(vo.getUrgencyLevel());
             double ratingScore = volunteerRatingScore;
@@ -542,6 +691,38 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
             explain.setTotalScore(round1(totalScore));
             vo.setMatchExplain(explain);
             vo.setMatchReasons(buildMatchReasons(skillScore, areaScore, priorityScore, ratingScore));
+        }
+    }
+
+    /**
+     * 志愿者接单广场：三层规则（硬过滤已在 SQL，标签匹配 + 排序在内存）
+     */
+    private void applyHallRuleMatching(List<ServiceRequestVO> voList, Long currentUserId) {
+        if (voList == null || voList.isEmpty() || currentUserId == null) {
+            return;
+        }
+        SysUser volunteer = sysUserMapper.selectById(currentUserId);
+        if (volunteer == null || volunteer.getIsDeleted() == 1 || volunteer.getRole() != Constants.ROLE_NORMAL_USER) {
+            return;
+        }
+        Set<String> volunteerSkills = loadVolunteerSkills(currentUserId, volunteer.getSkillTags());
+        for (ServiceRequestVO vo : voList) {
+            List<String> requestTags = loadRequestTags(vo.getId(), vo.getSpecialTags());
+            boolean skillMatched = isSkillTagMatched(volunteerSkills, requestTags, vo.getServiceType());
+            MatchExplainVO explain = new MatchExplainVO();
+            explain.setSkillScore(skillMatched ? 100D : 0D);
+            explain.setAreaScore(100D); // 同社区已在第一层硬过滤
+            explain.setPriorityScore(calcPriorityScore(vo.getUrgencyLevel()));
+            explain.setRatingScore(0D);
+            explain.setTotalScore(skillMatched ? 100D : 0D);
+            explain.setW1(1D);
+            explain.setW2(0D);
+            explain.setW3(0D);
+            explain.setW4(0D);
+            vo.setMatchExplain(explain);
+            vo.setMatchReasons(skillMatched
+                    ? List.of("技能标签匹配")
+                    : List.of("技能标签暂不匹配"));
         }
     }
 
@@ -622,6 +803,25 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         return Math.min(100D, (hit.size() * 1.0D / req.size()) * 100D);
     }
 
+    private double calcSkillBinaryScore(Set<String> volunteerSkills, List<String> requestTags, String serviceType) {
+        Set<String> req = new HashSet<>();
+        if (requestTags != null) {
+            req.addAll(requestTags.stream().filter(StringUtils::hasText).map(String::trim).collect(Collectors.toSet()));
+        }
+        if (StringUtils.hasText(serviceType)) {
+            req.add(serviceType.trim());
+        }
+        if (req.isEmpty() || volunteerSkills == null || volunteerSkills.isEmpty()) {
+            return 0D;
+        }
+        boolean matched = req.stream().anyMatch(volunteerSkills::contains);
+        return matched ? 100D : 0D;
+    }
+
+    private boolean isSkillTagMatched(Set<String> volunteerSkills, List<String> requestTags, String serviceType) {
+        return calcSkillBinaryScore(volunteerSkills, requestTags, serviceType) >= 99.9D;
+    }
+
     private double calcColdStartSkillScore(List<String> requestTags) {
         if (requestTags == null || requestTags.isEmpty()) {
             return 50D;
@@ -690,5 +890,13 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
 
     private double round1(double val) {
         return Math.round(val * 10.0D) / 10.0D;
+    }
+
+    private boolean isSkillMatched(ServiceRequestVO vo) {
+        MatchExplainVO explain = vo == null ? null : vo.getMatchExplain();
+        if (explain == null || explain.getSkillScore() == null) {
+            return false;
+        }
+        return explain.getSkillScore() >= 99.9D;
     }
 }

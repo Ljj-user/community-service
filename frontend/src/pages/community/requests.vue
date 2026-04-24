@@ -15,6 +15,8 @@ import {
   serviceRequestList,
   type ServiceRequestVO,
 } from '~/api/serviceRequests'
+import { adminCommunityOptions } from '~/api/adminCommunity'
+import { exportModule } from '~/api/adminExport'
 import {
   CheckmarkCircle20Regular,
   DismissCircle20Regular,
@@ -26,15 +28,18 @@ import { dtActionBtn, dtActionRowClass } from '~/utils/dataTableActions'
 const { t, locale } = useI18n()
 const message = useMessage()
 const dialog = useDialog()
+const exporting = ref(false)
 
 const loading = ref(false)
 const query = reactive({
   status: 0 as number | null,
   urgencyLevel: null as number | null,
   serviceType: '',
+  communityId: null as number | null,
   current: 1,
   size: 10,
 })
+const communityOptions = ref<Array<{ label: string, value: number }>>([])
 
 const pageTotal = ref(0)
 const rows = ref<ServiceRequestVO[]>([])
@@ -99,6 +104,7 @@ async function fetchList() {
       status: query.status ?? undefined,
       urgencyLevel: query.urgencyLevel ?? undefined,
       serviceType: query.serviceType || undefined,
+      communityId: query.communityId ?? undefined,
       current: query.current,
       size: query.size,
     })
@@ -119,8 +125,15 @@ function resetQuery() {
   query.status = 0
   query.urgencyLevel = null
   query.serviceType = ''
+  query.communityId = null
   query.current = 1
   fetchList()
+}
+
+async function loadCommunities() {
+  const res = await adminCommunityOptions()
+  if (res.code !== 200) return
+  communityOptions.value = (res.data || []).map(x => ({ label: `${x.name}（${x.id}）`, value: x.id }))
 }
 
 async function openDetail(row: ServiceRequestVO) {
@@ -181,6 +194,25 @@ async function submitReject() {
   fetchList()
 }
 
+async function exportRequestData() {
+  exporting.value = true
+  try {
+    const res = await exportModule({ module: 'service_request', format: 'excel' })
+    const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `service-request-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('导出成功')
+  } catch (e: any) {
+    message.error(e?.message || '导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
 const rejectRules = computed(() => ({
   rejectReason: {
     required: true,
@@ -194,7 +226,7 @@ const columns = computed<DataTableColumns<ServiceRequestVO>>(() => {
   return [
     { title: 'ID', key: 'id', width: 90 },
     { title: t('community.requests.colServiceType'), key: 'serviceType', minWidth: 130 },
-    { title: '所属社区', key: 'communityName', minWidth: 120, render: (r) => r.communityName || '-' },
+    { title: '所属社区', key: 'communityName', minWidth: 180, render: (r) => r.communityName ? `${r.communityName}（${r.communityId ?? '-'}）` : '-' },
     { title: t('community.requests.colResident'), key: 'requesterName', width: 120, render: (r) => r.requesterName || '-' },
     { title: t('community.requests.colAddress'), key: 'serviceAddress', minWidth: 200, ellipsis: { tooltip: true } },
     {
@@ -255,7 +287,10 @@ const columns = computed<DataTableColumns<ServiceRequestVO>>(() => {
   ]
 })
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchList()
+  loadCommunities()
+})
 </script>
 
 <template>
@@ -269,6 +304,9 @@ onMounted(fetchList)
           {{ t('community.requests.subtitle') }}
         </p>
       </div>
+      <n-button :loading="exporting" @click="exportRequestData">
+        导出数据
+      </n-button>
     </div>
 
     <Card>
@@ -276,6 +314,7 @@ onMounted(fetchList)
         <n-select v-model:value="query.status" :options="statusOptions" :placeholder="t('community.requests.statusPlaceholder')" clearable />
         <n-select v-model:value="query.urgencyLevel" :options="urgencyOptions" :placeholder="t('community.requests.urgencyPlaceholder')" clearable />
         <n-input v-model:value="query.serviceType" :placeholder="t('community.requests.serviceTypePlaceholder')" clearable />
+        <n-select v-model:value="query.communityId" :options="communityOptions" placeholder="所属社区" clearable filterable />
         <div class="flex gap-2">
           <n-button type="primary" :loading="loading" @click="() => { query.current = 1; fetchList() }">
             {{ t('community.users.query') }}
@@ -292,6 +331,7 @@ onMounted(fetchList)
         :columns="columns"
         :data="rows"
         :loading="loading"
+        :row-props="(row) => ({ onClick: () => openDetail(row), style: 'cursor: pointer;' })"
         :pagination="{
           page: query.current,
           pageSize: query.size,

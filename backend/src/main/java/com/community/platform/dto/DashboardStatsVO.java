@@ -40,6 +40,11 @@ public class DashboardStatsVO {
     private Long claimedRequests;
 
     /**
+     * 待确认需求数（志愿者已提交完成，等待需求方确认）
+     */
+    private Long pendingConfirmRequests;
+
+    /**
      * 已驳回需求数
      */
     private Long rejectedRequests;

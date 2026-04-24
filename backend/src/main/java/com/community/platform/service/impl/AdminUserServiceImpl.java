@@ -5,19 +5,22 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.community.platform.common.Constants;
 import com.community.platform.dto.*;
 import com.community.platform.generated.entity.SysUser;
+import com.community.platform.generated.entity.SysRegion;
+import com.community.platform.generated.mapper.SysRegionMapper;
 import com.community.platform.generated.mapper.SysUserMapper;
 import com.community.platform.security.UserDetailsImpl;
 import com.community.platform.service.AdminUserService;
 import com.community.platform.util.IdentityTypeUtil;
-import com.community.platform.util.MD5Util;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,6 +28,11 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Autowired
     private SysUserMapper sysUserMapper;
+    @Autowired
+    private SysRegionMapper sysRegionMapper;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private SysUser currentOperator() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -60,10 +68,27 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (query.getStatus() != null) {
             wrapper.eq(SysUser::getStatus, query.getStatus());
         }
+        if (query.getCommunityId() != null
+                && operator != null
+                && operator.getRole() != null
+                && operator.getRole().equals(Constants.ROLE_SUPER_ADMIN)) {
+            wrapper.eq(SysUser::getCommunityId, query.getCommunityId());
+        }
         wrapper.orderByDesc(SysUser::getCreatedAt);
 
         Page<SysUser> p = sysUserMapper.selectPage(new Page<>(page, size), wrapper);
-        List<AdminUserVO> records = p.getRecords().stream().map(this::toVO).collect(Collectors.toList());
+        Map<Long, SysRegion> regionMap = p.getRecords().stream()
+                .map(SysUser::getCommunityId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.collectingAndThen(Collectors.toList(), ids -> {
+                    if (ids.isEmpty()) {
+                        return Map.<Long, SysRegion>of();
+                    }
+                    return sysRegionMapper.selectBatchIds(ids).stream()
+                            .collect(Collectors.toMap(SysRegion::getId, x -> x, (a, b) -> a));
+                }));
+        List<AdminUserVO> records = p.getRecords().stream().map(u -> toVO(u, regionMap)).collect(Collectors.toList());
         return PageResult.of(records, p.getTotal(), p.getCurrent(), p.getSize());
     }
 
@@ -87,7 +112,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         SysUser user = new SysUser();
         user.setUsername(request.getUsername());
-        user.setPasswordMd5(MD5Util.encrypt(request.getPassword()));
+        user.setPasswordMd5(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
         // role=3 才使用 identityType，否则统一设为居民（1）
         if (request.getRole() != null && request.getRole().equals(Constants.ROLE_NORMAL_USER)) {
@@ -114,7 +139,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         user.setUpdatedAt(LocalDateTime.now());
         user.setIsDeleted((byte) 0);
         sysUserMapper.insert(user);
-        return toVO(sysUserMapper.selectById(user.getId()));
+        return toVO(sysUserMapper.selectById(user.getId()), Map.of());
     }
 
     @Override
@@ -155,7 +180,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (request.getStatus() != null) user.setStatus(request.getStatus());
         user.setUpdatedAt(LocalDateTime.now());
         sysUserMapper.updateById(user);
-        return toVO(user);
+        return toVO(user, Map.of());
     }
 
     @Override
@@ -183,7 +208,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         user.setStatus(status);
         user.setUpdatedAt(LocalDateTime.now());
         sysUserMapper.updateById(user);
-        return toVO(user);
+        return toVO(user, Map.of());
     }
 
     private void assertOperableByCommunityAdmin(SysUser operator, SysUser targetUser) {
@@ -207,9 +232,16 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
     }
 
-    private AdminUserVO toVO(SysUser user) {
+    private AdminUserVO toVO(SysUser user, Map<Long, SysRegion> regionMap) {
         AdminUserVO vo = new AdminUserVO();
         BeanUtils.copyProperties(user, vo);
+        vo.setCommunityId(user.getCommunityId());
+        if (user.getCommunityId() != null && regionMap != null) {
+            SysRegion region = regionMap.get(user.getCommunityId());
+            if (region != null) {
+                vo.setCommunityName(region.getName());
+            }
+        }
         if (user.getRole() != null && user.getRole().equals(Constants.ROLE_NORMAL_USER)) {
             vo.setIdentityType(IdentityTypeUtil.normalize(user.getIdentityType()));
         }

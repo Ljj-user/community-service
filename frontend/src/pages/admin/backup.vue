@@ -44,7 +44,15 @@ const backingUp = ref(false)
 const restoring = ref(false)
 
 const exportQuery = reactive({
-  module: 'service_request' as 'service_request' | 'users' | 'audit',
+  module: 'service_request' as
+    | 'service_request'
+    | 'service_monitor'
+    | 'users'
+    | 'volunteers'
+    | 'audit'
+    | 'invite_code'
+    | 'announcement'
+    | 'banner',
   format: 'excel' as 'excel' | 'pdf',
   timeRange: null as [number, number] | null,
 })
@@ -68,8 +76,13 @@ const history = ref<BackupHistoryRow[]>([])
 
 const moduleOptions = computed(() => [
   { label: t('community.backup.moduleRequest'), value: 'service_request' },
+  { label: '服务过程监控', value: 'service_monitor' },
   { label: t('community.backup.moduleUsers'), value: 'users' },
+  { label: '志愿者申请', value: 'volunteers' },
   { label: t('community.backup.moduleAudit'), value: 'audit' },
+  { label: '社区邀请码', value: 'invite_code' },
+  { label: '信息发布', value: 'announcement' },
+  { label: '轮播图管理', value: 'banner' },
 ])
 
 const formatOptions = [

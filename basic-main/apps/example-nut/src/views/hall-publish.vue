@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { createServiceRequest } from '@/api/modules/serviceRequests'
+
 definePage({
   meta: {
     title: '发布需求',
@@ -7,39 +9,156 @@ definePage({
 })
 
 const router = useRouter()
+const appAuthStore = useAppAuthStore()
 const loading = ref(false)
+const SERVICE_TYPES = [
+  '助老服务（陪护 / 陪诊）',
+  '代办服务（买菜 / 取药）',
+  '家政清洁',
+  '心理陪伴 / 聊天',
+  '应急帮助（紧急求助）',
+  '社区活动支持',
+] as const
+
 const form = reactive({
-  serviceType: '助老',
+  serviceType: SERVICE_TYPES[0],
   urgencyLevel: 2,
   serviceAddress: '',
   description: '',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+  emergencyContactRelation: '',
 })
 
+function getDescriptionTemplate(serviceType: string) {
+  if (serviceType === '助老服务（陪护 / 陪诊）') {
+    return `【服务类型】助老服务（陪护 / 陪诊）
+【需求内容】需要陪同老人就医或日常照看
+【服务时间】请填写可服务时段
+【联系人】请填写姓名与联系电话`
+  }
+  if (serviceType === '代办服务（买菜 / 取药）') {
+    const addressLine = form.serviceAddress.trim() || '请填写具体地址'
+    return `【服务类型】代办服务（买菜 / 取药）
+【代办事项】请填写需要代办的内容（买菜/取药）
+【配送地址】${addressLine}
+【联系人】请填写姓名与联系电话`
+  }
+  if (serviceType === '家政清洁') {
+    return `【服务类型】家政清洁
+【清洁范围】请填写需要清洁的区域（如厨房/卫生间）
+【上门时间】请填写期望上门时间
+【备注】如有工具或注意事项请补充`
+  }
+  if (serviceType === '心理陪伴 / 聊天') {
+    return `【服务类型】心理陪伴 / 聊天
+【需求说明】希望有人倾听与交流
+【陪伴方式】可线下或电话沟通
+【时间安排】请填写方便联系的时间`
+  }
+  if (serviceType === '应急帮助（紧急求助）') {
+    return `【服务类型】应急帮助（紧急求助）
+【紧急事项】请简要说明当前紧急情况
+【所在位置】请填写详细地址与楼栋门牌
+【联系方式】请立即填写可联系手机号`
+  }
+  return `【服务类型】社区活动支持
+【活动名称】请填写活动主题
+【需要支持】如秩序维护/物资搬运/现场引导
+【活动时间地点】请填写具体时间与地点`
+}
+
+watch(() => form.serviceType, (nextType) => {
+  if (form.description.trim()) {
+    return
+  }
+  form.description = getDescriptionTemplate(nextType)
+}, { immediate: true })
+
+watch(() => form.serviceAddress, () => {
+  if (form.serviceType !== '代办服务（买菜 / 取药）') return
+  if (form.description.trim()) return
+  form.description = getDescriptionTemplate(form.serviceType)
+})
+
+function plusHours(hours: number) {
+  const d = new Date(Date.now() + hours * 60 * 60 * 1000)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`
+}
+
 async function submit() {
+  if (loading.value) return
   if (!form.serviceAddress.trim()) {
     window.alert('请填写服务地址')
     return
   }
+  if (!form.emergencyContactName.trim()) {
+    window.alert('请填写联系人姓名')
+    return
+  }
+  if (!form.emergencyContactPhone.trim()) {
+    window.alert('请填写联系人电话')
+    return
+  }
   loading.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    window.alert('发布成功（演示）')
+    const res = await createServiceRequest({
+      serviceType: form.serviceType,
+      urgencyLevel: form.urgencyLevel,
+      serviceAddress: form.serviceAddress.trim(),
+      description: form.description.trim() || undefined,
+      emergencyContactName: form.emergencyContactName.trim(),
+      emergencyContactPhone: form.emergencyContactPhone.trim(),
+      emergencyContactRelation: form.emergencyContactRelation.trim() || undefined,
+      // 移动端当前未提供时间控件，先给默认预约时间（当前+2小时）
+      expectedTime: plusHours(2),
+    })
+    if (res.code !== 200) {
+      window.alert(res.message || '发布失败')
+      return
+    }
+    window.alert('发布成功，已提交审核')
     router.back()
+  }
+  catch (e: any) {
+    window.alert(e?.message || '发布失败')
   }
   finally {
     loading.value = false
   }
 }
+
+function resetTemplate() {
+  form.description = getDescriptionTemplate(form.serviceType)
+}
+
+onMounted(async () => {
+  await appAuthStore.hydrateUser()
+  const u = appAuthStore.user
+  if (!form.serviceAddress.trim()) {
+    form.serviceAddress = (u?.communityName || u?.address || '').trim()
+  }
+  if (!form.emergencyContactName.trim()) {
+    form.emergencyContactName = (u?.realName || u?.username || '').trim()
+  }
+  resetTemplate()
+})
 </script>
 
 <template>
   <AppPageLayout :navbar="false" tabbar>
     <div class="page">
-      <header class="top">
-        <button class="back" @click="router.back()">
+      <header class="m-topbar">
+        <button class="m-back" @click="router.back()">
           返回
         </button>
-        <h2>发布需求</h2>
+        <h2 class="m-top-title">发布需求</h2>
       </header>
 
       <section class="pub-hero" aria-hidden="true">
@@ -50,7 +169,7 @@ async function submit() {
             向社区发起一条需求
           </p>
           <p class="pub-hero-desc">
-            填写后邻居可在「接取任务」中查看并认领
+            填写后会真实提交到后端，进入审核流程
           </p>
         </div>
       </section>
@@ -58,19 +177,21 @@ async function submit() {
       <div class="pub-form">
         <div class="form-card">
           <div class="label">
-            服务类型
+            请选择服务类型
           </div>
-          <NutRadioGroup v-model="form.serviceType" direction="horizontal">
-            <NutRadio label="助老">
-              助老
-            </NutRadio>
-            <NutRadio label="代买跑腿">
-              代买跑腿
-            </NutRadio>
-            <NutRadio label="清洁">
-              清洁
-            </NutRadio>
-          </NutRadioGroup>
+          <div class="type-grid">
+            <button
+              v-for="type in SERVICE_TYPES"
+              :key="type"
+              type="button"
+              class="type-card"
+              :class="{ active: form.serviceType === type }"
+              @click="form.serviceType = type"
+            >
+              <span>{{ type }}</span>
+              <span v-if="form.serviceType === type" class="check-mark">✓</span>
+            </button>
+          </div>
         </div>
 
         <div class="form-card">
@@ -98,10 +219,29 @@ async function submit() {
         </div>
 
         <div class="form-card">
-          <div class="label">
-            需求描述
+          <div class="label-row">
+            <div class="label">
+              需求描述
+            </div>
+            <button type="button" class="template-reset" @click="resetTemplate">
+              重置模板
+            </button>
           </div>
-          <NutTextarea v-model="form.description" rows="3" placeholder="请描述需要帮助的内容" />
+          <NutTextarea v-model="form.description" rows="7" placeholder="请描述需要帮助的内容" />
+          <p class="desc-tip">
+            可在模板基础上补充细节
+          </p>
+        </div>
+
+        <div class="form-card">
+          <div class="label">
+            联系人信息
+          </div>
+          <div class="contact-grid">
+            <NutInput v-model="form.emergencyContactName" placeholder="联系人姓名（必填）" />
+            <NutInput v-model="form.emergencyContactPhone" placeholder="联系人电话（必填）" />
+            <NutInput v-model="form.emergencyContactRelation" placeholder="与服务对象关系（选填）" />
+          </div>
         </div>
       </div>
 
@@ -117,17 +257,14 @@ async function submit() {
 <style scoped>
 .page {
   min-height: 100%;
-  background: #f4f6f8;
-  padding: 14px;
-  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--m-color-bg);
+  padding: var(--m-space-page);
+  padding-bottom: calc(var(--m-space-page) + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;
   box-sizing: border-box;
 }
-.top { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.back { border: 0; border-radius: 8px; background: #fff; padding: 6px 10px; box-shadow: 0 1px 6px rgba(15, 23, 42, 0.06); }
-.top h2 { margin: 0; font-size: 18px; font-weight: 900; color: #111827; }
 
 .pub-hero {
   position: relative;
@@ -207,6 +344,63 @@ async function submit() {
   font-size: 13px;
   font-weight: 700;
 }
+.label-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.template-reset {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 11px;
+  color: #334155;
+  padding: 3px 10px;
+}
+.type-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.type-card {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #374151;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  min-height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.type-card.active {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #065f46;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+.check-mark { font-weight: 800; color: #059669; }
+.desc-tip {
+  position: relative;
+  z-index: 1;
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+.contact-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+}
 .level {
   position: relative;
   z-index: 1;
@@ -259,4 +453,8 @@ async function submit() {
   border-color: #10b981;
   color: #ecfdf5;
 }
+::global(.dark) .template-reset { background: #111827; border-color: #4b5563; color: #d1d5db; }
+::global(.dark) .type-card { background: #0f172a; border-color: #4b5563; color: #d1d5db; }
+::global(.dark) .type-card.active { background: #065f46; border-color: #10b981; color: #ecfdf5; }
+::global(.dark) .desc-tip { color: #9ca3af; }
 </style>

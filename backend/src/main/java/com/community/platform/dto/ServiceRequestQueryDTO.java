@@ -21,6 +21,7 @@ public class ServiceRequestQueryDTO {
      * 紧急程度：1低 2中 3高 4紧急
      */
     private Byte urgencyLevel;
+    private Long communityId;
     
     /**
      * 当前页码（默认1）

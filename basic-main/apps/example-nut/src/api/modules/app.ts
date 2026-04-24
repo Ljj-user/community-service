@@ -49,6 +49,7 @@ export default {
     identityType: number
     communityId?: number
     gender?: number
+    skillTags?: string[]
   }) => api.post<any, BackendResult<any>>('/auth/register', data),
 
   verifyInviteCode: (data: { code: string }) =>

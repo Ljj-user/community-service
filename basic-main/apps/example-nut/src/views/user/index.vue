@@ -27,6 +27,9 @@ const dashboard = ref<{
     totalServiceHours?: number | string | null
     averageRating?: number | string | null
     evaluationCount?: number
+    creditScore?: number | string | null
+    avgRating30d?: number | string | null
+    completionRate30d?: number | string | null
     honorNote?: string
   }
 } | null>(null)
@@ -34,8 +37,6 @@ const dashboard = ref<{
 const name = computed(() => appAuthStore.user?.realName || appAuthStore.user?.username || appAuthStore.account || '邻里用户')
 /** sys_region.name，由后端根据 community_id 关联查询 */
 const locationText = computed(() => appAuthStore.user?.communityName || '未绑定社区')
-/** sys_user.time_coins */
-const timeCoins = computed(() => Number(appAuthStore.user?.timeCoins ?? 0))
 /** sys_user.points */
 const creditScore = computed(() => Number(appAuthStore.user?.points ?? 0))
 
@@ -68,6 +69,18 @@ const totalHoursText = computed(() => {
   if (totalHours.value === '—')
     return '—'
   return `${totalHours.value} 小时`
+})
+
+const completionRateText = computed(() => {
+  const rate = Number(dashboard.value?.volunteer?.completionRate30d ?? 0)
+  if (Number.isNaN(rate)) return '0%'
+  return `${(rate * 100).toFixed(0)}%`
+})
+
+const volunteerCredit = computed(() => {
+  const v = dashboard.value?.volunteer?.creditScore
+  const n = Number(v ?? 0)
+  return Number.isNaN(n) ? 0 : n.toFixed(1)
 })
 
 const medals = [
@@ -121,29 +134,16 @@ onMounted(loadProfile)
       </div>
 
       <section class="bank-card">
-        <div class="card-bubble" />
         <div class="card-top">
           <div>
-            <p class="small-label">贡献积分</p>
-            <h2>{{ creditScore }}</h2>
+            <p class="small-label">账户信息</p>
+            <h2>{{ name }}</h2>
+            <p class="card-user">{{ locationText }}</p>
           </div>
           <div class="credit-badge">
             <FmIcon name="i-carbon:shield" />
             <span>信用分 {{ creditScore }}</span>
           </div>
-        </div>
-        <div class="card-bottom">
-          <div>
-            <p class="small-label">累计公益时长</p>
-            <p class="strong">{{ totalHoursText }}</p>
-          </div>
-          <div>
-            <p class="small-label">服务评价</p>
-            <p class="strong">{{ rankText }}</p>
-          </div>
-        </div>
-        <div class="card-user">
-          {{ name }} · {{ locationText }}
         </div>
       </section>
 
@@ -167,6 +167,25 @@ onMounted(loadProfile)
         </div>
       </section>
 
+      <section class="metric-card">
+        <div class="metric-item">
+          <span>志愿时长</span>
+          <b>{{ totalHoursText }}</b>
+        </div>
+        <div class="metric-item">
+          <span>完成率</span>
+          <b>{{ completionRateText }}</b>
+        </div>
+        <div class="metric-item">
+          <span>信用分</span>
+          <b>{{ volunteerCredit }}</b>
+        </div>
+        <div class="metric-item metric-wide">
+          <span>服务评价</span>
+          <b>{{ rankText }}</b>
+        </div>
+      </section>
+
       <section class="medal-panel">
         <h3>我的荣誉勋章</h3>
         <div class="medal-row">
@@ -186,7 +205,7 @@ onMounted(loadProfile)
       </section>
     </div>
 
-    <NutPopup v-model:visible="showSettings" position="bottom" round>
+    <NutPopup v-model:visible="showSettings" position="bottom" round class="settings-popup">
       <div class="settings-drawer">
         <div class="drawer-handle" />
         <h3>设置</h3>
@@ -226,30 +245,39 @@ onMounted(loadProfile)
 </template>
 
 <style scoped>
-.profile-page { padding: 14px; background: #f3f4f6; min-height: 100%; display: grid; gap: 14px; align-content: start; }
+.profile-page { padding: var(--m-space-page); background: var(--m-color-bg); min-height: 100%; display: grid; gap: 12px; align-content: start; }
 .top-header { display: flex; align-items: center; justify-content: space-between; }
-.top-header h2 { margin: 0; font-size: 20px; font-weight: 900; color: #1f2937; }
-.setting-btn { width: 34px; height: 34px; border: 0; border-radius: 999px; background: #fff; color: #6b7280; font-size: 22px; display: inline-flex; align-items: center; justify-content: center; }
-.bank-card { background: linear-gradient(135deg, #065f46, #10b981); border-radius: 22px; padding: 16px; color: #fff; position: relative; overflow: hidden; }
-.card-bubble { position: absolute; right: -24px; bottom: -24px; width: 120px; height: 120px; border-radius: 999px; background: rgba(255,255,255,.12); }
+.top-header h2 { margin: 0; font-size: 20px; font-weight: 800; color: var(--m-color-text); }
+.setting-btn { width: 34px; height: 34px; border: 1px solid var(--m-color-border); border-radius: 999px; background: var(--m-color-card); color: var(--m-color-subtext); font-size: 22px; display: inline-flex; align-items: center; justify-content: center; }
+.bank-card { background: var(--m-color-card); border-radius: var(--m-radius-card); padding: 14px; color: var(--m-color-text); position: relative; overflow: hidden; border: 1px solid var(--m-color-border); box-shadow: var(--m-shadow-card); }
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
-.small-label { margin: 0; font-size: 12px; color: rgba(255,255,255,.82); }
-.bank-card h2 { margin: 2px 0 0; font-size: 34px; line-height: 1.1; font-weight: 900; }
-.credit-badge { display: inline-flex; gap: 4px; align-items: center; background: rgba(255,255,255,.2); border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
-.card-bottom { margin-top: 14px; display: flex; justify-content: space-between; }
-.strong { margin: 3px 0 0; font-weight: 900; }
-.card-user { margin-top: 10px; font-size: 12px; opacity: .9; }
+.small-label { margin: 0; font-size: var(--m-font-sub); color: var(--m-color-subtext); }
+.bank-card h2 { margin: 2px 0 0; font-size: 20px; line-height: 1.2; font-weight: 800; color: var(--m-color-text); }
+.credit-badge { display: inline-flex; gap: 4px; align-items: center; background: var(--m-color-primary-soft); color: var(--m-color-primary); border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700; border: 1px solid var(--m-color-border); }
+.card-user { margin-top: 8px; font-size: var(--m-font-sub); color: var(--m-color-muted); }
 
 .func-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.func-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: #4b5563; }
-.func-icon { width: 46px; height: 46px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; }
-.bg-orange { background: #fff7ed; color: #f97316; }
-.bg-blue { background: #eff6ff; color: #3b82f6; }
-.bg-purple { background: #faf5ff; color: #a855f7; }
-.bg-green { background: #ecfdf5; color: #10b981; }
-.func-item small { font-size: 10px; color: #6b7280; }
+.func-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--m-color-subtext); }
+.func-icon { width: 46px; height: 46px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; border: 1px solid var(--m-color-border); background: var(--m-color-card); color: var(--m-color-primary); }
+.bg-orange, .bg-blue, .bg-purple, .bg-green { background: var(--m-color-card); color: var(--m-color-primary); }
+.func-item small { font-size: 10px; color: var(--m-color-subtext); }
 
-.medal-panel { background: transparent; border: 0; border-radius: 0; padding: 2px 0 0; }
+.metric-card {
+  border-radius: 12px;
+  border: 1px solid var(--m-color-border);
+  background: var(--m-color-card);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .03);
+}
+.metric-item { text-align: center; }
+.metric-item span { display: block; font-size: var(--m-font-sub); color: var(--m-color-subtext); }
+.metric-item b { display: block; margin-top: 4px; font-size: 16px; color: var(--m-color-text); }
+.metric-wide { grid-column: 1 / -1; text-align: left; border-top: 1px dashed var(--m-color-border); margin-top: 4px; padding-top: 8px; }
+
+.medal-panel { background: var(--m-color-card); border: 1px solid var(--m-color-border); border-radius: var(--m-radius-card); padding: 12px; box-shadow: var(--m-shadow-card); }
 .medal-panel h3 { margin: 0 0 10px; font-size: 15px; font-weight: 900; }
 .medal-row { display: flex; gap: 10px; overflow-x: auto; }
 .medal { width: 68px; height: 68px; border-radius: 999px; border: 2px solid #e5e7eb; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #9ca3af; font-size: 9px; font-weight: 700; background: transparent; }
@@ -258,19 +286,33 @@ onMounted(loadProfile)
 .active-green { border-color: #4ade80; color: #16a34a; }
 .active-blue { border-color: #60a5fa; color: #2563eb; }
 
-.medal-modal { padding: 16px; background: #fff; border-radius: 16px; }
+.medal-modal { padding: 16px; background: var(--m-color-card); border-radius: 16px; }
 .medal-modal-head { display: flex; align-items: center; gap: 8px; }
 .medal-modal-head :deep(svg) { font-size: 22px; color: #f59e0b; }
-.medal-modal-head h4 { margin: 0; font-size: 16px; font-weight: 900; color: #111827; }
+.medal-modal-head h4 { margin: 0; font-size: 16px; font-weight: 900; color: var(--m-color-text); }
 .medal-modal-status { margin: 12px 0 8px; font-size: 13px; font-weight: 800; }
 .medal-modal-status.acquired { color: #16a34a; }
 .medal-modal-status.not-yet { color: #9ca3af; }
-.medal-modal-desc { margin: 0; line-height: 1.7; font-size: 13px; color: #4b5563; white-space: pre-wrap; }
+.medal-modal-desc { margin: 0; line-height: 1.7; font-size: 13px; color: var(--m-color-subtext); white-space: pre-wrap; }
 
-.settings-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
-.drawer-handle { width: 42px; height: 4px; border-radius: 4px; background: #d1d5db; margin: 0 auto 10px; }
+.settings-drawer { padding: 10px 16px 20px; background: var(--m-color-card); border-top-left-radius: 24px; border-top-right-radius: 24px; }
+.settings-drawer {
+  width: min(100vw, 430px);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.settings-popup :deep(.nut-popup) {
+  width: min(100vw, 430px) !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+.settings-popup :deep(.nut-popup-content) {
+  width: 100% !important;
+}
+.drawer-handle { width: 42px; height: 4px; border-radius: 4px; background: var(--m-color-border); margin: 0 auto 10px; }
 .settings-drawer h3 { margin: 0 0 10px; font-size: 18px; font-weight: 900; }
-.setting-item { width: 100%; border: 1px solid #e5e7eb; background: #fff; color: #374151; border-radius: 12px; padding: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; margin-bottom: 8px; }
+.setting-item { width: 100%; border: 1px solid var(--m-color-border); background: var(--m-color-card); color: var(--m-color-text); border-radius: 12px; padding: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; margin-bottom: 8px; }
 .setting-item.danger { border-color: #fee2e2; background: #fff1f2; color: #be123c; margin-bottom: 0; }
 
 :global(.dark) .profile-page { background: #111827; }
@@ -278,6 +320,9 @@ onMounted(loadProfile)
 :global(.dark) .setting-btn { background: #1f2937; color: #d1d5db; }
 :global(.dark) .func-item { color: #d1d5db; }
 :global(.dark) .func-item small { color: #9ca3af; }
+:global(.dark) .metric-card { background: #1f2937; border-color: #374151; }
+:global(.dark) .metric-item span { color: #9ca3af; }
+:global(.dark) .metric-item b { color: #f3f4f6; }
 :global(.dark) .medal-panel h3 { color: #f3f4f6; }
 :global(.dark) .medal { border-color: #374151; color: #9ca3af; }
 :global(.dark) .settings-drawer { background: #1f2937; }

@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS sys_user;
 CREATE TABLE sys_user (
   id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   username          VARCHAR(50)      NOT NULL COMMENT '用户名（登录名）',
-  password_md5      CHAR(32)         NOT NULL COMMENT '密码MD5（按需求文档技术选型；建议后续升级为强哈希）',
+  password_md5      VARCHAR(100)     NOT NULL COMMENT '密码哈希（字段名沿用；兼容历史MD5与当前BCrypt）',
   role              TINYINT UNSIGNED NOT NULL COMMENT '角色：1超级管理员 2社区管理员 3普通用户',
   identity_type     TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '普通用户身份：1居民老人 2志愿者（仅role=3，互斥）',
   real_name         VARCHAR(50)      NULL COMMENT '真实姓名',

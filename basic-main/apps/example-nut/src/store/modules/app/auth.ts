@@ -22,6 +22,8 @@ export interface UserInfo {
   city?: string
   timeCoins?: number
   points?: number
+  skillTags?: string
+  address?: string
 }
 
 export interface LoginData {
@@ -32,15 +34,30 @@ export interface LoginData {
 export const useAppAuthStore = defineStore(
   'appAuth',
   () => {
+    const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
+      if (!raw) return fallback
+      try {
+        return JSON.parse(raw) as T
+      }
+      catch {
+        return fallback
+      }
+    }
+
     // 账号信息
     const account = ref(localStorage.account ?? '')
     const token = ref(localStorage.token ?? '')
     const avatar = ref(localStorage.avatar ?? '')
-    const user = ref<UserInfo | null>(localStorage.user ? JSON.parse(localStorage.user) : null)
+    const user = ref<UserInfo | null>(safeJsonParse<UserInfo | null>(localStorage.user ?? null, null))
 
     // 权限信息
     const isGetPermissions = ref(false)
     const permissions = ref<string[]>([])
+
+    // 防抖/单航：避免路由守卫和页面同时频繁 hydrate
+    const hydrateInFlight = ref<Promise<void> | null>(null)
+    const lastHydrateAt = ref(0)
+    const HYDRATE_COOLDOWN_MS = 15_000
 
     // 登录状态
     const isLogin = computed(() => {
@@ -97,6 +114,19 @@ export const useAppAuthStore = defineStore(
       catch {}
     }
 
+    async function hydrateUserThrottled(force = false) {
+      if (!token.value) return
+      const now = Date.now()
+      if (!force && hydrateInFlight.value) return hydrateInFlight.value
+      if (!force && now - lastHydrateAt.value < HYDRATE_COOLDOWN_MS) return
+      lastHydrateAt.value = now
+      const p = hydrateUser().finally(() => {
+        if (hydrateInFlight.value === p) hydrateInFlight.value = null
+      })
+      hydrateInFlight.value = p
+      return p
+    }
+
     // 登出
     function logout() {
       // 模拟退出登录，清除 token 信息
@@ -108,7 +138,31 @@ export const useAppAuthStore = defineStore(
       token.value = ''
       avatar.value = ''
       user.value = null
+      isGetPermissions.value = false
+      permissions.value = []
       router.push('/')
+    }
+
+    function logoutToLogin(redirect?: string) {
+      const current = redirect || router.currentRoute.value.fullPath || '/'
+      // 先清理本地状态，再导航
+      localStorage.removeItem('account')
+      localStorage.removeItem('token')
+      localStorage.removeItem('avatar')
+      localStorage.removeItem('user')
+      account.value = ''
+      token.value = ''
+      avatar.value = ''
+      user.value = null
+      isGetPermissions.value = false
+      permissions.value = []
+
+      // 避免在 login 页重复 push
+      if (String(router.currentRoute.value.name) === 'login') return
+      router.push({
+        name: 'login',
+        query: { redirect: current },
+      })
     }
 
     // 获取权限
@@ -116,6 +170,21 @@ export const useAppAuthStore = defineStore(
       // 你的项目移动端目前不依赖权限点，这里保持兼容空实现
       permissions.value = []
       isGetPermissions.value = true
+    }
+
+    const lastPermissionsCheckAt = ref(0)
+    const PERM_RETRY_COOLDOWN_MS = 10_000
+    async function ensurePermissionsChecked() {
+      if (isGetPermissions.value) return
+      const now = Date.now()
+      if (now - lastPermissionsCheckAt.value < PERM_RETRY_COOLDOWN_MS) return
+      lastPermissionsCheckAt.value = now
+      try {
+        await getPermissions()
+      }
+      catch {
+        // 保持冷却窗口，避免路由守卫重复刷
+      }
     }
 
     return {
@@ -128,8 +197,11 @@ export const useAppAuthStore = defineStore(
       permissions,
       login,
       hydrateUser,
+      hydrateUserThrottled,
       logout,
+      logoutToLogin,
       getPermissions,
+      ensurePermissionsChecked,
     }
   },
 )
