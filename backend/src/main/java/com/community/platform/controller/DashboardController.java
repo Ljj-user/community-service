@@ -4,6 +4,7 @@ import com.community.platform.common.Result;
 import com.community.platform.common.Constants;
 import com.community.platform.dto.AdminDashboardPanelVO;
 import com.community.platform.dto.DashboardStatsVO;
+import com.community.platform.dto.MonthlyMatchRateTrendVO;
 import com.community.platform.dto.RegionStatVO;
 import com.community.platform.dto.TrendChartVO;
 import com.community.platform.dto.NameCountVO;
@@ -108,6 +109,30 @@ public class DashboardController {
         boolean communityAdmin = isCommunityAdmin(current);
         Long scopeCommunityId = communityAdmin ? current.getCommunityId() : null;
         return Result.success(dashboardService.getVolunteerHonorTop(scopeCommunityId, days, topN));
+    }
+
+    /**
+     * 各社区服务量对比 TopN（按已完成需求数）
+     */
+    @GetMapping("/community-service-top")
+    @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
+    public Result<List<NameCountVO>> communityServiceTop(@RequestParam(defaultValue = "10") int topN) {
+        SysUser current = getCurrentUser();
+        boolean communityAdmin = isCommunityAdmin(current);
+        Long scopeCommunityId = communityAdmin ? current.getCommunityId() : null;
+        return Result.success(dashboardService.getCommunityServiceTop(scopeCommunityId, topN));
+    }
+
+    /**
+     * 月度需求对接成功率趋势（近 N 个月）
+     */
+    @GetMapping("/monthly-match-rate")
+    @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
+    public Result<MonthlyMatchRateTrendVO> monthlyMatchRate(@RequestParam(defaultValue = "6") int months) {
+        SysUser current = getCurrentUser();
+        boolean communityAdmin = isCommunityAdmin(current);
+        Long scopeCommunityId = communityAdmin ? current.getCommunityId() : null;
+        return Result.success(dashboardService.getMonthlyMatchRateTrend(scopeCommunityId, months));
     }
 
     private SysUser getCurrentUser() {

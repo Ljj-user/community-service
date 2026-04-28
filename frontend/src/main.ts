@@ -71,15 +71,13 @@ async function startApp() {
     if (import.meta.env.VITE_API_MOCKING_ENABLED === 'true') {
       await initializeMocking()
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.warn('Mock service initialization failed:', error)
   }
 
   try {
     app.mount('#app')
-  }
-  catch (error) {
+  } catch (error) {
     console.error('App mounting failed:', error)
   }
 }

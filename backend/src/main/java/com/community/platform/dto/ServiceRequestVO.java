@@ -22,6 +22,9 @@ public class ServiceRequestVO {
     private String serviceType;
     private String description;
     private String serviceAddress;
+    private String emergencyContactName;
+    private String emergencyContactPhone;
+    private String emergencyContactRelation;
     private LocalDateTime expectedTime;
     private Byte urgencyLevel;
     private List<String> specialTags;
@@ -39,6 +42,7 @@ public class ServiceRequestVO {
      */
     private Long latestClaimId;
     private Byte latestClaimStatus;
+    private String latestVolunteerName;
     /** 志愿者视角的可解释匹配明细 */
     private MatchExplainVO matchExplain;
     /** 推荐理由标签 */

@@ -3,6 +3,7 @@ package com.community.platform.service;
 import com.community.platform.dto.AdminDashboardPanelVO;
 import com.community.platform.dto.DashboardStatsVO;
 import com.community.platform.dto.FundingMonitorVO;
+import com.community.platform.dto.MonthlyMatchRateTrendVO;
 import com.community.platform.dto.NameCountVO;
 import com.community.platform.dto.RegionStatVO;
 import com.community.platform.dto.ScheduleBriefVO;
@@ -54,4 +55,14 @@ public interface DashboardService {
      * 志愿者荣誉榜 TopN（按完成时长）
      */
     List<NameCountVO> getVolunteerHonorTop(Long communityId, int days, int topN);
+
+    /**
+     * 各社区服务量对比 TopN（按已完成需求数）
+     */
+    List<NameCountVO> getCommunityServiceTop(Long communityId, int topN);
+
+    /**
+     * 月度需求对接成功率趋势（近 N 个月）
+     */
+    MonthlyMatchRateTrendVO getMonthlyMatchRateTrend(Long communityId, int months);
 }

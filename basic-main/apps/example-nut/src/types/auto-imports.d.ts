@@ -73,6 +73,7 @@ declare global {
   const useAppAuthStore: typeof import('../store/modules/app/auth').useAppAuthStore
   const useAppKeepAliveStore: typeof import('../store/modules/app/keepAlive').useAppKeepAliveStore
   const useAppPage: typeof import('../composables/app/page').useAppPage
+  const useAppPrefsStore: typeof import('../store/modules/app/prefs').useAppPrefsStore
   const useAppSettingsStore: typeof import('../store/modules/app/settings').useAppSettingsStore
   const useAttrs: typeof import('vue').useAttrs
   const useCssModule: typeof import('vue').useCssModule

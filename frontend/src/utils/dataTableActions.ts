@@ -1,6 +1,6 @@
+import { NButton, NIcon, NPopconfirm } from 'naive-ui'
 import type { Component } from 'vue'
 import { h } from 'vue'
-import { NButton, NIcon, NPopconfirm } from 'naive-ui'
 
 /** 与「用户管理」操作列一致的容器样式 */
 export const dtActionRowClass = 'flex flex-wrap items-center gap-2'
@@ -42,8 +42,8 @@ export function dtActionBtn(
 export function dtActionDelete(
   label: string,
   confirmText: string,
-  onPositiveClick: () => void | Promise<boolean | void>,
-  opts: { positiveText: string, negativeText: string },
+  onPositiveClick: () => boolean | undefined | Promise<boolean | undefined>,
+  opts: { positiveText: string; negativeText: string },
   icon?: Component,
 ) {
   return h(

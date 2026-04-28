@@ -19,6 +19,7 @@ catalog:
   '@iconify/vue': ^5.0.0
   '@nutui/nutui': ^4.3.14
   '@nutui/touch-emulator': ^1.0.0
+  tdesign-mobile-vue: ^1.13.2
   '@spiriit/vite-plugin-svg-spritemap': ^6.0.0
   '@stylistic/stylelint-config': ^5.0.0
   '@types/node': ^25.5.0

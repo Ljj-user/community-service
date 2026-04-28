@@ -18,5 +18,9 @@ app:
   ai:
     enabled: false
     base-url: https://api.deepseek.com
-    model: deepseek-chat
+    model: deepseek-v4-flash
+    # 建议不要把 key 写进仓库文件里：
+    # - Windows（PowerShell）: setx APP_AI_API_KEY "sk-xxx"
+    # - macOS/Linux: export APP_AI_API_KEY="sk-xxx"
+    # 也兼容 DEEPSEEK_API_KEY
     api-key:

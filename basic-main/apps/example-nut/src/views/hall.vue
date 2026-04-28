@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { getMyClaimRecords, getMyPublishHistory, getHallSummary, type ServiceClaimVO } from '@/api/modules/hall'
 import { completeClaimService, confirmClaimService, getServiceRequestDetail, type ServiceRequestVO } from '@/api/modules/serviceRequests'
+import AiHeroInput from '@/components/AiHeroInput.vue'
+import QuickActionCards from '@/components/QuickActionCards.vue'
+import ThreeSectionPage from '@/components/ThreeSectionPage.vue'
+import MainTopBar from '@/components/MainTopBar.vue'
+import RequestProgressCard from '@/components/hall/RequestProgressCard.vue'
 
 definePage({
   meta: {
@@ -13,8 +18,14 @@ const router = useRouter()
 const appAuthStore = useAppAuthStore()
 const loading = ref(false)
 const activeTab = ref<'joined' | 'published'>('joined')
+const aiText = ref('')
 const joinedRows = ref<ServiceClaimVO[]>([])
 const publishedRows = ref<ServiceRequestVO[]>([])
+const joinedRequesterNameMap = ref<Record<number, string>>({})
+const joinedStatusFilter = ref<'all' | 'going' | 'pending' | 'done'>('all')
+const joinedSortFilter = ref<'latest' | 'earliest'>('latest')
+const publishedStatusFilter = ref<'all' | 'pending' | 'published' | 'going' | 'confirm' | 'done'>('going')
+const publishedSortFilter = ref<'latest' | 'expected' | 'urgent'>('latest')
 const summary = reactive({
   myPublishedCount: 0,
   inProgressCount: 0,
@@ -26,9 +37,8 @@ const claimDetail = ref<ServiceRequestVO | null>(null)
 const selectedClaim = ref<ServiceClaimVO | null>(null)
 const selectedPublished = ref<ServiceRequestVO | null>(null)
 
-const name = computed(() => appAuthStore.user?.realName || appAuthStore.user?.username || appAuthStore.account || '社区用户')
-const communityText = computed(() => appAuthStore.user?.communityName || '未绑定社区')
-const avatarUrl = computed(() => appAuthStore.user?.avatarUrl || '')
+const resolvedCommunityName = computed(() => appAuthStore.user?.communityName || '未绑定社区')
+const headerDistance = computed(() => (appAuthStore.user?.communityName ? '已绑定' : '去绑定'))
 
 function onTakeTask() {
   const raw = String(appAuthStore.user?.skillTags || '').trim()
@@ -54,19 +64,107 @@ function onPublishRequest() {
   router.push('/hall-publish')
 }
 
-function goOverview(kind: 'reviews' | 'stats') {
-  router.push({
-    path: '/hall-overview',
-    query: { kind },
-  })
+function goAiAssistant() {
+  const q = aiText.value.trim()
+  router.push({ path: '/ai-assistant', query: q ? { q } : undefined })
 }
 
-function goAiAssistant() {
-  router.push('/ai-assistant')
+function onOpenMessages() {
+  router.push('/messages')
+}
+
+function onChangeCommunity() {
+  router.push('/join-community')
 }
 
 function openListTab(tab: 'joined' | 'published') {
   activeTab.value = tab
+}
+
+const joinedFilterOptions = [
+  { label: '全部', value: 'all' },
+  { label: '进行中', value: 'going' },
+  { label: '待确认', value: 'pending' },
+  { label: '已完成', value: 'done' },
+] as const
+
+const joinedSortOptions = [
+  { label: '最新认领', value: 'latest' },
+  { label: '最早认领', value: 'earliest' },
+] as const
+
+const publishedFilterOptions = [
+  { label: '全部', value: 'all' },
+  { label: '待审核', value: 'pending' },
+  { label: '已发布', value: 'published' },
+  { label: '进行中', value: 'going' },
+  { label: '待确认', value: 'confirm' },
+  { label: '已完成', value: 'done' },
+] as const
+
+const publishedSortOptions = [
+  { label: '最新发布', value: 'latest' },
+  { label: '最早服务', value: 'expected' },
+  { label: '紧急优先', value: 'urgent' },
+] as const
+
+const feedRows = computed(() => (activeTab.value === 'joined' ? joinedRows.value : publishedRows.value))
+
+function feedTitle(row: ServiceClaimVO | ServiceRequestVO) {
+  return (row as ServiceClaimVO).requestTitle || (row as ServiceRequestVO).serviceType || '邻里互助需求'
+}
+
+function feedDesc(row: ServiceClaimVO | ServiceRequestVO) {
+  return (row as ServiceRequestVO).description || (row as ServiceClaimVO).requestAddress || '邻里发布了新的帮助请求，期待你的建议。'
+}
+
+function feedMeta(row: ServiceClaimVO | ServiceRequestVO) {
+  if (activeTab.value === 'joined')
+    return `认领时间 · ${fmtTime((row as ServiceClaimVO).claimAt || (row as ServiceClaimVO).createdAt)}`
+  return `发布时间 · ${fmtTime((row as ServiceRequestVO).publishedAt || (row as ServiceRequestVO).createdAt)}`
+}
+
+function feedStatus(row: ServiceClaimVO | ServiceRequestVO) {
+  return activeTab.value === 'joined'
+    ? claimStatusText((row as ServiceClaimVO).claimStatus)
+    : requestStatusText((row as ServiceRequestVO).status)
+}
+
+function feedStatusClass(row: ServiceClaimVO | ServiceRequestVO) {
+  return activeTab.value === 'joined'
+    ? claimStatusClass((row as ServiceClaimVO).claimStatus)
+    : requestStatusClass((row as ServiceRequestVO).status)
+}
+
+function feedImage(index: number) {
+  return `https://picsum.photos/seed/hall-feed-${activeTab.value}-${index + 1}/720/420`
+}
+
+function feedUserName(row: ServiceClaimVO | ServiceRequestVO) {
+  if (activeTab.value === 'published')
+    return appAuthStore.user?.realName || appAuthStore.user?.username || appAuthStore.account || '我'
+  const requestId = Number((row as ServiceClaimVO).requestId || 0)
+  const mappedName = requestId ? joinedRequesterNameMap.value[requestId] : ''
+  if (mappedName) return mappedName
+  return (row as any).requesterName
+    || (row as any).residentName
+    || (row as any).publisherName
+    || (row as any).volunteerName
+    || (row as any).username
+    || '未实名用户'
+}
+
+function feedUserAvatar(index: number) {
+  if (activeTab.value === 'published' && appAuthStore.user?.avatarUrl)
+    return appAuthStore.user.avatarUrl
+  return `https://picsum.photos/seed/hall-user-${activeTab.value}-${index + 1}/88/88`
+}
+
+function openFeedDetail(row: ServiceClaimVO | ServiceRequestVO) {
+  if (activeTab.value === 'joined')
+    openClaimDetail(row as ServiceClaimVO)
+  else
+    openPublishedDetail(row as ServiceRequestVO)
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs = 4000): Promise<T> {
@@ -88,10 +186,50 @@ async function loadData() {
   loading.value = true
   try {
     await withTimeout(appAuthStore.hydrateUser(), 1500).catch(() => null)
+    const joinedStatus = joinedStatusFilter.value === 'all'
+      ? undefined
+      : joinedStatusFilter.value === 'going'
+        ? 1
+        : joinedStatusFilter.value === 'pending'
+          ? 4
+          : 2
+    const joinedSortBy = joinedSortFilter.value === 'earliest' ? 'claimAt' : 'createdAt'
+    const joinedSortOrder = joinedSortFilter.value === 'earliest' ? 'asc' : 'desc'
+
+    const publishedStatus = publishedStatusFilter.value === 'all'
+      ? undefined
+      : publishedStatusFilter.value === 'pending'
+        ? 0
+        : publishedStatusFilter.value === 'published'
+          ? 1
+          : publishedStatusFilter.value === 'going'
+            ? 2
+            : publishedStatusFilter.value === 'confirm'
+              ? 5
+              : 3
+    const publishedSortBy = publishedSortFilter.value === 'expected'
+      ? 'expectedTime'
+      : publishedSortFilter.value === 'urgent'
+        ? 'urgencyLevel'
+        : 'createdAt'
+    const publishedSortOrder = publishedSortFilter.value === 'expected' ? 'asc' : 'desc'
+
     const [summaryRet, joinedRet, pubRet] = await Promise.allSettled([
       withTimeout(getHallSummary(), 6000),
-      withTimeout(getMyClaimRecords(1, 20), 6000),
-      withTimeout(getMyPublishHistory(1, 20), 6000),
+      withTimeout(getMyClaimRecords({
+        current: 1,
+        size: 20,
+        status: joinedStatus,
+        sortBy: joinedSortBy,
+        sortOrder: joinedSortOrder,
+      }), 6000),
+      withTimeout(getMyPublishHistory({
+        current: 1,
+        size: 20,
+        status: publishedStatus,
+        sortBy: publishedSortBy,
+        sortOrder: publishedSortOrder,
+      }), 6000),
     ])
     const summaryRes = summaryRet.status === 'fulfilled' ? summaryRet.value : null
     const joinedRes = joinedRet.status === 'fulfilled' ? joinedRet.value : null
@@ -101,8 +239,27 @@ async function loadData() {
       summary.myPublishedCount = Number(summaryRes.data.myPublishedCount || 0)
       summary.inProgressCount = Number(summaryRes.data.inProgressCount || 0)
     }
-    const joinedList = joinedRes?.code === 200 ? (joinedRes.data?.records || []) : []
-    joinedRows.value = joinedList.filter((x: any) => [1, 4].includes(Number(x?.claimStatus)))
+    joinedRows.value = joinedRes?.code === 200 ? (joinedRes.data?.records || []) : []
+    // 用 requestId 反查需求详情，补齐“正在进行的帮助”里的真实发起人名称
+    const missingRequesterIds = Array.from(
+      new Set(
+        joinedRows.value
+          .map(x => Number(x.requestId || 0))
+          .filter(id => id > 0 && !joinedRequesterNameMap.value[id]),
+      ),
+    )
+    if (missingRequesterIds.length) {
+      const detailResults = await Promise.allSettled(
+        missingRequesterIds.map(id => withTimeout(getServiceRequestDetail(id), 4000)),
+      )
+      detailResults.forEach((ret, idx) => {
+        if (ret.status !== 'fulfilled' || ret.value?.code !== 200) return
+        const id = missingRequesterIds[idx]
+        const name = String(ret.value.data?.requesterName || '').trim()
+        if (id && name)
+          joinedRequesterNameMap.value[id] = name
+      })
+    }
     publishedRows.value = pubRes?.code === 200 ? (pubRes.data?.records || []) : []
   }
   catch (e: any) {
@@ -161,13 +318,6 @@ function requestStatusCode(v?: number) {
   if (v === 5) return 'PENDING_CONFIRM'
   if (v === 4) return 'CANCELLED'
   return 'CREATED'
-}
-
-function requestStep(v?: number) {
-  if (v === 0) return 0
-  if (v === 1) return 1
-  if (v === 2) return 2
-  return 3
 }
 
 async function openClaimDetail(row: ServiceClaimVO) {
@@ -274,76 +424,122 @@ async function onCompleteCurrentClaim() {
 }
 
 onMounted(loadData)
+
+watch([joinedStatusFilter, joinedSortFilter, publishedStatusFilter, publishedSortFilter], () => {
+  loadData()
+})
 </script>
 
 <template>
-  <AppPageLayout :navbar="false" tabbar>
-    <div class="task-page">
-      <div class="hero">
-        <div class="hero-left">
-          <h3>任务中心</h3>
-          <p>{{ name }} · {{ communityText }}</p>
-        </div>
-        <div class="hero-avatar">
-          <img v-if="avatarUrl" :src="avatarUrl" alt="avatar">
-          <FmIcon v-else name="i-carbon:user-avatar-filled-alt" />
-        </div>
-      </div>
+  <AppPageLayout :navbar="false" tabbar tabbar-class="m-mobile-tabbar-float">
+    <ThreeSectionPage page-class="task-page m-mobile-page-bg" content-class="task-content">
+      <template #header>
+        <MainTopBar
+          :community-name="resolvedCommunityName"
+          :distance-text="headerDistance"
+          @change-community="onChangeCommunity"
+          @right="onOpenMessages"
+        />
+      </template>
 
-      <div class="action-grid">
-        <button type="button" class="action-card help" @click="onTakeTask">
-          <div class="title">我要帮忙</div>
-          <div class="sub">我参与办理</div>
-        </button>
-        <button type="button" class="action-card publish" @click="onPublishRequest">
-          <div class="title">我要发布</div>
-          <div class="sub">我发布的事项</div>
-        </button>
-        <button type="button" class="action-card neutral" @click="goOverview('reviews')">
-          <div class="title">评价</div>
-          <div class="sub">查看办理评价</div>
-        </button>
-        <button type="button" class="action-card neutral" @click="goOverview('stats')">
-          <div class="title">服务统计</div>
-          <div class="sub">查看办理进度</div>
-        </button>
-      </div>
-      <button type="button" class="ai-entry" @click="goAiAssistant">
-        AI助手：一句话生成需求 + 常见问题问答
-      </button>
+      <AiHeroInput v-model="aiText" class="hall-ai-input" @send="goAiAssistant" />
 
-      <div class="tabs">
+      <QuickActionCards
+        help-title="爱心传递"
+        help-sub="浏览并帮助他人"
+        publish-title="我有难处"
+        publish-sub="提交求助需求"
+        @help="onTakeTask"
+        @publish="onPublishRequest"
+      />
+
+      <div class="tabs task-filters">
         <button :class="{ active: activeTab === 'joined' }" @click="openListTab('joined')">
-          我参与的办理（{{ summary.inProgressCount }}）
+          正在进行的帮助
         </button>
         <button :class="{ active: activeTab === 'published' }" @click="openListTab('published')">
-          我发布的事项（{{ summary.myPublishedCount }}）
+          正在进行的求助
         </button>
+      </div>
+
+      <div v-if="activeTab === 'joined'" class="filter-panel">
+        <div class="filter-row">
+          <button
+            v-for="item in joinedFilterOptions"
+            :key="item.value"
+            class="filter-chip"
+            :class="{ active: joinedStatusFilter === item.value }"
+            @click="joinedStatusFilter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div class="filter-row compact">
+          <button
+            v-for="item in joinedSortOptions"
+            :key="item.value"
+            class="filter-chip subtle"
+            :class="{ active: joinedSortFilter === item.value }"
+            @click="joinedSortFilter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
+
+      <div v-else class="filter-panel">
+        <div class="filter-row">
+          <button
+            v-for="item in publishedFilterOptions"
+            :key="item.value"
+            class="filter-chip"
+            :class="{ active: publishedStatusFilter === item.value }"
+            @click="publishedStatusFilter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div class="filter-row compact">
+          <button
+            v-for="item in publishedSortOptions"
+            :key="item.value"
+            class="filter-chip subtle"
+            :class="{ active: publishedSortFilter === item.value }"
+            @click="publishedSortFilter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
       </div>
 
       <div v-if="loading" class="status">加载中...</div>
-      <div v-else-if="activeTab === 'joined'" class="list">
-        <article v-for="r in joinedRows" :key="r.id" class="card card-clickable" @click="openClaimDetail(r)">
-          <div class="card-head">
-            <h4>{{ r.requestTitle || '服务任务' }}</h4>
-            <span class="state-pill" :class="claimStatusClass(r.claimStatus)">{{ claimStatusText(r.claimStatus) }}</span>
+      <div v-else class="list feed-list">
+        <article
+          v-for="(r, idx) in feedRows"
+          :key="r.id"
+          class="card card-clickable feed-card"
+          @click="openFeedDetail(r)"
+        >
+          <div class="feed-head">
+            <div class="feed-user">
+              <img :src="feedUserAvatar(idx)" alt="账户头像" class="feed-avatar">
+              <div class="feed-user-text">
+                <strong>{{ feedUserName(r) }}</strong>
+                <span>{{ feedMeta(r) }}</span>
+              </div>
+            </div>
+            <span class="state-pill" :class="feedStatusClass(r)">{{ feedStatus(r) }}</span>
           </div>
-          <p>{{ r.requestAddress || '本社区' }}</p>
-          <small>认领时间：{{ fmtTime(r.claimAt || r.createdAt) }}</small>
+          <h4 class="feed-title">{{ feedTitle(r) }}</h4>
+          <p class="feed-desc">{{ feedDesc(r) }}</p>
+          <img :src="feedImage(idx)" alt="任务配图" class="feed-image">
         </article>
-        <p v-if="joinedRows.length === 0" class="empty">暂无参与中的任务</p>
+        <p v-if="feedRows.length === 0" class="empty">暂无匹配内容</p>
       </div>
-      <div v-else class="list">
-        <article v-for="r in publishedRows" :key="r.id" class="card card-clickable" @click="openPublishedDetail(r)">
-          <div class="card-head">
-            <h4>{{ r.serviceType }}</h4>
-            <span class="state-pill" :class="requestStatusClass(r.status)">{{ requestStatusText(r.status) }}</span>
-          </div>
-          <p>{{ r.serviceAddress || '本社区' }}</p>
-          <small>发布时间：{{ fmtTime(r.publishedAt || r.createdAt) }}</small>
-        </article>
-        <p v-if="publishedRows.length === 0" class="empty">暂无已发布需求</p>
-      </div>
+
+      <button class="floating-create" type="button" aria-label="发布新求助" @click="onPublishRequest">
+        <FmIcon name="mdi:plus" />
+      </button>
 
       <NutPopup
         v-if="claimDetailVisible"
@@ -364,18 +560,21 @@ onMounted(loadData)
               <span class="state-code">{{ requestStatusCode(claimDetail.status) }}</span>
               <span class="state-text">{{ requestStatusText(claimDetail.status) }}</span>
             </div>
-            <div class="steps">
-              <div v-for="(s, idx) in ['发布', '审核', '进行中', '完成']" :key="s" class="step" :class="{ active: idx <= requestStep(claimDetail.status) }">
-                <span class="dot">{{ idx + 1 }}</span>
-                <span class="txt">{{ s }}</span>
-              </div>
+            <RequestProgressCard
+              :status="claimDetail.status"
+              :claim-status="selectedClaim?.claimStatus || selectedPublished?.latestClaimStatus || claimDetail.latestClaimStatus"
+            />
+            <div class="info-grid">
+              <p><b>服务类型</b><span>{{ claimDetail.serviceType }}</span></p>
+              <p><b>求助人</b><span>{{ claimDetail.requesterName || claimDetail.emergencyContactName || '未实名用户' }}</span></p>
+              <p><b>志愿者</b><span>{{ selectedClaim?.volunteerName || claimDetail.latestVolunteerName || '暂未认领' }}</span></p>
+              <p><b>手机号</b><span>{{ claimDetail.emergencyContactPhone || selectedClaim?.requesterPhone || '-' }}</span></p>
+              <p class="wide"><b>地址</b><span>{{ claimDetail.serviceAddress || '-' }}</span></p>
+              <p><b>需求状态</b><span>{{ requestStatusText(claimDetail.status) }}</span></p>
+              <p><b>认领状态</b><span>{{ claimStatusText(selectedClaim?.claimStatus || selectedPublished?.latestClaimStatus || claimDetail.latestClaimStatus) }}</span></p>
+              <p class="wide"><b>认领时间</b><span>{{ fmtTime(selectedClaim?.claimAt || selectedClaim?.createdAt) }}</span></p>
+              <p class="wide"><b>说明</b><span>{{ claimDetail.description || '暂无说明' }}</span></p>
             </div>
-            <p><b>服务类型：</b>{{ claimDetail.serviceType }}</p>
-            <p><b>地址：</b>{{ claimDetail.serviceAddress || '-' }}</p>
-            <p><b>需求状态：</b>{{ requestStatusText(claimDetail.status) }}</p>
-            <p><b>认领状态：</b>{{ claimStatusText(selectedClaim?.claimStatus || selectedPublished?.latestClaimStatus) }}</p>
-            <p><b>认领时间：</b>{{ fmtTime(selectedClaim?.claimAt || selectedClaim?.createdAt) }}</p>
-            <p><b>说明：</b>{{ claimDetail.description || '暂无说明' }}</p>
             <NutButton
               v-if="selectedClaim && Number(selectedClaim.claimStatus) === 1"
               block
@@ -397,33 +596,111 @@ onMounted(loadData)
           </div>
         </div>
       </NutPopup>
-    </div>
+    </ThreeSectionPage>
   </AppPageLayout>
 </template>
 
 <style scoped>
-.task-page { min-height: 100%; background: var(--m-color-bg); padding: var(--m-space-page); }
+.task-page {
+  min-height: 100%;
+  background:
+    radial-gradient(120% 84% at 50% -10%, #f9fbfa 0%, #f3f5f4 62%, #eef2f0 100%);
+}
+.task-content { padding: var(--m-space-page); }
 .hero { background: var(--m-color-card); border: 1px solid var(--m-color-border); border-radius: var(--m-radius-card); padding: 12px; box-shadow: var(--m-shadow-card); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* header moved into MainTopBar */
 .hero-left { min-width: 0; }
 .hero h3 { margin: 0; font-size: var(--m-font-title); font-weight: 800; color: var(--m-color-text); }
 .hero p { margin: 4px 0 0; font-size: var(--m-font-sub); color: var(--m-color-subtext); }
 .hero-avatar { width: 42px; height: 42px; border-radius: 999px; overflow: hidden; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; border: 1px solid #bbf7d0; }
 .hero-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.action-grid { margin-top: var(--m-space-block); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.action-card { border-radius: var(--m-radius-card); padding: 14px; text-align: left; border: 1px solid var(--m-color-border); background: var(--m-color-card); color: var(--m-color-text); box-shadow: var(--m-shadow-card); }
-.action-card .title { font-size: 16px; font-weight: 800; }
-.action-card .sub { margin-top: 4px; font-size: var(--m-font-sub); color: var(--m-color-subtext); }
-.action-card.help { border-left: 4px solid #2f9e63; }
-.action-card.publish { border-left: 4px solid #3aa86e; }
-.action-card.neutral { border-left: 4px solid #4b5563; }
-.ai-entry { margin-top: 10px; width: 100%; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: var(--m-radius-card); padding: 12px; font-size: 13px; font-weight: 700; text-align: left; }
+.hall-ai-input { margin-top: 10px; }
 .tabs { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.tabs button { border: 1px solid var(--m-color-border); background: var(--m-color-card); border-radius: 10px; padding: 8px; color: var(--m-color-subtext); font-size: var(--m-font-sub); }
+.tabs button {
+  border: 1px solid color-mix(in oklab, var(--m-color-border), transparent 30%);
+  background: color-mix(in srgb, var(--m-color-card), transparent 12%);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.30) inset,
+    0 6px 14px rgba(15, 23, 42, 0.06);
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--m-color-subtext);
+  font-size: var(--m-font-sub);
+}
 .tabs button.active { background: var(--m-color-primary-soft); border-color: var(--m-color-primary); color: var(--m-color-primary); font-weight: 800; }
+.task-filters { margin-top: 8px; }
+.filter-panel {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+.filter-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.filter-row.compact {
+  gap: 6px;
+}
+.filter-row::-webkit-scrollbar {
+  display: none;
+}
+.filter-chip {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in oklab, var(--m-color-border), transparent 24%);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--m-color-subtext);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+.filter-chip.subtle {
+  background: rgba(247, 248, 247, 0.88);
+}
+.filter-chip.active {
+  background: var(--m-color-primary-soft);
+  color: var(--m-color-primary);
+  border-color: color-mix(in srgb, var(--m-color-primary), white 45%);
+  font-weight: 700;
+}
 .status { margin-top: 10px; color: var(--m-color-subtext); font-size: var(--m-font-body); }
 .list { margin-top: 10px; display: grid; gap: 8px; }
-.card { border-radius: var(--m-radius-card); border: 1px solid var(--m-color-border); background: var(--m-color-card); padding: 10px; box-shadow: var(--m-shadow-card); }
+.feed-list { padding-bottom: 86px; }
+.card {
+  border-radius: var(--m-radius-card);
+  border: 1px solid color-mix(in oklab, var(--m-color-border), transparent 20%);
+  background: color-mix(in srgb, var(--m-color-card), transparent 8%);
+  backdrop-filter: saturate(160%) blur(8px);
+  -webkit-backdrop-filter: saturate(160%) blur(8px);
+  padding: 10px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 8px 16px rgba(15, 23, 42, 0.07);
+}
 .card-clickable { cursor: pointer; }
+.feed-card { padding: 12px; border-radius: 18px; }
+.feed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.feed-user { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.feed-avatar { width: 34px; height: 34px; border-radius: 999px; object-fit: cover; border: 1px solid #d1d5db; }
+.feed-user-text { display: grid; min-width: 0; }
+.feed-user-text strong { font-size: 13px; color: var(--m-color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-user-text span { font-size: 11px; color: var(--m-color-muted); }
+.feed-title { margin: 10px 0 6px; font-size: 20px; line-height: 1.3; font-weight: 900; color: #111827; }
+.feed-desc { margin: 0; font-size: 13px; line-height: 1.7; color: #4b5563; }
+.feed-image {
+  margin-top: 10px;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  display: block;
+}
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .state-pill { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 8px; }
 .state-going { background: #dbeafe; color: #1d4ed8; }
@@ -437,7 +714,7 @@ onMounted(loadData)
 
 .claim-drawer { padding: 10px 16px 20px; background: var(--m-color-card); border-top-left-radius: 24px; border-top-right-radius: 24px; }
 .order-popup :deep(.nut-popup) {
-  width: min(100vw, 430px) !important;
+  width: min(100vw, var(--m-device-max-width)) !important;
   left: 50% !important;
   right: auto !important;
   transform: translateX(-50%) !important;
@@ -446,22 +723,72 @@ onMounted(loadData)
   width: 100% !important;
 }
 .claim-drawer {
-  width: min(100vw, 430px);
+  width: min(100vw, var(--m-device-max-width));
   margin: 0 auto;
   box-sizing: border-box;
 }
 .drawer-handle { width: 42px; height: 4px; border-radius: 4px; background: var(--m-color-border); margin: 0 auto 10px; }
 .claim-drawer h3 { margin: 0 0 10px; font-size: 18px; font-weight: 900; }
-.detail-content p { margin: 0 0 8px; font-size: 13px; color: var(--m-color-subtext); }
+.detail-content p { margin: 0; font-size: 13px; color: var(--m-color-subtext); }
 .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .state-code { font-size: 11px; font-weight: 800; color: var(--m-color-primary); background: var(--m-color-primary-soft); border: 1px solid var(--m-color-border); padding: 2px 8px; border-radius: 999px; }
 .state-text { font-size: 12px; color: var(--m-color-muted); }
-.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 12px; }
-.step { text-align: center; color: #94a3b8; }
-.step .dot { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 700; }
-.step .txt { display: block; margin-top: 3px; font-size: 11px; }
-.step.active { color: #047857; }
-.step.active .dot { background: #10b981; color: #fff; border-color: #10b981; }
+.info-grid {
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 8px;
+}
+.info-grid p {
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 8px;
+  display: grid;
+  gap: 3px;
+}
+.info-grid p.wide { grid-column: 1 / -1; }
+.info-grid b { color: #64748b; font-size: 11px; }
+.info-grid span { color: #111827; font-size: 13px; font-weight: 800; word-break: break-word; }
+.floating-create {
+  position: fixed;
+  right: calc(max((100vw - min(100vw, var(--m-device-max-width))) / 2, 0px) + 16px);
+  bottom: calc(max(env(safe-area-inset-bottom), 12px) + 88px);
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(160deg, #1fa34a 0%, #14803b 100%);
+  color: #fff;
+  font-size: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.24) inset,
+    0 12px 24px rgba(22, 163, 74, 0.24);
+  z-index: 14;
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+}
+.floating-create :deep(.fm-icon) {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 390px) {
+  .floating-create {
+    right: 14px;
+    bottom: calc(max(env(safe-area-inset-bottom), 12px) + 84px);
+  }
+}
+
+:global(.dark) .task-page { background: #111827; }
+:global(.dark) .feed-title { color: #f3f4f6; }
+:global(.dark) .feed-desc { color: #cbd5e1; }
+:global(.dark) .feed-avatar { border-color: #4b5563; }
+:global(.dark) .feed-image { border-color: #374151; }
+:global(.dark) .tabs button { background: rgba(17, 24, 39, 0.58); border-color: rgba(148, 163, 184, 0.26); }
 
 </style>
 

@@ -15,6 +15,11 @@ export interface AiChatResponse {
   orderDraft?: AiOrderDraft
 }
 
-export function aiChat(message: string) {
-  return api.post<any, BackendResult<AiChatResponse>>('/ai/chat', { message })
+export interface AiChatHistoryMessage {
+  role: 'user' | 'assistant' | 'ai'
+  text: string
+}
+
+export function aiChat(message: string, history?: AiChatHistoryMessage[]) {
+  return api.post<any, BackendResult<AiChatResponse>>('/ai/chat', { message, history })
 }

@@ -43,7 +43,9 @@ export async function adminUserList(params?: {
   page?: number
   size?: number
 }) {
-  return apiService.get<BackendResult<PageResult<AdminUserVO>>>(`users/list${buildQuery(params)}`)
+  return apiService.get<BackendResult<PageResult<AdminUserVO>>>(
+    `users/list${buildQuery(params)}`,
+  )
 }
 
 export async function adminUserCreate(payload: {
@@ -94,4 +96,3 @@ function buildQuery(params?: Record<string, any>) {
   const s = search.toString()
   return s ? `?${s}` : ''
 }
-

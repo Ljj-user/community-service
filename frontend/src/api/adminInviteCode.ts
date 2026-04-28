@@ -25,7 +25,9 @@ export async function inviteCodeList(params?: { communityId?: number }) {
   if (params?.communityId !== undefined && params.communityId !== null)
     q.set('communityId', String(params.communityId))
   const s = q.toString()
-  return apiService.get<BackendResult<AdminInviteCodeVO[]>>(`invite-code/list${s ? `?${s}` : ''}`)
+  return apiService.get<BackendResult<AdminInviteCodeVO[]>>(
+    `invite-code/list${s ? `?${s}` : ''}`,
+  )
 }
 
 export async function inviteCodeCreate(payload: {
@@ -33,10 +35,12 @@ export async function inviteCodeCreate(payload: {
   expiresInDays?: number
   maxUses?: number
 }) {
-  return apiService.post<BackendResult<AdminInviteCodeVO>>('invite-code', payload)
+  return apiService.post<BackendResult<AdminInviteCodeVO>>(
+    'invite-code',
+    payload,
+  )
 }
 
 export async function inviteCodeDisable(id: number) {
   return apiService.post<BackendResult<null>>(`invite-code/${id}/disable`, null)
 }
-

@@ -20,10 +20,10 @@ public class AiChatController {
     private AiChatService aiChatService;
 
     @PostMapping("/chat")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER','COMMUNITY_ADMIN','SUPER_ADMIN')")
     public Result<AiChatResponseVO> chat(@Valid @RequestBody AiChatRequest request) {
         try {
-            return Result.success(aiChatService.chat(request.getMessage()));
+            return Result.success(aiChatService.chat(request.getMessage(), request.getHistory()));
         } catch (Exception e) {
             return Result.error("AI 对话失败: " + e.getMessage());
         }

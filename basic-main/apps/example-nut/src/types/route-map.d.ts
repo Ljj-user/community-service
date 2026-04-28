@@ -48,6 +48,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    'forgot-password': RouteRecordInfo<
+      'forgot-password',
+      '/forgot-password',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/hall': RouteRecordInfo<
       '/hall',
       '/hall',
@@ -86,6 +93,13 @@ declare module 'vue-router/auto-routes' {
     'login': RouteRecordInfo<
       'login',
       '/login',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/messages': RouteRecordInfo<
+      '/messages',
+      '/messages',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -132,6 +146,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings': RouteRecordInfo<
+      '/settings',
+      '/settings',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/user/': RouteRecordInfo<
       '/user/',
       '/user',
@@ -167,6 +188,12 @@ declare module 'vue-router/auto-routes' {
     'src/views/ai-assistant.vue': {
       routes:
         | '/ai-assistant'
+      views:
+        | never
+    }
+    'src/views/forgot-password.vue': {
+      routes:
+        | 'forgot-password'
       views:
         | never
     }
@@ -206,6 +233,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/views/messages.vue': {
+      routes:
+        | '/messages'
+      views:
+        | never
+    }
     'src/views/notices.vue': {
       routes:
         | '/notices'
@@ -239,6 +272,12 @@ declare module 'vue-router/auto-routes' {
     'src/views/service-evaluate.vue': {
       routes:
         | '/service-evaluate'
+      views:
+        | never
+    }
+    'src/views/settings.vue': {
+      routes:
+        | '/settings'
       views:
         | never
     }

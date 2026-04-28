@@ -57,6 +57,13 @@ export interface TrendChart {
   supply: number[]
 }
 
+export interface MonthlyMatchRateTrend {
+  labels: string[]
+  successRatePercent: number[]
+  createdCount: number[]
+  completedCount: number[]
+}
+
 export interface BackendResult<T> {
   code: number
   message: string
@@ -88,3 +95,10 @@ export async function getVolunteerTop(days = 30, topN = 10) {
   )
 }
 
+export async function getCommunityServiceTop(topN = 10) {
+  return apiService.get<BackendResult<NameCount[]>>(`community-service-top?topN=${topN}`)
+}
+
+export async function getMonthlyMatchRateTrend(months = 6) {
+  return apiService.get<BackendResult<MonthlyMatchRateTrend>>(`monthly-match-rate?months=${months}`)
+}

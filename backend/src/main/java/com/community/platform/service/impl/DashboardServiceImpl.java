@@ -5,6 +5,7 @@ import com.community.platform.common.Constants;
 import com.community.platform.dto.AdminDashboardPanelVO;
 import com.community.platform.dto.DashboardStatsVO;
 import com.community.platform.dto.FundingMonitorVO;
+import com.community.platform.dto.MonthlyMatchRateTrendVO;
 import com.community.platform.dto.NameCountVO;
 import com.community.platform.dto.RegionStatVO;
 import com.community.platform.dto.ScheduleBriefVO;
@@ -416,6 +417,98 @@ public class DashboardServiceImpl implements DashboardService {
                     return vo;
                 })
                 .toList();
+    }
+
+    @Override
+    public List<NameCountVO> getCommunityServiceTop(Long communityId, int topN) {
+        int n = Math.max(3, Math.min(topN, 50));
+        List<ServiceRequest> requests = serviceRequestMapper.selectList(
+                baseRequestWrapper(communityId)
+                        .in(ServiceRequest::getStatus,
+                                Constants.REQUEST_STATUS_PUBLISHED,
+                                Constants.REQUEST_STATUS_CLAIMED,
+                                Constants.REQUEST_STATUS_PENDING_CONFIRM,
+                                Constants.REQUEST_STATUS_COMPLETED)
+                        .isNotNull(ServiceRequest::getCommunityId)
+                        .select(ServiceRequest::getCommunityId)
+        );
+        if (requests.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Long> grouped = requests.stream()
+                .map(ServiceRequest::getCommunityId)
+                .filter(id -> id != null)
+                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+
+        List<Long> regionIds = grouped.keySet().stream().toList();
+        Map<Long, SysRegion> regionMap = sysRegionMapper.selectBatchIds(regionIds).stream()
+                .collect(Collectors.toMap(SysRegion::getId, r -> r, (a, b) -> a));
+
+        return grouped.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .limit(n)
+                .map(e -> {
+                    SysRegion region = regionMap.get(e.getKey());
+                    String regionName = region != null && region.getName() != null && !region.getName().isBlank()
+                            ? region.getName()
+                            : ("社区#" + e.getKey());
+                    NameCountVO vo = new NameCountVO();
+                    vo.setName(regionName);
+                    vo.setCount(e.getValue());
+                    return vo;
+                })
+                .toList();
+    }
+
+    @Override
+    public MonthlyMatchRateTrendVO getMonthlyMatchRateTrend(Long communityId, int months) {
+        int m = Math.max(3, Math.min(months, 24));
+        YearMonth end = YearMonth.now();
+        YearMonth startYm = end.minusMonths(m - 1L);
+
+        List<String> labels = new ArrayList<>();
+        List<BigDecimal> rates = new ArrayList<>();
+        List<Long> created = new ArrayList<>();
+        List<Long> completed = new ArrayList<>();
+
+        YearMonth cursor = startYm;
+        while (!cursor.isAfter(end)) {
+            LocalDateTime monthStart = cursor.atDay(1).atStartOfDay();
+            LocalDateTime monthEnd = cursor.atEndOfMonth().atTime(23, 59, 59, 999000000);
+
+            Long createdCnt = serviceRequestMapper.selectCount(
+                    baseRequestWrapper(communityId).between(ServiceRequest::getCreatedAt, monthStart, monthEnd));
+            Long completedCnt = serviceRequestMapper.selectCount(
+                    baseRequestWrapper(communityId)
+                            .eq(ServiceRequest::getStatus, Constants.REQUEST_STATUS_COMPLETED)
+                            .isNotNull(ServiceRequest::getCompletedAt)
+                            .between(ServiceRequest::getCompletedAt, monthStart, monthEnd));
+
+            long denom = createdCnt == null ? 0L : createdCnt;
+            long num = completedCnt == null ? 0L : completedCnt;
+
+            BigDecimal pct = BigDecimal.ZERO;
+            if (denom > 0) {
+                pct = BigDecimal.valueOf(num)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(denom), 1, BigDecimal.ROUND_HALF_UP);
+            }
+
+            labels.add(String.format("%04d-%02d", cursor.getYear(), cursor.getMonthValue()));
+            rates.add(pct);
+            created.add(denom);
+            completed.add(num);
+
+            cursor = cursor.plusMonths(1);
+        }
+
+        MonthlyMatchRateTrendVO vo = new MonthlyMatchRateTrendVO();
+        vo.setLabels(labels);
+        vo.setSuccessRatePercent(rates);
+        vo.setCreatedCount(created);
+        vo.setCompletedCount(completed);
+        return vo;
     }
 
     private LambdaQueryWrapper<ServiceRequest> baseRequestWrapper(Long communityId) {

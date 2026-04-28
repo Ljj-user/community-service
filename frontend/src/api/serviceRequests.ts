@@ -90,11 +90,15 @@ function buildQuery(params?: Record<string, any>) {
 }
 
 export async function serviceRequestList(params: ServiceRequestQuery) {
-  return apiService.get<BackendResult<IPage<ServiceRequestVO>>>(`list${buildQuery(params)}`)
+  return apiService.get<BackendResult<IPage<ServiceRequestVO>>>(
+    `list${buildQuery(params)}`,
+  )
 }
 
 export async function serviceRequestMyList(params: ServiceRequestQuery) {
-  return apiService.get<BackendResult<IPage<ServiceRequestVO>>>(`my-list${buildQuery(params)}`)
+  return apiService.get<BackendResult<IPage<ServiceRequestVO>>>(
+    `my-list${buildQuery(params)}`,
+  )
 }
 
 export async function serviceRequestDetail(id: number) {
@@ -108,4 +112,3 @@ export async function serviceRequestCreate(payload: ServiceRequestCreateDTO) {
 export async function serviceRequestAudit(payload: ServiceRequestAuditDTO) {
   return apiService.post<BackendResult<null>>('audit', payload)
 }
-

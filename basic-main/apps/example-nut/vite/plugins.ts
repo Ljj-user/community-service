@@ -25,7 +25,7 @@ export default function createVitePlugins(mode: string, isBuild = false) {
   const vitePlugins: (PluginOption | PluginOption[])[] = [
     VueRouter({
       routesFolder: './src/views',
-      dts: './src/types/route-map.d.ts',
+      dts: isBuild ? './src/types/route-map.d.ts' : false,
       exclude: ['**/components', '**/_*/**', '**/_*'],
     }),
     vue(),
@@ -42,7 +42,7 @@ export default function createVitePlugins(mode: string, isBuild = false) {
     viteEnv.VITE_ENABLE_VUE_DEVTOOLS && VueDevTools(),
 
     envParse({
-      dtsPath: 'src/types/env.d.ts',
+      ...(isBuild ? { dtsPath: 'src/types/env.d.ts' } : {}),
     }),
 
     // https://github.com/svitejs/vite-plugin-qrcode
@@ -59,7 +59,7 @@ export default function createVitePlugins(mode: string, isBuild = false) {
         },
         FantasticAutoImports,
       ],
-      dts: './src/types/auto-imports.d.ts',
+      dts: isBuild ? './src/types/auto-imports.d.ts' : false,
       dirs: [
         './src/store/modules/**/*',
         './src/composables/**/*',
@@ -71,7 +71,7 @@ export default function createVitePlugins(mode: string, isBuild = false) {
       globs: [
         'src/components/*/index.vue',
       ],
-      dts: './src/types/components.d.ts',
+      dts: isBuild ? './src/types/components.d.ts' : false,
       resolvers: [
         FantasticComponentsResolver(),
       ],

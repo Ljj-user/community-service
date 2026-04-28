@@ -28,4 +28,3 @@ export async function exportModule(params: {
     responseType: 'blob',
   })
 }
-

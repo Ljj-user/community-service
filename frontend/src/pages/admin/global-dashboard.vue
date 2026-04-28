@@ -10,8 +10,8 @@ meta:
 <script setup lang="ts">
 import type { ChartData, SimpleChartSeries } from '~/models/ChartData'
 import ChinaHeatMap from '~/components/Charts/ChinaHeatMap.vue'
-import type { DashboardStats, RegionStat } from '~/api/dashboardStats'
-import { getDashboardStats, getRegionCoverage } from '~/api/dashboardStats'
+import type { DashboardStats, MonthlyMatchRateTrend, NameCount, RegionStat } from '~/api/dashboardStats'
+import { getDashboardStats, getMonthlyMatchRateTrend, getRegionCoverage, getVolunteerTop } from '~/api/dashboardStats'
 import { serviceMonitorList } from '~/api/serviceMonitor'
 
 const { t, locale } = useI18n()
@@ -20,10 +20,13 @@ const message = useMessage()
 const loading = ref(false)
 const stats = ref<DashboardStats | null>(null)
 const regionStats = ref<RegionStat[]>([])
+const volunteerTop = ref<NameCount[]>([])
+const monthlyMatchRate = ref<MonthlyMatchRateTrend | null>(null)
+const monthlyTrendMonths = ref<6 | 12>(6)
 
 const mapData = computed(() => {
   const data: Record<string, number> = {}
-  regionStats.value.forEach((item) => {
+  regionStats.value.forEach((item: RegionStat) => {
     data[item.regionCode] = item.serviceCount
   })
   return data
@@ -89,12 +92,46 @@ const funnelChartData = computed<ChartData | null>(() => {
   }
 })
 
+const volunteerTopChart = computed<ChartData | null>(() => {
+  void locale.value
+  const list = volunteerTop.value || []
+  if (!list.length) return null
+  return {
+    labels: list.map((x: NameCount) => x.name),
+    series: [{ name: '近30天服务时长（小时）', data: list.map((x: NameCount) => Number(x.count ?? 0)) }],
+  }
+})
+
+const monthlyMatchRateChart = computed<ChartData | null>(() => {
+  void locale.value
+  if (!monthlyMatchRate.value) return null
+  const labels = monthlyMatchRate.value.labels || []
+  const series = monthlyMatchRate.value.successRatePercent || []
+  if (!labels.length || !series.length) return null
+  return {
+    labels,
+    series: [{ name: '对接成功率（%）', data: series.map(n => Number(n ?? 0)) }],
+  }
+})
+
+const monthlyMatchRateHint = computed(() => {
+  const m = monthlyMatchRate.value
+  if (!m || !m.labels?.length) return ''
+  const lastIdx = m.labels.length - 1
+  const created = Number(m.createdCount?.[lastIdx] ?? 0)
+  const completed = Number(m.completedCount?.[lastIdx] ?? 0)
+  if (created <= 0) return '本月新增为 0，成功率按 0% 展示。'
+  return `本月：${completed} / ${created}`
+})
+
 async function loadData() {
   loading.value = true
   try {
-    const [statsRes, regionRes, risk1, risk2] = await Promise.all([
+    const [statsRes, regionRes, topRes, monthRateRes, risk1, risk2] = await Promise.all([
       getDashboardStats(),
       getRegionCoverage(),
+      getVolunteerTop(30, 10),
+      getMonthlyMatchRateTrend(monthlyTrendMonths.value),
       serviceMonitorList({ current: 1, size: 1, riskType: 1 }),
       serviceMonitorList({ current: 1, size: 1, riskType: 2 }),
     ])
@@ -105,6 +142,12 @@ async function loadData() {
     }
     if (regionRes.code === 200 && regionRes.data) {
       regionStats.value = regionRes.data
+    }
+    if (topRes.code === 200) {
+      volunteerTop.value = (topRes.data || []) as any
+    }
+    if (monthRateRes.code === 200) {
+      monthlyMatchRate.value = monthRateRes.data as any
     }
     const r1 = risk1.code === 200 ? (risk1.data?.total ?? 0) : 0
     const r2 = risk2.code === 200 ? (risk2.data?.total ?? 0) : 0
@@ -120,6 +163,10 @@ async function loadData() {
 }
 
 onMounted(loadData)
+
+watch(monthlyTrendMonths, () => {
+  void loadData()
+})
 </script>
 
 <template>
@@ -249,6 +296,35 @@ onMounted(loadData)
         <BaseChart v-if="riskChart.length" :data="riskChart" type="donut" :height="260" />
         <p v-else class="text-xs text-slate-500">
           {{ t('community.globalDashboard.chartNoData') }}
+        </p>
+      </Card>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <Card title="志愿者活跃度排名（Top 10）">
+        <BaseChart v-if="volunteerTopChart" :data="volunteerTopChart" type="bar" :height="280" />
+        <p v-else class="text-xs text-slate-500">
+          暂无数据
+        </p>
+      </Card>
+
+      <Card title="月度需求对接成功率（趋势）">
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <p class="text-xs text-slate-500">
+            {{ monthlyMatchRateHint }}
+          </p>
+          <n-radio-group v-model:value="monthlyTrendMonths" size="small">
+            <n-radio-button :value="6">
+              近6个月
+            </n-radio-button>
+            <n-radio-button :value="12">
+              近12个月
+            </n-radio-button>
+          </n-radio-group>
+        </div>
+        <BaseChart v-if="monthlyMatchRateChart" :data="monthlyMatchRateChart" type="line" :height="280" />
+        <p v-else class="text-xs text-slate-500">
+          暂无数据
         </p>
       </Card>
     </div>

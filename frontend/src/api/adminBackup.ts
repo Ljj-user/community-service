@@ -76,4 +76,3 @@ export async function backupDownload(id: number) {
     responseType: 'blob',
   })
 }
-

@@ -166,7 +166,7 @@ public class SecurityConfig {
                         .requestMatchers("/community/**", "/dashboard/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
                         
                         // 普通用户：发布需求、认领服务、评价、个人待办、全局点赞
-                        .requestMatchers("/user/**", "/request/**", "/service/**", "/service-request/**", "/service-claim/**", "/service-evaluation/**", "/todo/**", "/support/**", "/ai/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/user/**", "/request/**", "/service/**", "/service-request/**", "/service-claim/**", "/service-evaluation/**", "/support/**", "/ai/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
                         
                         // 其他接口需要认证
                         .anyRequest().authenticated()
@@ -181,4 +181,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-

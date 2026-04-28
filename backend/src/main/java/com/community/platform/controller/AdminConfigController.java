@@ -49,4 +49,20 @@ public class AdminConfigController {
         adminConfigService.saveAlert(data);
         return Result.success("预警规则保存成功", null);
     }
+
+    @GetMapping("/ai")
+    public Result<Map<String, Object>> getAi() {
+        return Result.success(adminConfigService.getAi());
+    }
+
+    @PutMapping("/ai")
+    public Result<Void> saveAi(@RequestBody Map<String, Object> data) {
+        adminConfigService.saveAi(data);
+        return Result.success("AI 配置保存成功", null);
+    }
+
+    @PostMapping("/ai/test")
+    public Result<Map<String, Object>> testAi(@RequestBody Map<String, Object> data) {
+        return Result.success(adminConfigService.testAi(data));
+    }
 }

@@ -29,10 +29,8 @@ export const useNotificationStore = defineStore('Notification', () => {
       lastError.value = null
       const page = await InboxNotificationService.listMine(category, 1, 40)
       const rows = page.records || []
-      if (category === 1)
-        businessList.value = rows
-      else
-        announcementList.value = rows
+      if (category === 1) businessList.value = rows
+      else announcementList.value = rows
     } catch (e: any) {
       lastError.value = e?.message || 'load failed'
     } finally {
@@ -49,10 +47,8 @@ export const useNotificationStore = defineStore('Notification', () => {
   async function markAllRead(category?: 1 | 2) {
     await InboxNotificationService.markAllRead(category)
     await refreshUnread()
-    if (category === 1 || category === undefined)
-      await loadTab(1)
-    if (category === 2 || category === undefined)
-      await loadTab(2)
+    if (category === 1 || category === undefined) await loadTab(1)
+    if (category === 2 || category === undefined) await loadTab(2)
   }
 
   /** @deprecated 兼容旧调用，映射为公告+待办全部已读 */
