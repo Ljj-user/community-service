@@ -1,6 +1,8 @@
 # 依赖与构建产物
 node_modules/
 **/node_modules/
+.m2/
+**/.m2/
 dist/
 dist-*/
 dist-ssr/
@@ -23,6 +25,7 @@ target/
 
 # IDE
 .idea/
+.cursor/
 *.swp
 *.swo
 .DS_Store

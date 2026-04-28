@@ -82,7 +82,7 @@ export const useAppSettingsStore = defineStore(
   },
   {
     persist: {
-      paths: ['settings'],
+      pick: ['settings'],
     },
   },
 )

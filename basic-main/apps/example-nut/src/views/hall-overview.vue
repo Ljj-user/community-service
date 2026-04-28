@@ -60,12 +60,12 @@ async function loadData() {
       return
     }
     if (kind.value === 'publish-history') {
-      const ret = await getMyPublishHistory(1, 30)
+      const ret = await getMyPublishHistory({ current: 1, size: 30 })
       if (ret.code !== 200) throw new Error(ret.message || '加载失败')
       rows.value = ret.data.records || []
       return
     }
-    const ret = await getMyClaimRecords(1, 30)
+    const ret = await getMyClaimRecords({ current: 1, size: 30 })
     if (ret.code !== 200) throw new Error(ret.message || '加载失败')
     rows.value = ret.data.records || []
   }
