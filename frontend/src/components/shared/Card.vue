@@ -5,8 +5,18 @@ interface Props {
   title?: string
   titleSize?: 'small' | 'normal' | 'large'
   stretchHeight?: boolean
+  noShadow?: boolean
+  bottomBorder?: boolean
+  padded?: boolean
 }
-withDefaults(defineProps<Props>(), { titleSize: 'normal', stretch: false })
+
+withDefaults(defineProps<Props>(), {
+  titleSize: 'normal',
+  stretchHeight: false,
+  noShadow: false,
+  bottomBorder: false,
+  padded: true,
+})
 const slots = useSlots()
 const layout = useLayoutStore()
 const { flatDesign } = storeToRefs(layout)
@@ -19,8 +29,16 @@ const { flatDesign } = storeToRefs(layout)
     </div>
     <div class="card-container" :class="{ 'h-full': stretchHeight }">
       <div
-        class="card-content dark:bg-slate-900 rounded-md border-solid border-color-default p-4 relative z-10"
-        :class="{ 'shadow-lg': !flatDesign, 'drop-shadow-md': !flatDesign, 'border-1': flatDesign, 'h-full': stretchHeight }">
+        class="card-content dark:bg-slate-900 rounded-md border-solid border-color-default relative z-10"
+        :class="{
+          'p-4': padded,
+          'border-1': flatDesign,
+          'h-full': stretchHeight,
+          'shadow-lg': !flatDesign && !noShadow,
+          'drop-shadow-md': !flatDesign && !noShadow,
+          'card-bottom-border': bottomBorder,
+        }"
+      >
         <div v-if="slots.title" class="mix-blend-difference">
           <slot name="title" />
         </div>
@@ -44,6 +62,10 @@ const { flatDesign } = storeToRefs(layout)
 
   .card-content {
     --un-bg-opacity: .7;
+  }
+
+  .card-bottom-border {
+    border-bottom-width: 2px;
   }
   .title {
     font-size: 1rem;

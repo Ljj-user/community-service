@@ -62,4 +62,3 @@ export async function serviceMonitorList(params: ServiceMonitorQuery) {
     `monitor${buildQuery(params)}`,
   )
 }
-

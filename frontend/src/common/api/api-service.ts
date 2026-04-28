@@ -52,19 +52,13 @@ export class ApiService {
   }
 
   async post<T>(url: string, data: any): Promise<T> {
-    const response = await this.httpClient.post<T>(
-      this.buildUrl(url),
-      data,
-    )
+    const response = await this.httpClient.post<T>(this.buildUrl(url), data)
     return response.data
   }
 
   async put<T>(url: string, data: any): Promise<T> {
     try {
-      const response = await this.httpClient.put<T>(
-        this.buildUrl(url),
-        data,
-      )
+      const response = await this.httpClient.put<T>(this.buildUrl(url), data)
       return response.data as T
     } catch (error) {
       console.error(`${error} was occurred`)
@@ -74,9 +68,7 @@ export class ApiService {
 
   async delete<T>(url: string): Promise<T> {
     try {
-      const response = await this.httpClient.delete<T>(
-        this.buildUrl(url),
-      )
+      const response = await this.httpClient.delete<T>(this.buildUrl(url))
       return response.data as T
     } catch (error) {
       throw new Error(`${error} was occurred`)
@@ -121,7 +113,7 @@ export class ApiService {
     return result
   }
 
-  isDefaultProperty(prop: string, value: number) {
+  isDefaultProperty(prop: string, _value: number) {
     if (
       ['pageCount', 'onUpdatePageSize', 'showSizePicker', 'pageSizes'].includes(
         prop,

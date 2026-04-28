@@ -14,5 +14,7 @@ export interface CommunityOption {
 const apiService = new ApiService('admin')
 
 export async function adminCommunityOptions() {
-  return apiService.get<BackendResult<CommunityOption[]>>('region/community-options')
+  return apiService.get<BackendResult<CommunityOption[]>>(
+    'region/community-options',
+  )
 }

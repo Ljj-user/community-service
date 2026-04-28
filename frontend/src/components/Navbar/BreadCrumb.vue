@@ -10,7 +10,6 @@ const GROUP_KEYS = new Set([
 /** 非分组菜单 key 的上一级：可点击回到该模块默认页 */
 const PARENT_FALLBACK_ROUTE: Record<string, string> = {
   settings: '/account/profile',
-  apps: '/apps/todo',
 }
 
 const route = useRoute()

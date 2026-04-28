@@ -31,3 +31,15 @@ export async function configGetAlert() {
 export async function configSaveAlert(data: Record<string, unknown>) {
   return apiService.put<BackendResult<null>>('config/alert', data)
 }
+
+export async function configGetAi() {
+  return apiService.get<BackendResult<Record<string, unknown>>>('config/ai')
+}
+
+export async function configSaveAi(data: Record<string, unknown>) {
+  return apiService.put<BackendResult<null>>('config/ai', data)
+}
+
+export async function configTestAi(data: Record<string, unknown>) {
+  return apiService.post<BackendResult<Record<string, unknown>>>('config/ai/test', data)
+}

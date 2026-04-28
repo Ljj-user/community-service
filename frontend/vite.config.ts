@@ -12,6 +12,9 @@ import Pages from 'vite-plugin-pages'
 import Layouts from 'vite-plugin-vue-layouts-next'
 
 export default defineConfig({
+  // Windows + 中文路径下，个别机器会在启动时写入 d.ts 发生 UNKNOWN open 错误。
+  // 这里关闭运行期自动写入，改为使用仓库内已存在的类型声明文件，避免 dev server 启动失败。
+  // 如需重新生成，可临时改回具体 d.ts 路径执行一次。
   server: {
     port: 7000,
     host: true,
@@ -97,7 +100,7 @@ export default defineConfig({
           ],
         },
       ],
-      dts: 'src/auto-imports.d.ts',
+      dts: false,
       dirs: ['src/composables', 'src/store'],
       vueTemplate: true,
     }),
@@ -106,7 +109,7 @@ export default defineConfig({
       extensions: ['vue'],
       resolvers: [NaiveUiResolver()],
       include: [/\.vue$/, /\.vue\?vue/],
-      dts: 'src/components.d.ts',
+      dts: false,
     }),
 
     // https://github.com/antfu/unocss

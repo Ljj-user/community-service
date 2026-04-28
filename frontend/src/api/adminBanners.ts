@@ -23,7 +23,9 @@ export async function bannerList(params?: { communityId?: number | null }) {
   if (params?.communityId !== undefined && params?.communityId !== null)
     q.set('communityId', String(params.communityId))
   const s = q.toString()
-  return apiService.get<BackendResult<BannerVO[]>>(`banner/list${s ? `?${s}` : ''}`)
+  return apiService.get<BackendResult<BannerVO[]>>(
+    `banner/list${s ? `?${s}` : ''}`,
+  )
 }
 
 export async function bannerUpsert(payload: {
@@ -42,14 +44,21 @@ export async function bannerUpsert(payload: {
 export async function bannerUploadImage(file: File) {
   const fd = new FormData()
   fd.append('file', file)
-  return apiService.post<BackendResult<{ imageUrl: string }>>('banner/upload-image', fd)
+  return apiService.post<BackendResult<{ imageUrl: string }>>(
+    'banner/upload-image',
+    fd,
+  )
 }
 
-export async function bannerDelete(id: number, params?: { communityId?: number | null }) {
+export async function bannerDelete(
+  id: number,
+  params?: { communityId?: number | null },
+) {
   const q = new URLSearchParams()
   if (params?.communityId !== undefined && params?.communityId !== null)
     q.set('communityId', String(params.communityId))
   const s = q.toString()
-  return apiService.delete<BackendResult<null>>(`banner/${id}${s ? `?${s}` : ''}`)
+  return apiService.delete<BackendResult<null>>(
+    `banner/${id}${s ? `?${s}` : ''}`,
+  )
 }
-

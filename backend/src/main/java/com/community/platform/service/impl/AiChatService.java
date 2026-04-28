@@ -2,8 +2,12 @@ package com.community.platform.service.impl;
 
 import com.community.platform.dto.AiChatResponseVO;
 import com.community.platform.dto.AiOrderDraftVO;
+import com.community.platform.dto.AiChatRequest;
+import com.community.platform.generated.entity.SysConfig;
+import com.community.platform.generated.mapper.SysConfigMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -14,12 +18,16 @@ import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class AiChatService {
+
+    private static final String SYS_KEY_AI = "ai";
 
     @Value("${app.ai.enabled:false}")
     private boolean aiEnabled;
@@ -27,24 +35,83 @@ public class AiChatService {
     @Value("${app.ai.base-url:https://api.deepseek.com}")
     private String aiBaseUrl;
 
-    @Value("${app.ai.model:deepseek-chat}")
+    @Value("${app.ai.model:deepseek-v4-flash}")
     private String aiModel;
 
     @Value("${app.ai.api-key:}")
     private String aiApiKey;
 
+    @Autowired(required = false)
+    private SysConfigMapper sysConfigMapper;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public AiChatResponseVO chat(String message) {
+    private AiRuntimeConfig runtimeConfig() {
+        AiRuntimeConfig c = new AiRuntimeConfig();
+        c.enabled = aiEnabled;
+        c.baseUrl = aiBaseUrl;
+        c.model = aiModel;
+        c.apiKey = resolvedApiKey();
+
+        try {
+            if (sysConfigMapper == null) return c;
+            SysConfig row = sysConfigMapper.selectByConfigKey(SYS_KEY_AI);
+            if (row == null || row.getConfigValue() == null) return c;
+            var m = row.getConfigValue();
+            if (m.containsKey("enabled")) c.enabled = toBool(m.get("enabled"), c.enabled);
+            if (m.containsKey("baseUrl")) c.baseUrl = toStr(m.get("baseUrl"), c.baseUrl);
+            if (m.containsKey("model")) c.model = toStr(m.get("model"), c.model);
+            if (m.containsKey("apiKey")) {
+                String k = toStr(m.get("apiKey"), "");
+                if (!k.isBlank()) c.apiKey = k.trim();
+            }
+        } catch (Exception ignored) {
+            // 任何异常都不影响核心业务：回退到 yml/env 默认值
+        }
+        return c;
+    }
+
+    private static boolean toBool(Object v, boolean def) {
+        if (v == null) return def;
+        if (v instanceof Boolean b) return b;
+        String s = String.valueOf(v).trim().toLowerCase(Locale.ROOT);
+        if (s.isEmpty()) return def;
+        return s.equals("1") || s.equals("true") || s.equals("yes") || s.equals("y");
+    }
+
+    private static String toStr(Object v, String def) {
+        if (v == null) return def;
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() ? def : s;
+    }
+
+    private String resolvedApiKey() {
+        if (aiApiKey != null && !aiApiKey.isBlank()) return aiApiKey.trim();
+        String env = System.getenv("APP_AI_API_KEY");
+        if (env != null && !env.isBlank()) return env.trim();
+        // 兼容常见命名（可选）
+        env = System.getenv("DEEPSEEK_API_KEY");
+        if (env != null && !env.isBlank()) return env.trim();
+        return "";
+    }
+
+    public AiChatResponseVO chat(String message, List<AiChatRequest.HistoryMessage> history) {
+        AiRuntimeConfig cfg = runtimeConfig();
         String text = message == null ? "" : message.trim();
         if (text.isEmpty()) {
             throw new RuntimeException("消息不能为空");
         }
+        if (looksLikeDateTimeQuestion(text)) {
+            return buildDateTimeAnswer();
+        }
+        if (looksLikeModelQuestion(text)) {
+            return buildModelAnswer(cfg);
+        }
         if (looksLikeDemand(text)) {
             return buildDemandDraft(text);
         }
-        if (aiEnabled && aiApiKey != null && !aiApiKey.isBlank()) {
-            AiChatResponseVO byModel = callModelForFaq(text);
+        if (cfg.enabled && cfg.apiKey != null && !cfg.apiKey.isBlank()) {
+            AiChatResponseVO byModel = callModelForFaq(text, history);
             if (byModel != null) {
                 return byModel;
             }
@@ -60,6 +127,51 @@ public class AiChatService {
                 || text.contains("买菜")
                 || text.contains("陪诊")
                 || text.contains("打扫");
+    }
+
+    private boolean looksLikeDateTimeQuestion(String text) {
+        return text.contains("今天周几")
+                || text.contains("星期几")
+                || text.contains("今天几号")
+                || text.contains("几月几号")
+                || text.contains("现在几点")
+                || (text.contains("日期") && text.contains("时间"));
+    }
+
+    private boolean looksLikeModelQuestion(String text) {
+        return text.contains("什么模型")
+                || text.contains("你是模型")
+                || text.contains("模型是")
+                || text.contains("哪个模型");
+    }
+
+    private AiChatResponseVO buildDateTimeAnswer() {
+        LocalDateTime now = LocalDateTime.now();
+        String weekday = now.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINA);
+        String reply = String.format(
+                Locale.ROOT,
+                "现在是 %d年%d月%d日（%s）%02d:%02d。",
+                now.getYear(),
+                now.getMonthValue(),
+                now.getDayOfMonth(),
+                weekday,
+                now.getHour(),
+                now.getMinute()
+        );
+        AiChatResponseVO vo = new AiChatResponseVO();
+        vo.setMode("FAQ");
+        vo.setReply(reply);
+        return vo;
+    }
+
+    private AiChatResponseVO buildModelAnswer(AiRuntimeConfig cfg) {
+        String provider = cfg.baseUrl == null ? "当前配置" : cfg.baseUrl;
+        String model = cfg.model == null ? "未配置" : cfg.model;
+        String reply = String.format(Locale.ROOT, "当前接入模型：%s（%s）。", model, provider);
+        AiChatResponseVO vo = new AiChatResponseVO();
+        vo.setMode("FAQ");
+        vo.setReply(reply);
+        return vo;
     }
 
     private AiChatResponseVO buildDemandDraft(String text) {
@@ -145,30 +257,46 @@ public class AiChatService {
         return vo;
     }
 
-    private AiChatResponseVO callModelForFaq(String text) {
+    private AiChatResponseVO callModelForFaq(String text, List<AiChatRequest.HistoryMessage> history) {
         try {
-            String prompt = """
-                    你是社区公益服务平台助手。请返回 JSON：
-                    {
-                      "mode": "FAQ",
-                      "reply": "回答内容"
-                    }
-                    用户问题：%s
-                    """.formatted(text);
+            AiRuntimeConfig cfg = runtimeConfig();
+            List<Map<String, String>> messages = new ArrayList<>();
+            messages.add(Map.of(
+                    "role", "system",
+                    "content", """
+                    你是社区公益服务平台问答助手。
+                    要求：
+                    1) 优先给出具体可执行步骤；
+                    2) 语气自然，不要重复模板句；
+                    3) 若用户问日期时间，可直接根据当前中国时间回答；
+                    4) 优先返回 JSON：{"mode":"FAQ","reply":"..."}；如果未按 JSON 返回，也要保证内容可直接展示。
+                    当前中国时间：%s
+                    """.formatted(LocalDateTime.now())
+            ));
 
-            String body = objectMapper.writeValueAsString(java.util.Map.of(
-                    "model", aiModel,
-                    "messages", List.of(
-                            java.util.Map.of("role", "system", "content", "你是社区公益服务平台问答助手，回答简短清晰。"),
-                            java.util.Map.of("role", "user", "content", prompt)
-                    ),
-                    "temperature", 0.2
+            if (history != null && !history.isEmpty()) {
+                int start = Math.max(0, history.size() - 8);
+                for (int i = start; i < history.size(); i++) {
+                    AiChatRequest.HistoryMessage h = history.get(i);
+                    if (h == null) continue;
+                    String role = normalizeRole(h.getRole());
+                    String content = h.getText() == null ? "" : h.getText().trim();
+                    if (content.isBlank()) continue;
+                    messages.add(Map.of("role", role, "content", content));
+                }
+            }
+            messages.add(Map.of("role", "user", "content", text));
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "model", cfg.model,
+                    "messages", messages,
+                    "temperature", 0.35
             ));
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(aiBaseUrl + "/chat/completions"))
+                    .uri(URI.create(cfg.baseUrl + "/chat/completions"))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + aiApiKey)
+                    .header("Authorization", "Bearer " + cfg.apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
@@ -176,13 +304,50 @@ public class AiChatService {
             JsonNode root = objectMapper.readTree(response.body());
             String content = root.path("choices").path(0).path("message").path("content").asText("");
             if (content.isBlank()) return null;
-            JsonNode parsed = objectMapper.readTree(content);
+
+            String reply = parseReplyContent(content);
             AiChatResponseVO vo = new AiChatResponseVO();
-            vo.setMode(parsed.path("mode").asText("FAQ"));
-            vo.setReply(parsed.path("reply").asText("已收到你的问题。"));
+            vo.setMode("FAQ");
+            vo.setReply(reply);
             return vo;
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private String parseReplyContent(String content) {
+        String c = content == null ? "" : content.trim();
+        if (c.isBlank()) return "已收到你的问题。";
+        try {
+            JsonNode parsed = objectMapper.readTree(c);
+            String r = parsed.path("reply").asText("");
+            if (!r.isBlank()) return r.trim();
+        } catch (Exception ignored) {
+        }
+        int start = c.indexOf('{');
+        int end = c.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            try {
+                JsonNode parsed = objectMapper.readTree(c.substring(start, end + 1));
+                String r = parsed.path("reply").asText("");
+                if (!r.isBlank()) return r.trim();
+            } catch (Exception ignored) {
+            }
+        }
+        return c;
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null) return "user";
+        String r = role.trim().toLowerCase(Locale.ROOT);
+        if ("assistant".equals(r) || "ai".equals(r)) return "assistant";
+        return "user";
+    }
+
+    private static class AiRuntimeConfig {
+        boolean enabled;
+        String baseUrl;
+        String model;
+        String apiKey;
     }
 }

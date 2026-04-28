@@ -1,395 +1,118 @@
 <script setup lang="ts">
-import { aiChat, type AiChatResponse } from '@/api/modules/ai'
-import { createServiceRequest } from '@/api/modules/serviceRequests'
+import { aiChat, type AiChatHistoryMessage } from '@/api/modules/ai'
+import { toast } from 'vue-sonner'
+import AiHeroInput from '@/components/AiHeroInput.vue'
 
 definePage({
-  meta: {
-    title: 'AI助手',
-    auth: true,
-  },
+  meta: { title: 'AI助手', auth: true },
 })
 
+const route = useRoute()
 const router = useRouter()
-const appAuthStore = useAppAuthStore()
 const loading = ref(false)
-const publishing = ref(false)
 const inputText = ref('')
-const chatRows = ref<Array<{ role: 'user' | 'ai'; text: string }>>([
-  { role: 'ai', text: '你好，我可以帮你生成需求单，也可以回答“怎么发布需求/积分怎么算/服务规则”等问题。' },
+const quickPrompts = ['我该怎么发布需求？', '怎么接取任务？', '怎么查看服务统计？', '帮我写一段求助说明'] as const
+const chatRows = ref<Array<{ role: 'user' | 'ai'; text: string; time: string }>>([
+  { role: 'ai', text: '您好，我是邻里互助 AI 助手。可以直接描述您的问题。', time: '刚刚' },
 ])
-const latestDraft = ref<AiChatResponse['orderDraft']>()
-const draftForm = reactive({
-  serviceType: '助老服务（陪护 / 陪诊）',
-  urgencyLevel: 2,
-  expectedTime: '',
-  tags: [] as string[],
-  description: '',
-  serviceAddress: '',
-  emergencyContactName: '',
-  emergencyContactPhone: '',
-  emergencyContactRelation: '',
-})
-const listening = ref(false)
 
-let recognition: any = null
-
-const SERVICE_TYPES = [
-  '助老服务（陪护 / 陪诊）',
-  '代办服务（买菜 / 取药）',
-  '家政清洁',
-  '心理陪伴 / 聊天',
-  '应急帮助（紧急求助）',
-  '社区活动支持',
-] as const
-
-function goBack() {
-  router.back()
+function nowTime() {
+  return new Date().toTimeString().slice(0, 5)
 }
 
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || loading.value) return
-  chatRows.value.push({ role: 'user', text })
+  const history: AiChatHistoryMessage[] = chatRows.value.slice(-8).map(row => ({
+    role: row.role === 'ai' ? 'assistant' : 'user',
+    text: row.text,
+  }))
+  chatRows.value.push({ role: 'user', text, time: nowTime() })
   inputText.value = ''
   loading.value = true
   try {
-    const res = await aiChat(text)
-    const data = res.data
-    chatRows.value.push({ role: 'ai', text: data?.reply || '已收到。' })
-    latestDraft.value = data?.orderDraft
-    if (data?.orderDraft) {
-      // 同步到可编辑草稿表单（确保能一键发布且通过后端校验）
-      draftForm.serviceType = (data.orderDraft.serviceType && SERVICE_TYPES.includes(data.orderDraft.serviceType as any))
-        ? data.orderDraft.serviceType
-        : SERVICE_TYPES[0]
-      draftForm.urgencyLevel = Number(data.orderDraft.urgencyLevel || 2)
-      draftForm.expectedTime = String(data.orderDraft.expectedTime || '')
-      draftForm.tags = Array.isArray(data.orderDraft.tags) ? data.orderDraft.tags : []
-      draftForm.description = String(data.orderDraft.description || '')
-      // 地址 / 联系人自动带入账号信息（用户仍可改）
-      const u = appAuthStore.user
-      draftForm.serviceAddress = (u?.communityName || u?.address || '').trim()
-      draftForm.emergencyContactName = (u?.realName || u?.username || '').trim()
-      draftForm.emergencyContactPhone = ''
-      draftForm.emergencyContactRelation = ''
-    }
+    const res = await aiChat(text, history)
+    chatRows.value.push({ role: 'ai', text: res.data?.reply || '已收到。', time: nowTime() })
+  }
+  catch (e: any) {
+    toast.error(e?.message || 'AI 服务暂不可用')
+    chatRows.value.push({ role: 'ai', text: '网络有点忙，请稍后再试。', time: nowTime() })
   }
   finally {
     loading.value = false
   }
 }
 
-async function createOrderByDraft() {
-  if (!latestDraft.value || publishing.value) return
-  if (!draftForm.serviceAddress.trim()) {
-    window.alert('请填写服务地址')
-    return
-  }
-  if (!draftForm.emergencyContactName.trim()) {
-    window.alert('请填写联系人姓名')
-    return
-  }
-  if (!draftForm.emergencyContactPhone.trim()) {
-    window.alert('请填写联系人电话')
-    return
-  }
-  publishing.value = true
-  try {
-    await createServiceRequest({
-      serviceType: draftForm.serviceType,
-      serviceAddress: draftForm.serviceAddress.trim(),
-      description: draftForm.description.trim() || undefined,
-      expectedTime: draftForm.expectedTime || '',
-      urgencyLevel: Number(draftForm.urgencyLevel || 2),
-      specialTags: draftForm.tags || [],
-      emergencyContactName: draftForm.emergencyContactName.trim(),
-      emergencyContactPhone: draftForm.emergencyContactPhone.trim(),
-      emergencyContactRelation: draftForm.emergencyContactRelation.trim() || undefined,
-    })
-    window.alert('订单已生成，可在任务中心查看')
-    latestDraft.value = undefined
-    router.push('/hall')
-  }
-  finally {
-    publishing.value = false
-  }
+function usePrompt(prompt: string) {
+  inputText.value = prompt
+  void sendMessage()
 }
+
+async function sendPrefilledQueryFromRoute() {
+  const q = String(route.query.q || '').trim()
+  if (!q) return
+  inputText.value = q
+  await sendMessage()
+}
+
+onMounted(() => {
+  void sendPrefilledQueryFromRoute()
+})
 </script>
 
 <template>
   <AppPageLayout :navbar="false" tabbar>
-    <div class="ai-page">
-      <header class="topbar">
-        <button class="back-btn" type="button" @click="goBack">← 返回</button>
-        <h1>AI助手</h1>
+    <div class="page m-mobile-page-bg">
+      <header class="head">
+        <button class="back" @click="router.back()">
+          <FmIcon name="i-carbon:chevron-left" />
+        </button>
+        <h2>邻里互助助手</h2>
+        <img src="https://picsum.photos/seed/kindred-assistant/120/120" alt="AI头像" class="avatar">
       </header>
 
-      <div class="chat-box">
-        <div v-for="(row, idx) in chatRows" :key="idx" class="msg" :class="row.role">
-          {{ row.text }}
-        </div>
-        <div v-if="loading" class="msg ai">正在思考中...</div>
+      <div class="chat">
+        <article v-for="(row, idx) in chatRows" :key="idx" class="bubble-wrap" :class="row.role">
+          <div class="bubble" :class="row.role">{{ row.text }}</div>
+          <small>{{ row.time }}</small>
+        </article>
 
-        <section v-if="latestDraft" class="draft-inline">
-          <h3>需求草稿（可编辑）</h3>
-
-          <div class="field">
-            <div class="field-label">服务类型</div>
-            <select v-model="draftForm.serviceType" class="select">
-              <option v-for="t in SERVICE_TYPES" :key="t" :value="t">
-                {{ t }}
-              </option>
-            </select>
-          </div>
-
-          <div class="field">
-            <div class="field-label">紧急程度</div>
-            <div class="level">
-              <button type="button" :class="{ active: draftForm.urgencyLevel === 1 }" @click="draftForm.urgencyLevel = 1">
-                普通
-              </button>
-              <button type="button" :class="{ active: draftForm.urgencyLevel === 2 }" @click="draftForm.urgencyLevel = 2">
-                中等
-              </button>
-              <button type="button" :class="{ active: draftForm.urgencyLevel >= 3 }" @click="draftForm.urgencyLevel = 4">
-                紧急
-              </button>
-            </div>
-          </div>
-
-          <div class="field">
-            <div class="field-label">服务地址</div>
-            <input v-model="draftForm.serviceAddress" class="input" placeholder="如：幸福小区1栋101">
-          </div>
-
-          <div class="field">
-            <div class="field-label">联系人姓名</div>
-            <input v-model="draftForm.emergencyContactName" class="input" placeholder="必填">
-          </div>
-          <div class="field">
-            <div class="field-label">联系人电话</div>
-            <input v-model="draftForm.emergencyContactPhone" class="input" placeholder="必填">
-          </div>
-          <div class="field">
-            <div class="field-label">关系（选填）</div>
-            <input v-model="draftForm.emergencyContactRelation" class="input" placeholder="如：子女/邻居">
-          </div>
-
-          <div class="field">
-            <div class="field-label">标签</div>
-            <input v-model="draftForm.tags" class="input" placeholder="（可选）后台会按 tags 存 specialTags" style="display:none">
-            <div class="tags">
-              <span v-for="(t, i) in draftForm.tags" :key="`${t}-${i}`" class="tag">
-                {{ t }}
-              </span>
-              <span v-if="draftForm.tags.length === 0" class="tag muted">无</span>
-            </div>
-          </div>
-
-          <div class="field">
-            <div class="field-label">描述</div>
-            <textarea v-model="draftForm.description" class="textarea" rows="5" placeholder="可修改 AI 生成内容" />
-          </div>
-
-          <button type="button" class="create-btn" :disabled="publishing" @click="createOrderByDraft">
-            {{ publishing ? '创建中...' : '一键生成订单' }}
+        <div class="prompts">
+          <button v-for="prompt in quickPrompts" :key="prompt" @click="usePrompt(prompt)">
+            {{ prompt }}
           </button>
-        </section>
+        </div>
+
+        <article v-if="loading" class="bubble-wrap ai">
+          <div class="bubble ai">正在思考中...</div>
+        </article>
       </div>
 
-      <footer class="input-bar">
-        <button type="button" class="voice-btn" :class="{ active: listening }" @click="toggleVoiceInput">
-          {{ listening ? '停止' : '语音' }}
-        </button>
-        <input v-model="inputText" type="text" placeholder="输入需求或问题..." @keyup.enter="sendMessage">
-        <button type="button" class="send-btn" :disabled="loading" @click="sendMessage">发送</button>
-      </footer>
+      <AiHeroInput
+        v-model="inputText"
+        class="input-bar"
+        :show-voice="false"
+        placeholder="输入问题后按回车即可发送"
+        @send="sendMessage"
+      />
     </div>
   </AppPageLayout>
 </template>
 
 <style scoped>
-
-function toggleVoiceInput() {
-  const win = window as any
-  const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition
-  if (!SpeechRecognition) {
-    window.alert('当前浏览器不支持语音输入，请改用文字输入')
-    return
-  }
-  if (!recognition) {
-    recognition = new SpeechRecognition()
-    recognition.lang = 'zh-CN'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-    recognition.onresult = (event: any) => {
-      const transcript = event?.results?.[0]?.[0]?.transcript || ''
-      inputText.value = String(transcript).trim()
-    }
-    recognition.onend = () => {
-      listening.value = false
-    }
-    recognition.onerror = () => {
-      listening.value = false
-    }
-  }
-  if (listening.value) {
-    recognition.stop()
-    listening.value = false
-    return
-  }
-  listening.value = true
-  recognition.start()
-}
-</script>
-
-<template>
-  <AppPageLayout :navbar="false" tabbar>
-    <div class="ai-page">
-      <header class="topbar">
-        <button class="back-btn" type="button" @click="goBack">← 返回</button>
-        <h1>AI助手</h1>
-      </header>
-
-      <div class="chat-box">
-        <div v-for="(row, idx) in chatRows" :key="idx" class="msg" :class="row.role">
-          {{ row.text }}
-        </div>
-        <div v-if="loading" class="msg ai">正在思考中...</div>
-        <section v-if="latestDraft" class="draft-inline">
-          <h3>需求草稿</h3>
-          <p><b>服务类型：</b>{{ latestDraft.serviceType }}</p>
-          <p><b>时间：</b>{{ latestDraft.expectedTime || '尽快' }}</p>
-          <p><b>标签：</b>{{ (latestDraft.tags || []).join('、') || '无' }}</p>
-          <p><b>描述：</b>{{ latestDraft.description || '-' }}</p>
-          <button type="button" class="create-btn" :disabled="publishing" @click="createOrderByDraft">
-            {{ publishing ? '创建中...' : '一键生成订单' }}
-          </button>
-        </section>
-      </div>
-
-      <footer class="input-bar">
-        <button type="button" class="voice-btn" :class="{ active: listening }" @click="toggleVoiceInput">
-          {{ listening ? '停止' : '语音' }}
-        </button>
-        <input v-model="inputText" type="text" placeholder="输入需求或问题..." @keyup.enter="sendMessage">
-        <button type="button" class="send-btn" :disabled="loading" @click="sendMessage">发送</button>
-      </footer>
-    </div>
-  </AppPageLayout>
-</template>
-
-<style scoped>
-.ai-page {
-  min-height: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  background: #f7f7f8;
-}
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #ececf1;
-  background: #f7f7f8;
-}
-.topbar h1 { margin: 0; font-size: 16px; font-weight: 700; color: #111827; }
-.back-btn {
-  border: 0;
-  background: transparent;
-  border-radius: 8px;
-  padding: 6px 8px;
-  color: #4b5563;
-}
-.chat-box {
-  overflow-y: auto;
-  padding: 14px 12px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-}
-.msg {
-  display: inline-block;
-  width: auto;
-  max-width: min(88%, 620px);
-  padding: 10px 12px;
-  border-radius: 14px;
-  font-size: 14px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.msg.ai {
-  align-self: flex-start;
-  background: transparent;
-  color: #111827;
-}
-.msg.user {
-  align-self: flex-end;
-  background: #ffffff;
-  color: #111827;
-  border: 1px solid #ececf1;
-}
-.draft-inline {
-  justify-self: start;
-  width: min(100%, 620px);
-  background: #ffffff;
-  border: 1px solid #ececf1;
-  border-radius: 14px;
-  padding: 10px 12px;
-}
-.draft-inline h3 { margin: 0 0 8px; font-size: 14px; }
-.field { margin: 0 0 10px; }
-.field-label { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
-.input, .select, .textarea {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 14px;
-  box-sizing: border-box;
-  background: #fff;
-}
-.textarea { resize: vertical; }
-.tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.tag { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #f3f4f6; color: #111827; }
-.tag.muted { color: #6b7280; }
-.create-btn {
-  width: 100%;
-  border: 0;
-  border-radius: 10px;
-  padding: 10px;
-  color: #fff;
-  background: #10a37f;
-  font-weight: 700;
-}
-.input-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-  border-top: 1px solid #ececf1;
-  background: #f7f7f8;
-}
-.input-bar input {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 12px;
-  padding: 11px 12px;
-  font-size: 14px;
-  line-height: 1.35;
-}
-.voice-btn, .send-btn {
-  border: none;
-  border-radius: 10px;
-  padding: 10px 12px;
-  color: #fff;
-  background: #6b7280;
-}
-.voice-btn.active { background: #dc2626; }
-.send-btn { background: #10a37f; }
+.page { min-height: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: 10px 12px; gap: 10px; }
+.head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.back { width: 34px; height: 34px; border: 1px solid var(--m-color-border); border-radius: 10px; background: var(--m-color-card); display: inline-flex; align-items: center; justify-content: center; }
+.head h2 { margin: 0; font-size: 17px; color: var(--m-color-text); font-weight: 900; text-align: center; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #d1d5db; }
+.chat { overflow: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
+.bubble-wrap { max-width: 86%; display: grid; gap: 4px; }
+.bubble-wrap.user { align-self: flex-end; justify-items: end; }
+.bubble { border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.bubble.ai { background: #fff; border: 1px solid #e5e7eb; color: #111827; }
+.bubble.user { background: #16a34a; color: #fff; }
+.bubble-wrap small { color: #9ca3af; font-size: 11px; }
+.prompts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.prompts button { border: 0; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 800; padding: 8px 10px; }
+.input-bar { margin-top: 2px; }
 </style>

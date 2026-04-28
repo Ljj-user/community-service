@@ -32,4 +32,14 @@ public class ServiceRequestQueryDTO {
      * 每页大小（默认10）
      */
     private Integer size = 10;
+
+    /**
+     * 排序字段：createdAt / publishedAt / expectedTime / urgencyLevel
+     */
+    private String sortBy;
+
+    /**
+     * 排序方向：asc / desc
+     */
+    private String sortOrder;
 }

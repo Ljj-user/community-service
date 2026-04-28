@@ -17,4 +17,3 @@ export async function addLikeOnce(): Promise<number> {
   const res = await apiService.post<BackendResult<number>>('like', {})
   return res.data ?? 0
 }
-

@@ -26,7 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -315,7 +314,7 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             throw new RuntimeException("用户不存在");
         }
 
-        long coins = claim.getServiceHours().setScale(0, RoundingMode.CEILING).longValue();
+        long coins = Constants.TIME_COINS_PER_COMPLETED_SERVICE;
         if (coins <= 0) {
             throw new RuntimeException("核销时长无效");
         }
@@ -388,12 +387,31 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
     }
     
     @Override
-    public IPage<ServiceClaimVO> getMyServiceRecords(Long volunteerId, Integer current, Integer size) {
+    public IPage<ServiceClaimVO> getMyServiceRecords(Long volunteerId, Integer current, Integer size, Byte claimStatus, String sortBy, String sortOrder) {
         // 查询该志愿者的认领记录
         LambdaQueryWrapper<ServiceClaim> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ServiceClaim::getVolunteerUserId, volunteerId)
-                .eq(ServiceClaim::getIsDeleted, 0)
-                .orderByDesc(ServiceClaim::getCreatedAt);
+                .eq(ServiceClaim::getIsDeleted, 0);
+
+        if (claimStatus != null) {
+            wrapper.eq(ServiceClaim::getClaimStatus, claimStatus);
+        }
+
+        String normalizedSortBy = sortBy == null ? "" : sortBy.trim();
+        String normalizedSortOrder = sortOrder == null ? "desc" : sortOrder.trim().toLowerCase();
+        boolean asc = "asc".equals(normalizedSortOrder);
+
+        switch (normalizedSortBy) {
+            case "claimAt" -> {
+                wrapper.orderBy(true, asc, ServiceClaim::getClaimAt);
+                wrapper.orderByDesc(ServiceClaim::getCreatedAt);
+            }
+            case "hoursSubmittedAt" -> {
+                wrapper.orderBy(true, asc, ServiceClaim::getHoursSubmittedAt);
+                wrapper.orderByDesc(ServiceClaim::getCreatedAt);
+            }
+            default -> wrapper.orderBy(true, asc, ServiceClaim::getCreatedAt);
+        }
         
         Page<ServiceClaim> page = new Page<>(current != null ? current : 1, size != null ? size : 10);
         IPage<ServiceClaim> claimPage = serviceClaimMapper.selectPage(page, wrapper);
@@ -451,6 +469,11 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             if (request != null) {
                 vo.setRequestTitle(request.getServiceType());
                 vo.setRequestAddress(request.getServiceAddress());
+                SysUser requester = sysUserMapper.selectById(request.getRequesterUserId());
+                if (requester != null) {
+                    vo.setRequesterName(requester.getRealName());
+                    vo.setRequesterPhone(request.getEmergencyContactPhone());
+                }
             }
         }
     }

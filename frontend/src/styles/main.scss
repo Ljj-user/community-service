@@ -115,6 +115,32 @@ body {
   color: var(--primary-color);
 }
 
+/* Glass UI primitives (for "ui.glass"-style surfaces) */
+.glass-surface {
+  background: color-mix(in srgb, var(--main-content), transparent 22%);
+  border: 1px solid color-mix(in srgb, var(--border-color), transparent 25%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 12px;
+}
+
+.dark .glass-surface {
+  background: color-mix(in srgb, #0f172a, transparent 35%);
+  border-color: color-mix(in srgb, var(--border-color), transparent 35%);
+}
+
+.glass-highlight {
+  background:
+    radial-gradient(1200px 240px at 12% 0%, color-mix(in srgb, var(--primary-color) 18%, transparent) 0%, transparent 60%),
+    radial-gradient(900px 240px at 88% 0%, rgba(255, 255, 255, 0.22) 0%, transparent 55%);
+}
+
+.glass-shadow {
+  box-shadow:
+    0 12px 30px rgba(2, 6, 23, 0.10),
+    0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
 @import url('./utils/_error.scss');
 @import url('./utils/_progress.scss');
 

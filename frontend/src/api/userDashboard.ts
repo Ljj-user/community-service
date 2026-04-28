@@ -35,5 +35,7 @@ export interface UserDashboardSummary {
 const apiService = new ApiService('user')
 
 export async function getUserDashboardSummary() {
-  return apiService.get<BackendResult<UserDashboardSummary>>('dashboard/summary')
+  return apiService.get<BackendResult<UserDashboardSummary>>(
+    'dashboard/summary',
+  )
 }

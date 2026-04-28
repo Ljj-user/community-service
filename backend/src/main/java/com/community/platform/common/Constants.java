@@ -64,6 +64,11 @@ public class Constants {
     public static final Byte EVAL_ROLE_VOLUNTEER = 2;
 
     /**
+     * 时间币结算：志愿者每完成一单固定获得 5 个时间币。
+     */
+    public static final Long TIME_COINS_PER_COMPLETED_SERVICE = 5L;
+
+    /**
      * 允许发布的服务类型白名单
      */
     public static final List<String> ALLOWED_SERVICE_TYPES = List.of(

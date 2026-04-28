@@ -49,11 +49,15 @@ export async function completeService(payload: ServiceCompleteDTO) {
   return apiService.post<BackendResult<null>>('complete', payload)
 }
 
-export async function myServiceRecords(params: { current: number; size: number }) {
+export async function myServiceRecords(params: {
+  current: number
+  size: number
+}) {
   const search = new URLSearchParams({
     current: String(params.current),
     size: String(params.size),
   })
-  return apiService.get<BackendResult<IPage<ServiceClaimVO>>>(`my-records?${search.toString()}`)
+  return apiService.get<BackendResult<IPage<ServiceClaimVO>>>(
+    `my-records?${search.toString()}`,
+  )
 }
-

@@ -18,11 +18,15 @@ export interface ServiceRequestVO {
   serviceType: string
   serviceAddress: string
   requesterName?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  emergencyContactRelation?: string
   urgencyLevel: number
   status: number
   /** 最新认领记录（用于“确认完成/评价”联动） */
   latestClaimId?: number
   latestClaimStatus?: number
+  latestVolunteerName?: string
   expectedTime?: string
   publishedAt?: string
   createdAt?: string

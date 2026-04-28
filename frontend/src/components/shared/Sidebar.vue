@@ -2,65 +2,41 @@
 import {
   PersonSettings20Regular as AccountSettingsIcon,
   PersonSettings20Filled as AccountSettingsIconActive,
-  AppFolder20Regular as AppsIcon,
-  DoorArrowRight20Regular as AuthIcon,
   CheckmarkStarburst20Regular as BrandsIcon,
   CheckmarkStarburst20Filled as BrandsIconActive,
-  Folder24Regular as CategoryIcon,
-  Folder24Filled as CategoryIconSelected,
   DataTrending16Regular as ChartsIcon,
-  ChatMultiple20Regular as ChatAppIcon,
-  ChatMultiple20Filled as ChatAppIconActive,
   Dismiss24Filled as CloseIcon,
-  Color24Regular as ColorsIcon,
-  Color24Filled as ColorsIconActive,
-  PuzzlePiece24Regular as ComponentsIcon,
-  AppsAddIn24Regular as CreateProductIcon,
-  AppsAddIn24Filled as CreateProductIconActive,
   People24Regular as CustomersIcon,
   People24Filled as CustomersIconActive,
   Board24Regular as DashboardIcon,
-  ChartMultiple20Regular as DashboardIcon1,
   ChartMultiple20Filled as DashboardIcon1Active,
   ArrowTrendingLines24Regular as DashboardIcon2,
   Table28Regular as DataIcon,
   Table28Filled as DataIconActive,
   ErrorCircle24Regular as ErrorIcon,
   Cart24Regular as eCommerceIcon,
-  PersonLightbulb20Regular as ForgetIcon,
   FormNew24Regular as FormsIcon,
-  Cart24Regular as InvoicesIcon,
-  Cart24Filled as InvoicesIconActive,
-  PersonLock20Regular as LoginIcon,
-  ErrorCircleSettings20Regular as MaintenanceIcon,
-  ShieldError24Regular as NotFoundIcon,
   DocumentLink20Regular as PagesIcon,
-  BoxMultiple20Regular as ProductsIcon2,
-  BoxMultiple20Filled as ProductsIcon2Active,
-  PersonAdd20Regular as RegisterIcon,
   StarThreeQuarter20Filled as ReviewIcon,
   Settings28Regular as SettingsIcon,
   CheckmarkCircle24Regular as TodoAppIcon,
   CheckmarkCircle24Filled as TodoAppIconActive,
 } from '@vicons/fluent'
-
 import { storeToRefs } from 'pinia'
 import type { SidebarMenuOption } from './SidebarMenu.vue'
 
 const layoutStore = useLayoutStore()
-const { collapsed, forceCollapsed, mobileMode, mobileMenuClosed } =
-  storeToRefs(layoutStore)
+const { collapsed, forceCollapsed, mobileMode, mobileMenuClosed } = storeToRefs(layoutStore)
 const { t, locale } = useI18n()
 const accountStore = useAccountStore()
 const { user } = storeToRefs(accountStore)
 
-/** Logo 下方置顶：首页看板（动态命名，统一跳转 /dashboard） */
 const homeBoardLabel = computed(() => {
-  const r = user.value?.role
-  const id = user.value?.identityType
-  if (r === 1 || r === 2)
+  const role = user.value?.role
+  const identityType = user.value?.identityType
+  if (role === 1 || role === 2)
     return t('menu.homeBoardAdmin')
-  if (r === 3 && id === 2)
+  if (role === 3 && identityType === 2)
     return t('menu.homeBoardVolunteer')
   return t('menu.homeBoardResident')
 })
@@ -75,50 +51,8 @@ const homeBoardItem = computed<SidebarMenuOption>(() => ({
 
 const effectiveCollapsed = computed(() => {
   if (mobileMode.value) return mobileMenuClosed.value
-
   return collapsed.value || forceCollapsed.value
 })
-
-/** 社区管理员不可见的高危菜单 key */
-const COMMUNITY_ADMIN_EXCLUDE_KEYS = new Set(['admin-config', 'admin-backup', 'admin-audit', 'admin-global-dashboard'])
-
-function filterCommunityAdminMenu(options: SidebarMenuOption[]): SidebarMenuOption[] {
-  return options
-    .map((item) => {
-      if (item.children?.length) {
-        return {
-          ...item,
-          children: item.children.filter(
-            c => !COMMUNITY_ADMIN_EXCLUDE_KEYS.has(c.key ?? ''),
-          ),
-        }
-      }
-      return item
-    })
-    .filter((item) => {
-      if (item.children?.length === 0)
-        return false
-      return !COMMUNITY_ADMIN_EXCLUDE_KEYS.has(item.key ?? '')
-    })
-}
-
-/** 与「设置」相同：可折叠子菜单（非 group），点击父级展开/收起 */
-function buildAppsSubmenu(): SidebarMenuOption {
-  return {
-    label: t('menu.apps'),
-    key: 'apps',
-    icon: AppsIcon,
-    children: [
-      {
-        label: t('menu.appsTodo'),
-        route: '/apps/todo',
-        key: 'apps-todo',
-        icon: TodoAppIcon,
-        activeIcon: TodoAppIconActive,
-      },
-    ],
-  }
-}
 
 function buildSettingsSubmenu(): SidebarMenuOption {
   return {
@@ -137,7 +71,7 @@ function buildSettingsSubmenu(): SidebarMenuOption {
   }
 }
 
-const adminMenuTemplate = computed<SidebarMenuOption[]>(() => {
+const superAdminMenuOptions = computed<SidebarMenuOption[]>(() => {
   void locale.value
   return [
     homeBoardItem.value,
@@ -228,7 +162,74 @@ const adminMenuTemplate = computed<SidebarMenuOption[]>(() => {
         },
       ],
     },
-    buildAppsSubmenu(),
+    buildSettingsSubmenu(),
+  ]
+})
+
+const communityAdminMenuOptions = computed<SidebarMenuOption[]>(() => {
+  void locale.value
+  return [
+    homeBoardItem.value,
+    {
+      label: t('menu.adminOpsGroup'),
+      key: 'group-admin-ops',
+      icon: CustomersIcon,
+      activeIcon: CustomersIconActive,
+      children: [
+        {
+          label: t('menu.communityScopedUsers'),
+          route: '/admin/users',
+          key: 'community-users',
+          icon: CustomersIcon,
+          activeIcon: CustomersIconActive,
+        },
+        {
+          label: t('menu.communityRequests'),
+          route: '/community/requests',
+          key: 'communityRequests',
+          icon: ErrorIcon,
+        },
+        {
+          label: t('menu.communityVolunteers'),
+          route: '/community/volunteers',
+          key: 'communityVolunteers',
+          icon: CustomersIcon,
+          activeIcon: CustomersIconActive,
+        },
+        {
+          label: t('menu.communityMonitor'),
+          route: '/community/monitor',
+          key: 'communityMonitor',
+          icon: DashboardIcon2,
+        },
+        {
+          label: t('menu.communityAnnouncements'),
+          route: '/community/announcements',
+          key: 'communityAnnouncements',
+          icon: PagesIcon,
+        },
+        {
+          label: t('menu.communityInviteCodes'),
+          route: '/community/invite-codes',
+          key: 'communityInviteCodes',
+          icon: FormsIcon,
+          activeIcon: FormsIcon,
+        },
+        {
+          label: t('menu.communityBanners'),
+          route: '/community/banners',
+          key: 'communityBanners',
+          icon: BrandsIcon,
+          activeIcon: BrandsIconActive,
+        },
+        {
+          label: t('menu.communityAudit'),
+          route: '/admin/audit',
+          key: 'community-audit',
+          icon: ErrorIcon,
+        },
+      ],
+    },
     buildSettingsSubmenu(),
   ]
 })
@@ -281,18 +282,19 @@ const userMenuOptions = computed<SidebarMenuOption[]>(() => {
       ],
     })
   }
+
   if (identityType === 2) {
     options.push({
       label: t('menu.volunteerServicesGroup'),
       key: 'group-volunteer',
-      icon: DashboardIcon1,
+      icon: DashboardIcon,
       activeIcon: DashboardIcon1Active,
       children: [
         {
           label: t('menu.userVolunteer'),
           route: '/user/volunteer',
           key: 'user-volunteer',
-          icon: DashboardIcon1,
+          icon: DashboardIcon,
           activeIcon: DashboardIcon1Active,
         },
         {
@@ -318,27 +320,23 @@ const userMenuOptions = computed<SidebarMenuOption[]>(() => {
   }
 
   options.push(announcementOption)
-  options.push(buildAppsSubmenu())
   options.push(buildSettingsSubmenu())
   return options
 })
 
-// 根据角色切换侧边栏菜单
 const menuOptions = computed<SidebarMenuOption[]>(() => {
   const role = user.value?.role
 
-  if (role === 3) {
+  if (role === 3)
     return userMenuOptions.value
-  }
 
-  if (role === 1) {
-    return adminMenuTemplate.value
-  }
+  if (role === 1)
+    return superAdminMenuOptions.value
 
-  return filterCommunityAdminMenu(adminMenuTemplate.value)
+  return communityAdminMenuOptions.value
 })
+
 const router = useRouter()
-//mobile view
 router.beforeEach(() => {
   layoutStore.closeSidebar()
 })

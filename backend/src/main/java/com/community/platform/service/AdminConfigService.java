@@ -15,4 +15,9 @@ public interface AdminConfigService {
 
     Map<String, Object> getAlert();
     void saveAlert(Map<String, Object> data);
+
+    Map<String, Object> getAi();
+    void saveAi(Map<String, Object> data);
+
+    Map<String, Object> testAi(Map<String, Object> data);
 }

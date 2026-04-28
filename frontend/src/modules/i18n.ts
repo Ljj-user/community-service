@@ -9,10 +9,8 @@ if (storedValue) {
   const parsed = JSON.parse(storedValue)
   if (parsed && Object.hasOwn(parsed, 'activeLanguage')) {
     const allowed = ['en', 'zn']
-    if (allowed.includes(parsed.activeLanguage))
-      locale = parsed.activeLanguage
-    else if (parsed.activeLanguage)
-      locale = 'zn'
+    if (allowed.includes(parsed.activeLanguage)) locale = parsed.activeLanguage
+    else if (parsed.activeLanguage) locale = 'zn'
   }
 }
 

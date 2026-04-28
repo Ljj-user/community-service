@@ -17,6 +17,12 @@ export default setSettings({
         text: '任务',
       },
       {
+        path: '/messages',
+        icon: 'mdi:message-processing-outline',
+        activeIcon: 'mdi:message-processing',
+        text: '消息',
+      },
+      {
         path: '/user/',
         icon: 'mdi:account-outline',
         activeIcon: 'mdi:account',

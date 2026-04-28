@@ -67,7 +67,9 @@ function buildQuery(params?: Record<string, any>) {
 }
 
 export async function announcementList(params: AnnouncementQuery) {
-  return apiService.get<BackendResult<IPage<AnnouncementVO>>>(`list${buildQuery(params)}`)
+  return apiService.get<BackendResult<IPage<AnnouncementVO>>>(
+    `list${buildQuery(params)}`,
+  )
 }
 
 export async function announcementDetail(id: number) {
@@ -78,7 +80,10 @@ export async function announcementCreate(payload: AnnouncementSaveDTO) {
   return apiService.post<BackendResult<number>>('create', payload)
 }
 
-export async function announcementUpdate(id: number, payload: AnnouncementSaveDTO) {
+export async function announcementUpdate(
+  id: number,
+  payload: AnnouncementSaveDTO,
+) {
   return apiService.put<BackendResult<number>>(`${id}`, payload)
 }
 
@@ -87,6 +92,8 @@ export async function announcementDelete(id: number) {
 }
 
 export async function announcementSetTop(id: number, isTop: boolean) {
-  return apiService.put<BackendResult<null>>(`${id}/top?isTop=${isTop ? 'true' : 'false'}`, {})
+  return apiService.put<BackendResult<null>>(
+    `${id}/top?isTop=${isTop ? 'true' : 'false'}`,
+    {},
+  )
 }
-

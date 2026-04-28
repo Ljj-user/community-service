@@ -269,7 +269,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
             return voPage;
         }
 
-        wrapper.orderByDesc(ServiceRequest::getCreatedAt);
+        applyMyRequestOrder(wrapper, queryDTO);
         Page<ServiceRequest> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());
         IPage<ServiceRequest> requestPage = serviceRequestMapper.selectPage(page, wrapper);
         List<ServiceRequestVO> voList = requestPage.getRecords().stream().map(this::convertToVO).collect(Collectors.toList());
@@ -280,6 +280,28 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         Page<ServiceRequestVO> voPage = new Page<>(requestPage.getCurrent(), requestPage.getSize(), requestPage.getTotal());
         voPage.setRecords(voList);
         return voPage;
+    }
+
+    private void applyMyRequestOrder(LambdaQueryWrapper<ServiceRequest> wrapper, ServiceRequestQueryDTO queryDTO) {
+        String sortBy = queryDTO.getSortBy() == null ? "" : queryDTO.getSortBy().trim();
+        String sortOrder = queryDTO.getSortOrder() == null ? "desc" : queryDTO.getSortOrder().trim().toLowerCase();
+        boolean asc = "asc".equals(sortOrder);
+
+        switch (sortBy) {
+            case "expectedTime" -> {
+                wrapper.orderBy(true, asc, ServiceRequest::getExpectedTime);
+                wrapper.orderByDesc(ServiceRequest::getCreatedAt);
+            }
+            case "urgencyLevel" -> {
+                wrapper.orderBy(true, asc, ServiceRequest::getUrgencyLevel);
+                wrapper.orderByDesc(ServiceRequest::getCreatedAt);
+            }
+            case "publishedAt" -> {
+                wrapper.orderBy(true, asc, ServiceRequest::getPublishedAt);
+                wrapper.orderByDesc(ServiceRequest::getCreatedAt);
+            }
+            default -> wrapper.orderBy(true, asc, ServiceRequest::getCreatedAt);
+        }
     }
 
     @Override
@@ -338,6 +360,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         ServiceRequestVO vo = convertToVO(request);
         fillUserInfo(List.of(vo));
         fillCommunityInfo(List.of(vo));
+        fillLatestClaimInfo(List.of(vo));
         return vo;
     }
 
@@ -662,6 +685,12 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
             if (c != null) {
                 vo.setLatestClaimId(c.getId());
                 vo.setLatestClaimStatus(c.getClaimStatus());
+                if (c.getVolunteerUserId() != null) {
+                    SysUser volunteer = sysUserMapper.selectById(c.getVolunteerUserId());
+                    if (volunteer != null) {
+                        vo.setLatestVolunteerName(volunteer.getRealName());
+                    }
+                }
             }
         }
     }

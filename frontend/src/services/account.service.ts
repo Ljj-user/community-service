@@ -74,10 +74,13 @@ class AccountService {
   }
 
   async sendVerificationCode(email: string, scene = 'REGISTER') {
-    return apiService.post<BackendResult<VerificationTicketData>>('verification/send', {
-      email,
-      scene,
-    })
+    return apiService.post<BackendResult<VerificationTicketData>>(
+      'verification/send',
+      {
+        email,
+        scene,
+      },
+    )
   }
 
   async submitOnboarding(payload: OnboardingPayload) {
@@ -101,11 +104,17 @@ class AccountService {
     }
   }
 
-  async changePassword(oldPassword: string, newPassword: string): Promise<boolean> {
-    const result = await apiService.post<BackendResult<any>>('change-password', {
-      oldPassword,
-      newPassword,
-    })
+  async changePassword(
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<boolean> {
+    const result = await apiService.post<BackendResult<any>>(
+      'change-password',
+      {
+        oldPassword,
+        newPassword,
+      },
+    )
     return result.code === 200
   }
 }

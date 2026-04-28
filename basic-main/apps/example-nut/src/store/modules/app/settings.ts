@@ -80,4 +80,9 @@ export const useAppSettingsStore = defineStore(
       setTitle,
     }
   },
+  {
+    persist: {
+      paths: ['settings'],
+    },
+  },
 )

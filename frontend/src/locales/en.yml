@@ -247,6 +247,8 @@ menu:
   communityAnnouncements: Announcements
   communityInviteCodes: Community Invite Codes
   communityBanners: Community Banners
+  communityScopedUsers: Community Users
+  communityAudit: Community Audit Log
   userResident: Resident Workspace
   userVolunteer: Volunteer Workspace
   user-announcements: Community Announcements
@@ -842,10 +844,13 @@ community:
     saveOkBasic: Basic parameters saved
     saveOkNotice: Notification templates saved
     saveOkAlert: Alert rules saved
+    saveOkAi: AI settings saved
     btnSave: Save
+    btnTestAi: Test connection
     collapseBasic: '1. Basic parameters'
     collapseNotice: '2. Notification templates'
     collapseAlert: '3. Alert rules'
+    collapseAi: '4. AI'
     cardBusiness: Business rules
     cardCompliance: Compliance & risk
     cardA11y: Digital accessibility
@@ -853,6 +858,20 @@ community:
     cardKpi: KPI thresholds
     cardCredit: Resident credit & freeze
     cardAnomaly: Anomaly innovation rules
+    cardAi: AI chat service
+    aiEnabled: Enable AI chat
+    aiEnabledHint: When disabled, the system falls back to built-in FAQ responses.
+    aiBaseUrl: Model Base URL
+    aiBaseUrlHint: OpenAI-style endpoint (e.g. /chat/completions).
+    aiModel: Model name
+    aiModelHint: e.g. deepseek-v4-flash / deepseek-v4-pro
+    aiApiKey: API key (optional)
+    aiApiKeyPh: Leave empty to keep current key; enter to update
+    aiApiKeyHint: For security, the existing key is never shown. Re-enter to update.
+    aiKeyConfigured: Key configured
+    aiKeyMissing: Key missing
+    aiTestOk: 'Connected: {status}, {ms}ms'
+    aiTestFail: 'Failed: {status}, {err}'
     pointsPerHour: Points per service hour
     pointsPerHourHint: Points redeemable for canteen, housekeeping, etc.
     demandClassifyHours: Demand classification SLA (hours)

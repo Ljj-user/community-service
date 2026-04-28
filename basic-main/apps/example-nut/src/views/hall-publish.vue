@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { createServiceRequest } from '@/api/modules/serviceRequests'
+import { toast } from 'vue-sonner'
 
 definePage({
   meta: {
@@ -20,7 +21,15 @@ const SERVICE_TYPES = [
   '社区活动支持',
 ] as const
 
-const form = reactive({
+const form = reactive<{
+  serviceType: (typeof SERVICE_TYPES)[number]
+  urgencyLevel: number
+  serviceAddress: string
+  description: string
+  emergencyContactName: string
+  emergencyContactPhone: string
+  emergencyContactRelation: string
+}>({
   serviceType: SERVICE_TYPES[0],
   urgencyLevel: 2,
   serviceAddress: '',
@@ -29,6 +38,10 @@ const form = reactive({
   emergencyContactPhone: '',
   emergencyContactRelation: '',
 })
+
+function onGotoStats() {
+  router.push({ path: '/hall-overview', query: { kind: 'stats' } })
+}
 
 function getDescriptionTemplate(serviceType: string) {
   if (serviceType === '助老服务（陪护 / 陪诊）') {
@@ -69,9 +82,7 @@ function getDescriptionTemplate(serviceType: string) {
 }
 
 watch(() => form.serviceType, (nextType) => {
-  if (form.description.trim()) {
-    return
-  }
+  if (form.description.trim()) return
   form.description = getDescriptionTemplate(nextType)
 }, { immediate: true })
 
@@ -94,18 +105,9 @@ function plusHours(hours: number) {
 
 async function submit() {
   if (loading.value) return
-  if (!form.serviceAddress.trim()) {
-    window.alert('请填写服务地址')
-    return
-  }
-  if (!form.emergencyContactName.trim()) {
-    window.alert('请填写联系人姓名')
-    return
-  }
-  if (!form.emergencyContactPhone.trim()) {
-    window.alert('请填写联系人电话')
-    return
-  }
+  if (!form.serviceAddress.trim()) return toast.error('请填写服务地址')
+  if (!form.emergencyContactName.trim()) return toast.error('请填写联系人姓名')
+  if (!form.emergencyContactPhone.trim()) return toast.error('请填写联系人电话')
   loading.value = true
   try {
     const res = await createServiceRequest({
@@ -116,18 +118,14 @@ async function submit() {
       emergencyContactName: form.emergencyContactName.trim(),
       emergencyContactPhone: form.emergencyContactPhone.trim(),
       emergencyContactRelation: form.emergencyContactRelation.trim() || undefined,
-      // 移动端当前未提供时间控件，先给默认预约时间（当前+2小时）
       expectedTime: plusHours(2),
     })
-    if (res.code !== 200) {
-      window.alert(res.message || '发布失败')
-      return
-    }
-    window.alert('发布成功，已提交审核')
+    if (res.code !== 200) throw new Error(res.message || '发布失败')
+    toast.success('发布成功，已提交审核')
     router.back()
   }
   catch (e: any) {
-    window.alert(e?.message || '发布失败')
+    toast.error(e?.message || '发布失败')
   }
   finally {
     loading.value = false
@@ -141,44 +139,28 @@ function resetTemplate() {
 onMounted(async () => {
   await appAuthStore.hydrateUser()
   const u = appAuthStore.user
-  if (!form.serviceAddress.trim()) {
-    form.serviceAddress = (u?.communityName || u?.address || '').trim()
-  }
-  if (!form.emergencyContactName.trim()) {
-    form.emergencyContactName = (u?.realName || u?.username || '').trim()
-  }
+  if (!form.serviceAddress.trim()) form.serviceAddress = (u?.communityName || u?.address || '').trim()
+  if (!form.emergencyContactName.trim()) form.emergencyContactName = (u?.realName || u?.username || '').trim()
   resetTemplate()
 })
 </script>
 
 <template>
   <AppPageLayout :navbar="false" tabbar>
-    <div class="page">
-      <header class="m-topbar">
-        <button class="m-back" @click="router.back()">
-          返回
+    <div class="page m-mobile-page-bg">
+      <header class="head">
+        <button type="button" class="back" @click="router.back()">
+          <FmIcon name="i-carbon:chevron-left" />
         </button>
-        <h2 class="m-top-title">发布需求</h2>
+        <h2>发布需求</h2>
+        <button type="button" class="stats-btn" @click="onGotoStats">
+          <FmIcon name="mdi:chart-line" />服务统计
+        </button>
       </header>
 
-      <section class="pub-hero" aria-hidden="true">
-        <div class="pub-hero-glow" />
-        <div class="pub-hero-inner">
-          <span class="pub-badge">互助</span>
-          <p class="pub-hero-title">
-            向社区发起一条需求
-          </p>
-          <p class="pub-hero-desc">
-            填写后会真实提交到后端，进入审核流程
-          </p>
-        </div>
-      </section>
-
-      <div class="pub-form">
+      <section class="form">
         <div class="form-card">
-          <div class="label">
-            请选择服务类型
-          </div>
+          <div class="label">请选择服务类型</div>
           <div class="type-grid">
             <button
               v-for="type in SERVICE_TYPES"
@@ -195,266 +177,78 @@ onMounted(async () => {
         </div>
 
         <div class="form-card">
-          <div class="label">
-            紧急程度
-          </div>
+          <div class="label">紧急程度</div>
           <div class="level">
-            <button type="button" :class="{ active: form.urgencyLevel === 1 }" @click="form.urgencyLevel = 1">
-              普通
-            </button>
-            <button type="button" :class="{ active: form.urgencyLevel === 2 }" @click="form.urgencyLevel = 2">
-              中等
-            </button>
-            <button type="button" :class="{ active: form.urgencyLevel >= 3 }" @click="form.urgencyLevel = 4">
-              极紧急
-            </button>
+            <button type="button" :class="{ active: form.urgencyLevel === 1 }" @click="form.urgencyLevel = 1">普通</button>
+            <button type="button" :class="{ active: form.urgencyLevel === 2 }" @click="form.urgencyLevel = 2">中等</button>
+            <button type="button" :class="{ active: form.urgencyLevel >= 3 }" @click="form.urgencyLevel = 4">极紧急</button>
           </div>
         </div>
 
         <div class="form-card">
-          <div class="label">
-            服务地址
-          </div>
+          <div class="label">服务地址</div>
           <NutInput v-model="form.serviceAddress" placeholder="如：幸福小区1栋101" />
         </div>
 
         <div class="form-card">
           <div class="label-row">
-            <div class="label">
-              需求描述
-            </div>
-            <button type="button" class="template-reset" @click="resetTemplate">
-              重置模板
-            </button>
+            <div class="label">需求描述</div>
+            <button type="button" class="template-reset" @click="resetTemplate">重置模板</button>
           </div>
           <NutTextarea v-model="form.description" rows="7" placeholder="请描述需要帮助的内容" />
-          <p class="desc-tip">
-            可在模板基础上补充细节
-          </p>
+          <p class="desc-tip">可在模板基础上补充细节</p>
         </div>
 
         <div class="form-card">
-          <div class="label">
-            联系人信息
-          </div>
+          <div class="label">联系人信息</div>
           <div class="contact-grid">
             <NutInput v-model="form.emergencyContactName" placeholder="联系人姓名（必填）" />
             <NutInput v-model="form.emergencyContactPhone" placeholder="联系人电话（必填）" />
             <NutInput v-model="form.emergencyContactRelation" placeholder="与服务对象关系（选填）" />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="pub-actions">
-        <NutButton block type="primary" class="submit-btn" :loading="loading" @click="submit">
-          提交发布
-        </NutButton>
-      </div>
+      <button class="submit-btn" :disabled="loading" @click="submit">
+        {{ loading ? '提交中...' : '提交发布' }}
+      </button>
     </div>
   </AppPageLayout>
 </template>
 
 <style scoped>
-.page {
-  min-height: 100%;
-  background: var(--m-color-bg);
-  padding: var(--m-space-page);
-  padding-bottom: calc(var(--m-space-page) + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-sizing: border-box;
-}
-
-.pub-hero {
-  position: relative;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid #6ee7b7;
-  background: linear-gradient(135deg, #047857 0%, #10b981 45%, #34d399 100%);
-  color: #fff;
-  padding: 14px 14px 16px;
-  flex-shrink: 0;
-}
-.pub-hero-glow {
-  position: absolute;
-  right: -40px;
-  top: -36px;
-  width: 120px;
-  height: 120px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  pointer-events: none;
-}
-.pub-hero-inner { position: relative; z-index: 1; }
-.pub-badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-}
-.pub-hero-title {
-  margin: 10px 0 0;
-  font-size: 17px;
-  font-weight: 900;
-  line-height: 1.25;
-}
-.pub-hero-desc {
-  margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.45;
-  opacity: 0.95;
-}
-
-.pub-form {
-  display: grid;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-}
+.page { min-height: 100%; padding: 12px; display: grid; gap: 12px; }
+.head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.back { width: 34px; height: 34px; border: 1px solid var(--m-color-border); border-radius: 10px; background: var(--m-color-card); display: inline-flex; align-items: center; justify-content: center; }
+.head h2 { margin: 0; font-size: 18px; color: var(--m-color-text); font-weight: 900; }
+.stats-btn { height: 34px; border: 0; border-radius: 10px; padding: 0 10px; color: #fff; font-size: 12px; font-weight: 900; display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #0f766e 0%, #059669 100%); }
+.form { display: grid; gap: 10px; }
 .form-card {
   position: relative;
-  background: linear-gradient(160deg, #ffffff 0%, #f0fdf4 100%);
-  border: 1px solid #d1fae5;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 14px;
   padding: 12px;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
 }
-.form-card::before {
-  content: '';
-  position: absolute;
-  right: -24px;
-  bottom: -28px;
-  width: 72px;
-  height: 72px;
-  border-radius: 999px;
-  background: rgba(16, 185, 129, 0.1);
-  pointer-events: none;
-}
-.label {
-  position: relative;
-  z-index: 1;
-  margin-bottom: 8px;
-  color: #047857;
-  font-size: 13px;
-  font-weight: 700;
-}
-.label-row {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.template-reset {
-  border: 1px solid #cbd5e1;
-  border-radius: 999px;
-  background: #fff;
-  font-size: 11px;
-  color: #334155;
-  padding: 3px 10px;
-}
-.type-grid {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
+.label { margin-bottom: 8px; color: #0f172a; font-size: 13px; font-weight: 700; }
+.label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.template-reset { border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; font-size: 11px; color: #334155; padding: 3px 10px; }
+.type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .type-card {
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  background: #fff;
-  color: #374151;
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.35;
-  text-align: left;
-  min-height: 56px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  border: 1px solid #d1d5db; border-radius: 10px; background: #fff; color: #374151; padding: 10px 12px; font-size: 12px; line-height: 1.35;
+  text-align: left; min-height: 56px; display: flex; justify-content: space-between; align-items: flex-start;
 }
-.type-card.active {
-  border-color: #10b981;
-  background: #ecfdf5;
-  color: #065f46;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
-}
+.type-card.active { border-color: #10b981; background: #ecfdf5; color: #065f46; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2); }
 .check-mark { font-weight: 800; color: #059669; }
-.desc-tip {
-  position: relative;
-  z-index: 1;
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 12px;
-}
-.contact-grid {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 8px;
-}
-.level {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.level button {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 10px;
-  padding: 8px 0;
-  color: #4b5563;
-}
-.level button.active {
-  border-color: #10b981;
-  color: #047857;
-  background: #ecfdf5;
-  font-weight: 800;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
-}
-
-.pub-actions { flex-shrink: 0; }
+.desc-tip { margin: 6px 0 0; color: #64748b; font-size: 12px; }
+.contact-grid { display: grid; gap: 8px; }
+.level { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.level button { border: 1px solid #d1d5db; background: #fff; border-radius: 10px; padding: 8px 0; color: #4b5563; }
+.level button.active { border-color: #10b981; color: #047857; background: #ecfdf5; font-weight: 800; }
 .submit-btn {
-  border-radius: 12px !important;
-  font-weight: 800 !important;
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35) !important;
+  height: 46px; border: 0; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 900;
+  background: linear-gradient(140deg, #1fa34a 0%, #14803b 100%);
 }
-
-:global(.dark) .page { background: #111827; }
-:global(.dark) .back { background: #1f2937; color: #f3f4f6; border: 1px solid #374151; }
-:global(.dark) .top h2 { color: #f3f4f6; }
-:global(.dark) .pub-hero {
-  border-color: #14532d;
-  background: linear-gradient(135deg, #064e3b 0%, #047857 50%, #059669 100%);
-}
-:global(.dark) .form-card {
-  background: linear-gradient(160deg, #1f2937 0%, #052e26 100%);
-  border-color: #14532d;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
-:global(.dark) .label { color: #6ee7b7; }
-:global(.dark) .level button {
-  background: #0f172a;
-  border-color: #4b5563;
-  color: #d1d5db;
-}
-:global(.dark) .level button.active {
-  background: #065f46;
-  border-color: #10b981;
-  color: #ecfdf5;
-}
-::global(.dark) .template-reset { background: #111827; border-color: #4b5563; color: #d1d5db; }
-::global(.dark) .type-card { background: #0f172a; border-color: #4b5563; color: #d1d5db; }
-::global(.dark) .type-card.active { background: #065f46; border-color: #10b981; color: #ecfdf5; }
-::global(.dark) .desc-tip { color: #9ca3af; }
+.submit-btn:disabled { opacity: .6; }
 </style>

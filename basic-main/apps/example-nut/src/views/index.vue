@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { getUserAnnouncementDetail, listUserAnnouncements, type AnnouncementVO } from '@/api/modules/announcements'
 import { listBanners, type BannerVO } from '@/api/modules/banner'
+import AiHeroInput from '@/components/AiHeroInput.vue'
+import QuickActionCards from '@/components/QuickActionCards.vue'
+import ThreeSectionPage from '@/components/ThreeSectionPage.vue'
+import MainTopBar from '@/components/MainTopBar.vue'
+import heroCommunityService from '@/assets/mobile/community_service1.png'
 
 definePage({
   meta: {
@@ -14,14 +19,15 @@ const router = useRouter()
 
 const loading = ref(false)
 const error = ref('')
+const aiText = ref('')
 const communityOptions = ['幸福里社区', '阳光社区', '和谐社区']
 /** 仅用于公告区演示数据；顶部社区显示以“后端绑定社区”为准 */
 const noticeCommunity = ref(communityOptions[0])
-const communityDistanceMap: Record<string, string> = {
-  幸福里社区: '0.8km',
-  阳光社区: '1.6km',
-  和谐社区: '2.4km',
-}
+// const communityDistanceMap: Record<string, string> = {
+//   幸福里社区: '0.8km',
+//   阳光社区: '1.6km',
+//   和谐社区: '2.4km',
+// }
 const bannerList = ref<Array<{ id: number; title: string; sub: string }>>([])
 const bannerFallback = [
   { id: 1, title: '春季互助行动', sub: '邻里协作让生活更轻松' },
@@ -44,13 +50,12 @@ const bannerLocationSubtitle = computed(() => {
   return name
 })
 const bannerUserName = computed(() => displayName.value || '邻里用户')
-const accountAvatarUrl = computed(() => appAuthStore.user?.avatarUrl || '')
-/** 与 sys_user.points 一致（信用分/积分） */
-const creditScore = computed(() => Number(appAuthStore.user?.points ?? 0))
+const topAnnouncement = computed(() => announcementRows.value[0] || null)
+// 账号卡片已移除（首页更聚焦：轮播/公告/入口/AI）
 // 顶部不再模拟“距离”，避免与绑定社区逻辑冲突；展示占位
 const headerDistance = computed(() => (appAuthStore.user?.communityName ? '已绑定' : '去绑定'))
 /** 需求卡片上展示的距离仍跟公告切换社区（演示）一致 */
-const listDistance = computed(() => communityDistanceMap[noticeCommunity.value] ?? '—')
+// const listDistance = computed(() => communityDistanceMap[noticeCommunity.value] ?? '—')
 const announcementRows = ref<AnnouncementVO[]>([])
 
 const showAnnouncementModal = ref(false)
@@ -105,24 +110,18 @@ async function loadData() {
   }
 }
 
-function onGotoMe() {
-  router.push('/user/')
-}
+// function onGotoMe() {
+//   router.push('/user/')
+// }
 
-function onScan() {
-  router.push('/scan')
-}
+// AI 入口已移到页面底部卡片
 
-function onOpenAiAssistant() {
-  router.push('/ai-assistant')
+function onOpenMessages() {
+  router.push('/messages')
 }
 
 function onChangeCommunity() {
   router.push('/join-community')
-}
-
-function onViewAllAnnouncements() {
-  router.push({ path: '/notices' })
 }
 
 function onGotoHelp() {
@@ -133,12 +132,24 @@ function onGotoPublish() {
   router.push('/hall-publish')
 }
 
-function onGotoTasks() {
-  router.push('/hall')
+function heroStyle(id: number) {
+  if (id === bannerList.value[0]?.id) {
+    return {
+      '--hero-bg': `url("${heroCommunityService}")`,
+    }
+  }
+  return {
+    '--hero-bg': `url("https://picsum.photos/seed/community-hero-${id}/960/420")`,
+  }
 }
 
-function onGotoOverview(kind: 'reviews' | 'stats') {
-  router.push({ path: '/hall-overview', query: { kind } })
+// function onGotoOverview(kind: 'reviews' | 'stats') {
+//   router.push({ path: '/hall-overview', query: { kind } })
+// }
+
+function onAiSend() {
+  const q = aiText.value.trim()
+  router.push({ path: '/ai-assistant', query: q ? { q } : undefined })
 }
 
 async function openAnnouncementDetail(n: AnnouncementVO) {
@@ -174,126 +185,61 @@ onMounted(loadData)
 </script>
 
 <template>
-  <AppPageLayout :navbar="false" tabbar>
-    <div class="home-page">
-      <header class="biz-header">
-        <button class="community-switch" @click="onChangeCommunity">
-          <FmIcon name="i-carbon:location-filled" class="community-icon" />
-          <span class="community-main">{{ resolvedCommunityName }}</span>
-          <span class="community-tip">点击切换社区</span>
-          <span class="distance">{{ headerDistance }}</span>
-          <FmIcon name="i-carbon:chevron-right" />
-        </button>
-        <button type="button" class="scan-btn" aria-label="扫一扫" @click="onScan">
-          <span class="scan-glyph" aria-hidden="true" />
-        </button>
-        <button type="button" class="ai-btn" aria-label="AI助手" @click="onOpenAiAssistant">
-          AI
-        </button>
-      </header>
+  <AppPageLayout :navbar="false" tabbar tabbar-class="m-mobile-tabbar-float">
+    <ThreeSectionPage page-class="home-page m-mobile-page-bg" content-class="home-content">
+      <template #header>
+        <MainTopBar
+          :community-name="resolvedCommunityName"
+          :distance-text="headerDistance"
+          @change-community="onChangeCommunity"
+          @right="onOpenMessages"
+        />
+      </template>
 
-      <main class="content-scroll">
+        <!-- 顶部：轮播图 -->
         <NutSwiper :auto-play="3000" :pagination-visible="true" class="hero-swiper">
           <NutSwiperItem v-for="b in bannerList" :key="b.id">
-            <div class="hero-item">
-              <div class="hero-title">
-                {{ b.title }}
+            <div class="hero-item" :style="heroStyle(b.id)">
+              <div class="hero-content">
+                <div class="hero-title">
+                  {{ b.title }}
+                </div>
+                <div v-if="b.sub" class="hero-sub">
+                  {{ b.sub }}
+                </div>
+                <div class="hero-user">
+                  你好，{{ bannerUserName }} · {{ bannerLocationSubtitle }}
+                </div>
               </div>
-              <div v-if="b.sub" class="hero-sub">
-                {{ b.sub }}
-              </div>
-              <div class="hero-user">
-                你好，{{ bannerUserName }} · {{ bannerLocationSubtitle }}
+              <button
+                v-if="topAnnouncement"
+                type="button"
+                class="hero-notice"
+                @click.stop="openAnnouncementDetail(topAnnouncement)"
+              >
+                <span class="hero-notice-tag">公告</span>
+                <span class="hero-notice-text">{{ topAnnouncement.title }}</span>
+                <FmIcon name="i-carbon:chevron-right" class="hero-notice-icon" aria-hidden="true" />
+              </button>
+              <div v-else class="hero-notice hero-notice-muted">
+                <span class="hero-notice-tag">公告</span>
+                <span class="hero-notice-text">暂无公告</span>
               </div>
             </div>
           </NutSwiperItem>
         </NutSwiper>
 
-        <button class="account-card" @click="onGotoMe">
-          <div class="avatar-wrap">
-            <img v-if="accountAvatarUrl" :src="accountAvatarUrl" alt="avatar">
-            <FmIcon v-else name="i-carbon:user-avatar-filled-alt" />
-          </div>
-          <div class="account-left">
-            <div class="mini-label">
-              我的账户
-            </div>
-            <div class="account-name">
-              {{ displayName }}
-            </div>
-            <div class="account-sub">
-              {{ resolvedCommunityName }}
-            </div>
-          </div>
-          <div class="account-right">
-            <div class="mini-label">
-              贡献积分
-            </div>
-            <div class="account-coins">
-              {{ creditScore }}
-            </div>
-            <div class="to-me">
-              查看我的 >
-            </div>
-          </div>
-        </button>
+        <QuickActionCards
+          help-title="爱心传递"
+          help-sub="浏览并帮助他人"
+          publish-title="我有难处"
+          publish-sub="一键发布求助"
+          @help="onGotoHelp"
+          @publish="onGotoPublish"
+        />
 
-        <section class="quick-panel">
-          <div class="quick-head">
-            <h3>快捷入口</h3>
-            <button class="quick-more" @click="onGotoTasks">
-              去任务中心
-            </button>
-          </div>
-          <div class="quick-grid">
-            <button class="quick-item q-emerald" @click="onGotoHelp">
-              <div class="q-title">我要帮忙</div>
-              <div class="q-sub">浏览并接取任务</div>
-            </button>
-            <button class="quick-item q-green" @click="onGotoPublish">
-              <div class="q-title">我要发布</div>
-              <div class="q-sub">一键发布求助</div>
-            </button>
-            <button class="quick-item q-cyan" @click="onGotoOverview('reviews')">
-              <div class="q-title">评价反馈</div>
-              <div class="q-sub">查看评价记录</div>
-            </button>
-            <button class="quick-item q-amber" @click="onGotoOverview('stats')">
-              <div class="q-title">服务统计</div>
-              <div class="q-sub">查看我的进度</div>
-            </button>
-          </div>
-        </section>
-
-        <section class="notice-card">
-          <div class="notice-head">
-            <h3>社区公告</h3>
-            <button @click="onViewAllAnnouncements">
-              查看全部
-            </button>
-          </div>
-          <div class="notice-list">
-            <div v-if="announcementRows.length === 0" class="notice-empty">
-              暂无公告（数据来自后台，已发布且您所在社区可见时显示）
-            </div>
-            <button
-              v-for="n in announcementRows"
-              :key="n.id"
-              type="button"
-              class="notice-item"
-              @click="openAnnouncementDetail(n)"
-            >
-              <div class="dot" />
-              <div class="text">
-                {{ n.title }}
-              </div>
-              <div class="time">
-                {{ fmtAnnounceTime(n.publishedAt || n.createdAt) }}
-              </div>
-              <FmIcon name="i-carbon:chevron-right" class="notice-chevron" aria-hidden="true" />
-            </button>
-          </div>
-        </section>
+        <!-- 底部：AI 输入框 -->
+        <AiHeroInput v-model="aiText" class="home-ai-input" @send="onAiSend" />
 
         <div v-if="loading" class="status-text">
           加载中...
@@ -302,7 +248,6 @@ onMounted(loadData)
           {{ error }}
         </div>
         <div class="safe-space" />
-      </main>
 
       <!-- 社区绑定已改为邀请码/扫码；不再提供“直接切换社区”抽屉 -->
 
@@ -316,7 +261,7 @@ onMounted(loadData)
         :style="{ width: 'min(92vw, 420px)', padding: 0 }"
       >
         <div class="announce-modal">
-          <div class="announce-modal-hero">
+          <div class="announce-modal-top">
             <div class="announce-modal-badge">
               <FmIcon name="i-carbon:notification-filled" />
               社区公告
@@ -328,14 +273,17 @@ onMounted(loadData)
               v-if="announcementDetail || announcementListItem"
               class="announce-modal-meta"
             >
-              <span>{{
+              <span class="announce-meta-pill">{{
                 fmtAnnounceTime(
                   (announcementDetail || announcementListItem)?.publishedAt
                     || (announcementDetail || announcementListItem)?.createdAt,
                 )
               }}</span>
-              <span v-if="(announcementDetail || announcementListItem)?.publisherName">
-                · {{ (announcementDetail || announcementListItem)?.publisherName }}
+              <span
+                v-if="(announcementDetail || announcementListItem)?.publisherName"
+                class="announce-meta-pill"
+              >
+                {{ (announcementDetail || announcementListItem)?.publisherName }}
               </span>
             </div>
           </div>
@@ -347,26 +295,30 @@ onMounted(loadData)
               {{ announcementDetailError }}
             </div>
             <template v-else-if="announcementDetail">
-              <div
-                v-if="announcementDetail.contentHtml"
-                class="announce-html"
-                v-html="announcementDetail.contentHtml"
-              />
-              <div
-                v-else-if="announcementDetail.contentText"
-                class="announce-text"
-              >
-                {{ announcementDetail.contentText }}
+              <div class="announce-modal-panel">
+                <div
+                  v-if="announcementDetail.contentHtml"
+                  class="announce-html"
+                  v-html="announcementDetail.contentHtml"
+                />
+                <div
+                  v-else-if="announcementDetail.contentText"
+                  class="announce-text"
+                >
+                  {{ announcementDetail.contentText }}
+                </div>
+                <p v-else class="announce-modal-status muted">
+                  暂无正文
+                </p>
               </div>
-              <p v-else class="announce-modal-status muted">
-                暂无正文
-              </p>
             </template>
+          </div>
+          <div class="announce-modal-foot">
+            <span>消息已同步到当前社区</span>
           </div>
         </div>
       </NutPopup>
-
-    </div>
+    </ThreeSectionPage>
   </AppPageLayout>
 </template>
 
@@ -374,47 +326,64 @@ onMounted(loadData)
 .home-page {
   position: relative;
   height: 100%;
-  width: min(100vw, 430px);
+  width: min(100vw, var(--m-device-max-width));
   margin: 0 auto;
-  background: var(--m-color-bg);
+  background:
+    radial-gradient(120% 84% at 50% -10%, #f9fbfa 0%, #f3f5f4 62%, #eef2f0 100%);
 }
-.biz-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 12px 8px; background: var(--m-color-card); }
-.community-switch { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; font-weight: 700; padding: 0; margin: 0; min-width: 0; flex: 1; }
-.community-main { font-weight: 800; color: var(--m-color-text); }
-.community-tip { font-size: 11px; color: #10b981; font-weight: 700; }
-.scan-btn { flex-shrink: 0; width: 40px; height: 40px; border: 1px solid var(--m-color-border); border-radius: 999px; background: var(--m-color-card); color: var(--m-color-primary); display: inline-flex; align-items: center; justify-content: center; padding: 0; position: relative; }
-.scan-glyph {
-  width: 17px;
-  height: 17px;
-  border: 2px solid #0f766e;
-  border-radius: 2px;
-  position: relative;
-  box-sizing: border-box;
-}
-.scan-glyph::before,
-.scan-glyph::after {
-  content: '';
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background: #0f766e;
-  border-radius: 1px;
-}
-.scan-glyph::before { left: 2px; top: 2px; box-shadow: 9px 0 0 #0f766e, 0 9px 0 #0f766e; }
-.scan-glyph::after { right: 2px; bottom: 2px; }
-.scan-btn:active { transform: scale(0.96); }
-.ai-btn { flex-shrink: 0; height: 40px; min-width: 40px; border: 1px solid #86efac; border-radius: 999px; background: #ecfdf5; color: #166534; font-weight: 900; padding: 0 10px; }
-.community-icon { color: #059669; font-size: 18px; }
-.distance { font-size: var(--m-font-sub); color: var(--m-color-muted); margin-left: 2px; }
 
-.content-scroll { overflow-y: auto; height: calc(100% - 56px); padding: 10px 12px 0; }
+.home-content {
+  padding: 10px 12px 0;
+  background: transparent;
+}
 .hero-swiper { border-radius: 16px; overflow: hidden; height: 148px; }
 .hero-swiper :deep(.nut-swiper-inner) { height: 148px; }
 .hero-swiper :deep(.nut-swiper-item) { height: 148px; }
-.hero-item { height: 148px; padding: 16px; color: var(--m-color-text); background: var(--m-color-primary-soft); border: 1px solid var(--m-color-border); display: flex; flex-direction: column; }
-.hero-title { font-size: 20px; font-weight: 800; color: var(--m-color-primary); }
-.hero-sub { margin-top: 6px; font-size: 14px; color: var(--m-color-subtext); }
-.hero-user { margin-top: auto; font-size: var(--m-font-sub); color: var(--m-color-subtext); }
+.hero-item {
+  height: 148px;
+  padding: 14px;
+  border: 1px solid var(--m-color-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-image:
+    linear-gradient(160deg, rgba(15, 23, 42, 0.16) 0%, rgba(2, 6, 23, 0.44) 100%),
+    var(--hero-bg);
+  background-size: cover;
+  background-position: center;
+}
+.hero-content { position: relative; z-index: 1; max-width: 80%; }
+.hero-title { font-size: 18px; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(2, 6, 23, 0.42); }
+.hero-sub { margin-top: 4px; font-size: 13px; color: rgba(255, 255, 255, 0.92); text-shadow: 0 2px 8px rgba(2, 6, 23, 0.34); }
+.hero-user { margin-top: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.84); text-shadow: 0 2px 8px rgba(2, 6, 23, 0.34); }
+.hero-notice {
+  min-height: 34px;
+  border: 0;
+  width: 100%;
+  border-radius: 12px;
+  padding: 6px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  text-align: left;
+}
+.hero-notice-tag {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.88);
+  color: #ecfdf5;
+}
+.hero-notice-text { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-notice-icon { font-size: 14px; color: rgba(255, 255, 255, 0.88); }
+.hero-notice-muted { opacity: 0.92; }
 
 .account-card { margin-top: 10px; border-radius: var(--m-radius-card); background: var(--m-color-card); border: 1px solid var(--m-color-border); padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; box-shadow: var(--m-shadow-card); }
 .avatar-wrap { width: 46px; height: 46px; border-radius: 999px; overflow: hidden; background: #ecfdf5; color: #047857; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
@@ -427,41 +396,31 @@ onMounted(loadData)
 .account-coins { margin-top: 2px; font-size: 20px; font-weight: 900; color: #047857; }
 .to-me { margin-top: 2px; font-size: 12px; color: #10b981; font-weight: 700; }
 
-.notice-card { margin-top: 10px; border-radius: var(--m-radius-card); border: 1px solid var(--m-color-border); background: var(--m-color-card); padding: 12px; box-shadow: var(--m-shadow-card); }
-.notice-head { display: flex; align-items: center; justify-content: space-between; }
-.notice-head h3 { margin: 0; font-size: 15px; font-weight: 900; }
-.notice-head button { border: 0; background: transparent; color: #10b981; font-size: 13px; font-weight: 700; }
-.notice-list { margin-top: 8px; max-height: 114px; overflow-y: auto; display: grid; gap: 6px; padding-right: 2px; }
-.notice-empty { font-size: 12px; color: #9ca3af; padding: 6px 0; text-align: center; }
-.notice-item {
-  min-height: 36px;
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto 18px;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  padding: 6px 4px;
-  margin: 0;
-  border-radius: 10px;
-  cursor: pointer;
-  text-align: left;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.12s ease;
+.announce-popup-wrap :deep(.nut-popup) {
+  width: min(92vw, 420px) !important;
 }
-.notice-item:active { background: #f0fdf4; }
-.dot { width: 6px; height: 6px; border-radius: 999px; background: #10b981; }
-.notice-item .text { font-size: 13px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.notice-item .time { font-size: 11px; color: #9ca3af; padding-left: 4px; white-space: nowrap; }
-.notice-chevron { color: #cbd5e1; font-size: 15px; justify-self: end; }
-
-.announce-popup-wrap :deep(.nut-popup-content) { padding: 0; overflow: hidden; border-radius: 18px; }
-.announce-modal { background: #fff; max-height: min(78vh, 640px); display: flex; flex-direction: column; }
-.announce-modal-hero {
-  padding: 18px 18px 14px;
-  background: linear-gradient(135deg, #047857 0%, #10b981 55%, #34d399 100%);
-  color: #fff;
+.announce-popup-wrap :deep(.nut-popup-content) {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: transparent;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+}
+.announce-modal {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(245, 248, 246, 0.98) 100%);
+  border: 1px solid rgba(31, 122, 76, 0.14);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: saturate(150%) blur(16px);
+  -webkit-backdrop-filter: saturate(150%) blur(16px);
+}
+.announce-modal-top {
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background:
+    linear-gradient(180deg, rgba(237, 247, 240, 0.94) 0%, rgba(255, 255, 255, 0.68) 100%);
 }
 .announce-modal-badge {
   display: inline-flex;
@@ -469,40 +428,64 @@ onMounted(loadData)
   gap: 6px;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.92;
+  color: #166534;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 101, 52, 0.14);
+  background: rgba(255, 255, 255, 0.72);
 }
 .announce-modal-badge :deep(svg) { font-size: 14px; }
 .announce-modal-title {
   margin: 10px 0 0;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 900;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
+  line-height: 1.4;
+  letter-spacing: 0;
+  color: #0f172a;
 }
 .announce-modal-meta {
-  margin-top: 10px;
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.announce-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.2);
   font-size: 12px;
-  opacity: 0.92;
-  line-height: 1.4;
+  color: #475569;
 }
 .announce-modal-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px 20px;
+  padding: 16px 18px 12px;
   -webkit-overflow-scrolling: touch;
+}
+.announce-modal-panel {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.55) inset,
+    0 10px 26px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
 }
 .announce-modal-status {
   text-align: center;
   color: #6b7280;
   font-size: 14px;
-  padding: 12px 0;
+  padding: 16px 0;
 }
 .announce-modal-status.err { color: #dc2626; }
 .announce-modal-status.muted { color: #9ca3af; }
 .announce-text {
+  padding: 16px;
   font-size: 14px;
   line-height: 1.65;
   color: #374151;
@@ -510,10 +493,16 @@ onMounted(loadData)
   word-break: break-word;
 }
 .announce-html {
+  padding: 16px;
   font-size: 14px;
   line-height: 1.65;
   color: #374151;
   word-break: break-word;
+}
+.announce-modal-foot {
+  padding: 0 18px 16px;
+  font-size: 12px;
+  color: #64748b;
 }
 .announce-html :deep(p) { margin: 0.5em 0; }
 .announce-html :deep(p:first-child) { margin-top: 0; }
@@ -524,29 +513,11 @@ onMounted(loadData)
 .status-text { margin-top: 10px; color: var(--m-color-subtext); font-size: var(--m-font-body); }
 .status-text.error { color: #dc2626; }
 
-.quick-panel { margin-top: 10px; border-radius: var(--m-radius-card); border: 1px solid var(--m-color-border); background: var(--m-color-card); padding: 12px; box-shadow: var(--m-shadow-card); }
-.quick-head { display: flex; align-items: center; justify-content: space-between; }
-.quick-head h3 { margin: 0; font-size: 15px; font-weight: 900; }
-.quick-more { border: 0; background: transparent; color: #10b981; font-size: 13px; font-weight: 800; }
-.quick-grid { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.quick-item {
-  border: 1px solid var(--m-color-border);
-  background: #fff;
-  border-radius: 14px;
-  padding: 12px;
-  text-align: left;
-  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
-}
-.q-title { font-size: 15px; font-weight: 900; color: #111827; }
-.q-sub { margin-top: 4px; font-size: 12px; color: #6b7280; font-weight: 600; }
-.q-emerald { background: linear-gradient(160deg, #ffffff 10%, #ecfdf5 96%); border-color: #bbf7d0; }
-.q-green { background: linear-gradient(160deg, #ffffff 10%, #f0fdf4 96%); border-color: #dcfce7; }
-.q-cyan { background: linear-gradient(160deg, #ffffff 10%, #ecfeff 96%); border-color: #a5f3fc; }
-.q-amber { background: linear-gradient(160deg, #ffffff 10%, #fffbeb 96%); border-color: #fde68a; }
+.home-ai-input { margin-top: 10px; }
 
 .publish-drawer { padding: 10px 16px 20px; background: #fff; border-top-left-radius: 24px; border-top-right-radius: 24px; }
 .publish-drawer {
-  width: min(100vw, 430px);
+  width: min(100vw, var(--m-device-max-width));
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -565,40 +536,54 @@ onMounted(loadData)
 .urgency-choose { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .urgency-choose button { border: 1px solid #d1d5db; background: #fff; border-radius: 10px; padding: 8px 0; }
 .urgency-choose button.active { border-color: #10b981; color: #047857; background: #ecfdf5; font-weight: 800; }
-.safe-space { height: 100px; }
+.safe-space { height: 118px; }
 
 :global(.dark) .home-page { background: #111827; }
-:global(.dark) .biz-header { background: #1f2937; border-bottom: 1px solid #374151; }
-:global(.dark) .community-switch { color: #f3f4f6; }
-:global(.dark) .scan-btn { background: #064e3b; color: #6ee7b7; }
-:global(.dark) .distance { color: #9ca3af; }
-:global(.dark) .account-card,
-:global(.dark) .notice-card,
+/* dark header styles moved into MainTopBar */
 :global(.dark) .tab-item,
 :global(.dark) .req-card,
 :global(.dark) .community-item,
 :global(.dark) .form-block,
 :global(.dark) .publish-drawer,
 :global(.dark) .community-drawer { background: #1f2937; border-color: #374151; }
-:global(.dark) .notice-empty { color: #6b7280; }
-:global(.dark) .notice-item:active { background: rgba(16, 185, 129, 0.12); }
-:global(.dark) .notice-item .text { color: #e5e7eb; }
-:global(.dark) .notice-chevron { color: #4b5563; }
-:global(.dark) .announce-modal { background: #1f2937; }
-:global(.dark) .announce-modal-body { background: #1f2937; }
+:global(.dark) .hero-notice { background: rgba(15, 23, 42, 0.42); }
+:global(.dark) .hero-notice-tag { background: rgba(16, 185, 129, 0.82); color: #ecfdf5; }
+:global(.dark) .announce-modal {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(8, 28, 24, 0.98) 100%);
+  border-color: rgba(52, 211, 153, 0.18);
+}
+:global(.dark) .announce-modal-top {
+  background: linear-gradient(180deg, rgba(17, 38, 30, 0.9) 0%, rgba(15, 23, 42, 0.5) 100%);
+  border-bottom-color: rgba(148, 163, 184, 0.12);
+}
+:global(.dark) .announce-modal-badge {
+  background: rgba(17, 24, 39, 0.7);
+  border-color: rgba(52, 211, 153, 0.16);
+  color: #bbf7d0;
+}
+:global(.dark) .announce-modal-title { color: #f8fafc; }
+:global(.dark) .announce-meta-pill {
+  background: rgba(17, 24, 39, 0.72);
+  border-color: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+:global(.dark) .announce-modal-panel {
+  background: rgba(15, 23, 42, 0.62);
+  border-color: rgba(52, 211, 153, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 12px 30px rgba(0, 0, 0, 0.24);
+}
 :global(.dark) .announce-text,
 :global(.dark) .announce-html { color: #e5e7eb; }
-:global(.dark) .announce-modal-status { color: #9ca3af; }
+:global(.dark) .announce-modal-status,
+:global(.dark) .announce-modal-foot { color: #9ca3af; }
 :global(.dark) .announce-html :deep(a) { color: #34d399; }
 :global(.dark) .mini-label,
-:global(.dark) .account-sub,
-:global(.dark) .notice-item .time,
 :global(.dark) .row-publisher,
 :global(.dark) .row-2,
 :global(.dark) .meta,
 :global(.dark) .label { color: #9ca3af; }
-:global(.dark) .account-name,
-:global(.dark) .notice-head h3,
 :global(.dark) .title,
 :global(.dark) .community-item .left,
 :global(.dark) .publish-drawer h3,
@@ -606,12 +591,4 @@ onMounted(loadData)
 :global(.dark) .tab-item { color: #d1d5db; }
 :global(.dark) .section-head h3 { color: #f3f4f6; }
 :global(.dark) .urgency-choose button { background: #111827; border-color: #4b5563; color: #d1d5db; }
-::global(.dark) .quick-panel { background: #1f2937; border-color: #374151; }
-::global(.dark) .quick-item { background: #111827; border-color: #374151; }
-::global(.dark) .q-title { color: #f3f4f6; }
-::global(.dark) .q-sub { color: #9ca3af; }
-::global(.dark) .q-emerald { background: linear-gradient(160deg, #0f172a 12%, #052e26 95%); border-color: #14532d; }
-::global(.dark) .q-green { background: linear-gradient(160deg, #0f172a 12%, #112b21 95%); border-color: #14532d; }
-::global(.dark) .q-cyan { background: linear-gradient(160deg, #0f172a 12%, #082f39 95%); border-color: #164e63; }
-::global(.dark) .q-amber { background: linear-gradient(160deg, #0f172a 12%, #3b2b11 95%); border-color: #78350f; }
 </style>

@@ -27,45 +27,43 @@ interface BackendResult<T> {
 }
 
 function normalizeAvatarUrl(raw?: string): string {
-  if (!raw)
-    return ''
+  if (!raw) return ''
   // Compatibility for legacy DB values like `xxx.jpg`.
   if (!raw.includes('/') && /\.(png|jpe?g|gif|webp|bmp)$/i.test(raw))
     return `/api/static/avatars/${raw}`
   // Compatibility for Windows absolute file path accidentally saved before.
-  if (/^[A-Za-z]:[\\/]/.test(raw))
-    return ''
+  if (/^[A-Za-z]:[\\/]/.test(raw)) return ''
   // Backend may return absolute URL in dev; route it through Vite proxy to avoid cross-origin/CSP/cache issues.
   if (/^https?:\/\/localhost:8080\/static\//i.test(raw))
     return raw.replace(/^https?:\/\/localhost:8080/i, '/api')
   if (/^https?:\/\/127\.0\.0\.1:8080\/static\//i.test(raw))
     return raw.replace(/^https?:\/\/127\.0\.0\.1:8080/i, '/api')
-  if (/^https?:\/\//i.test(raw))
-    return raw
+  if (/^https?:\/\//i.test(raw)) return raw
   const url = raw.startsWith('/') ? raw : `/${raw}`
   // Backend static files should go through Vite proxy in dev.
-  if (url.startsWith('/static/'))
-    return `/api${url}`
+  if (url.startsWith('/static/')) return `/api${url}`
   return url
 }
 
 function toBackendAvatarUrl(raw?: string): string {
-  if (!raw)
-    return ''
+  if (!raw) return ''
   // Avoid storing frontend proxy prefix in DB.
-  if (raw.startsWith('/api/static/'))
-    return raw.replace('/api', '')
+  if (raw.startsWith('/api/static/')) return raw.replace('/api', '')
   return raw
 }
 
 function parseSkillTags(raw?: string): string[] {
-  if (!raw)
-    return []
+  if (!raw) return []
   try {
     const j = JSON.parse(raw) as unknown
-    return Array.isArray(j) ? j.filter((x): x is string => typeof x === 'string') : []
+    return Array.isArray(j)
+      ? j.filter((x): x is string => typeof x === 'string')
+      : []
   } catch {
-    return raw.split(',').map(s => s.trim()).filter(Boolean)
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   }
 }
 
@@ -99,7 +97,8 @@ function mapToProfile(data: BackendUserProfile): Profile {
 
 class ProfileService {
   async getUserProfile(): Promise<Profile> {
-    const result = await apiService.get<BackendResult<BackendUserProfile>>('profile')
+    const result =
+      await apiService.get<BackendResult<BackendUserProfile>>('profile')
     return mapToProfile(result.data)
   }
 

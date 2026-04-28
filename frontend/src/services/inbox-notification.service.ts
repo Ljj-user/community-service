@@ -25,7 +25,11 @@ class InboxNotificationService {
   }
 
   async listMine(category: 1 | 2, page = 1, size = 30): Promise<InboxPage> {
-    const raw = await api.query<BackendResult<InboxPage>>('mine', { category, page, size })
+    const raw = await api.query<BackendResult<InboxPage>>('mine', {
+      category,
+      page,
+      size,
+    })
     return unwrap<InboxPage>(raw)
   }
 

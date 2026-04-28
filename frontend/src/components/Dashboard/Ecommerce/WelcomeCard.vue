@@ -20,34 +20,35 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-auto flex flex-col justify-end relative">
-    <div class="p-2">
-      <Card>
-        <div class="flex flex-row justify-between">
-          <div class="flex flex-row md:pt-4">
-            <span class="text-12 me-2">👋 </span>
-            <div>
-              <h3 class="text-lg font-bold">
-                {{ t('dashboard.welcome.title') }}
-              </h3>
+  <div class="w-full">
+    <Card class="welcome-card">
+      <div class="flex flex-row justify-between">
+        <div class="flex flex-row md:pt-4">
+          <span class="text-12 me-2">👋 </span>
+          <div>
+            <h3 class="text-lg font-bold">
+              {{ t('dashboard.welcome.title') }}
+            </h3>
 
-              <p class="description">
-                {{ t('dashboard.welcome.greeting_message') }}
-              </p>
-              <p class="description pt-7">
-                你已来到互助社区
-                <b class="inline-block min-w-12 px-1 text-size-lg">
-                  <n-number-animation show-separator :from="0" :to="daysInCommunity" />
-                </b>
-                天
-              </p>
-            </div>
+            <p class="description">
+              {{ t('dashboard.welcome.greeting_message') }}
+            </p>
+            <p class="description pt-7">
+              你已来到互助社区
+              <b class="inline-block min-w-12 px-1 text-size-lg">
+                <n-number-animation show-separator :from="0" :to="daysInCommunity" />
+              </b>
+              天
+            </p>
           </div>
-          <img src="@/assets/images/3d-female-character-waving.png" width="140px"
-            class="hidden md:block -mt-24 -mb-4 me-6 cursor-pointer">
         </div>
-      </card>
-    </div>
+        <img
+          src="@/assets/images/3d-female-character-waving.png"
+          width="120px"
+          class="hidden md:block -mt-16 -mb-2 me-4 cursor-pointer"
+        >
+      </div>
+    </Card>
   </div>
 </template>
 
@@ -65,5 +66,9 @@ onMounted(() => {
 
 .description{
   font-size: .99rem;
+}
+
+.welcome-card {
+  min-height: 180px;
 }
 </style>

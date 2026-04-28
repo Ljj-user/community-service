@@ -16,6 +16,8 @@ public class ServiceClaimVO {
     private String requestAddress;  // 服务地址
     private Long volunteerUserId;
     private String volunteerName;
+    private String requesterName;
+    private String requesterPhone;
     private LocalDateTime claimAt;
     private Byte claimStatus;
     private BigDecimal serviceHours;

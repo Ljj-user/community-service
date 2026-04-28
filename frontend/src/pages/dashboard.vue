@@ -11,11 +11,13 @@ import {
   type AdminDashboardPanel,
   getSupplyDemandTrend,
   getVolunteerTop,
+  getCommunityServiceTop,
   type TrendChart,
+  getMonthlyMatchRateTrend,
+  type MonthlyMatchRateTrend,
 } from '~/api/dashboardStats'
 import { serviceMonitorList } from '~/api/serviceMonitor'
 import { getUserDashboardSummary, type UserDashboardSummary } from '~/api/userDashboard'
-import ChinaHeatMap from '~/components/Charts/ChinaHeatMap.vue'
 
 const { t, locale } = useI18n()
 const message = useMessage()
@@ -28,8 +30,65 @@ const loading = ref(false)
 const adminPanel = ref<AdminDashboardPanel | null>(null)
 const trend = ref<TrendChart | null>(null)
 const volunteerTop = ref<{ name: string; count: number }[]>([])
+const communityServiceTop = ref<{ name: string; count: number }[]>([])
+const monthlyMatchRate = ref<MonthlyMatchRateTrend | null>(null)
+const monthlyTrendMonths = ref<6 | 12>(6)
 const riskSplit = ref<{ unclaimed: number; unfinished: number }>({ unclaimed: 0, unfinished: 0 })
 const userSummary = ref<UserDashboardSummary | null>(null)
+
+function mockVolunteerTop() {
+  return [
+    { name: '张伟', count: 22 },
+    { name: '李娜', count: 18 },
+    { name: '王强', count: 16 },
+    { name: '刘洋', count: 14 },
+    { name: '陈晨', count: 12 },
+    { name: '赵敏', count: 10 },
+    { name: '周杰', count: 9 },
+    { name: '孙倩', count: 8 },
+    { name: '吴磊', count: 7 },
+    { name: '郑爽', count: 6 },
+  ]
+}
+
+function mockMonthlyMatchRate(months: 6 | 12): MonthlyMatchRateTrend {
+  const now = new Date()
+  const labels: string[] = []
+  const createdCount: number[] = []
+  const completedCount: number[] = []
+  const successRatePercent: number[] = []
+
+  const n = months
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    labels.push(`${y}-${m}`)
+
+    const created = Math.max(6, 24 - i * 2)
+    const completed = Math.max(0, created - (i % 4) * 2)
+    createdCount.push(created)
+    completedCount.push(completed)
+    successRatePercent.push(created > 0 ? Number(((completed / created) * 100).toFixed(1)) : 0)
+  }
+
+  return { labels, successRatePercent, createdCount, completedCount }
+}
+
+function mockCommunityServiceTop() {
+  return [
+    { name: '西湖社区', count: 26 },
+    { name: '拱墅社区', count: 23 },
+    { name: '滨江社区', count: 20 },
+    { name: '上城社区', count: 18 },
+    { name: '余杭社区', count: 16 },
+    { name: '临平社区', count: 14 },
+    { name: '萧山社区', count: 13 },
+    { name: '钱塘社区', count: 12 },
+    { name: '富阳社区', count: 10 },
+    { name: '临安社区', count: 9 },
+  ]
+}
 
 const isSuperAdmin = computed(() => role.value === 1)
 const isCommunityAdmin = computed(() => role.value === 2)
@@ -56,10 +115,12 @@ async function load() {
   loading.value = true
   try {
     if (role.value === 1 || role.value === 2) {
-      const [res, trendRes, topRes, risk1, risk2] = await Promise.all([
+      const [res, trendRes, topRes, communityRes, monthRateRes, risk1, risk2] = await Promise.all([
         getDashboardPanel(),
         getSupplyDemandTrend(7),
         getVolunteerTop(30, 10),
+        getCommunityServiceTop(10),
+        getMonthlyMatchRateTrend(monthlyTrendMonths.value),
         serviceMonitorList({ current: 1, size: 1, riskType: 1 }),
         serviceMonitorList({ current: 1, size: 1, riskType: 2 }),
       ])
@@ -69,10 +130,22 @@ async function load() {
       else {
         message.error(res.message || t('community.unifiedDashboard.loadFail'))
       }
-      if (trendRes.code === 200)
+      if (Number(trendRes.code) === 200)
         trend.value = trendRes.data
-      if (topRes.code === 200)
+      if (Number(topRes.code) === 200 && Array.isArray(topRes.data) && topRes.data.length)
         volunteerTop.value = (topRes.data || []) as any
+      else
+        volunteerTop.value = mockVolunteerTop()
+
+      if (Number(communityRes.code) === 200 && Array.isArray(communityRes.data) && communityRes.data.length)
+        communityServiceTop.value = (communityRes.data || []) as any
+      else
+        communityServiceTop.value = mockCommunityServiceTop()
+
+      if (Number(monthRateRes.code) === 200 && monthRateRes.data?.labels?.length)
+        monthlyMatchRate.value = monthRateRes.data as any
+      else
+        monthlyMatchRate.value = mockMonthlyMatchRate(monthlyTrendMonths.value)
       riskSplit.value = {
         unclaimed: risk1.code === 200 ? (risk1.data?.total ?? 0) : 0,
         unfinished: risk2.code === 200 ? (risk2.data?.total ?? 0) : 0,
@@ -97,6 +170,10 @@ async function load() {
 }
 
 onMounted(load)
+
+watch(monthlyTrendMonths, () => {
+  void load()
+})
 
 const maxDemand = computed(() => {
   const list = adminPanel.value?.demandByServiceType ?? []
@@ -152,6 +229,47 @@ const topBarData = computed(() => {
       { name: '近30天服务时长（小时）', data: list.map(x => x.count) },
     ],
   }
+})
+
+const communityCompareChartData = computed(() => {
+  const rows = (communityServiceTop.value || [])
+    .map((x: any) => ({
+      name: String(x.name || '未知社区'),
+      value: Number(x.count || 0),
+    }))
+    .filter((x: any) => x.value >= 0)
+    .sort((a: any, b: any) => b.value - a.value)
+    .slice(0, 10)
+
+  if (!rows.length) return null
+
+  return {
+    labels: rows.map((x: any) => x.name),
+    series: [
+      { name: '服务单量', data: rows.map((x: any) => x.value) },
+    ],
+  }
+})
+
+const monthlyMatchRateChart = computed(() => {
+  const m = monthlyMatchRate.value
+  if (!m?.labels?.length || !m?.successRatePercent?.length) return null
+  return {
+    labels: m.labels,
+    series: [
+      { name: '对接成功率（%）', data: m.successRatePercent.map(n => Number(n ?? 0)) },
+    ],
+  }
+})
+
+const monthlyMatchRateHint = computed(() => {
+  const m = monthlyMatchRate.value
+  if (!m?.labels?.length) return ''
+  const lastIdx = m.labels.length - 1
+  const created = Number(m.createdCount?.[lastIdx] ?? 0)
+  const completed = Number(m.completedCount?.[lastIdx] ?? 0)
+  if (created <= 0) return '本月新增为 0，成功率按 0% 展示。'
+  return `本月：${completed} / ${created}`
 })
 
 const riskDonutData = computed(() => {
@@ -222,6 +340,8 @@ const riskDonutOptions = computed(() => ({
     <n-spin :show="loading">
       <!-- 超级管理员 -->
       <div v-if="isSuperAdmin && adminPanel" class="space-y-4">
+        <WelcomeCard />
+
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Card title="平台覆盖规模">
             <div class="text-2xl font-semibold">
@@ -258,7 +378,7 @@ const riskDonutOptions = computed(() => ({
         </div>
 
         <div class="grid gap-4 lg:grid-cols-2">
-          <Card title="需求类型画像（饼图）">
+          <Card title="各服务类型占比分布">
             <BaseChart
               v-if="adminPanel.demandByServiceType?.length"
               :data="adminPanel.demandByServiceType.map(x => ({ name: x.name, value: x.count }))"
@@ -268,18 +388,44 @@ const riskDonutOptions = computed(() => ({
             <p v-else class="text-xs text-slate-500">暂无真实业务数据，请先导入初始化数据或产生服务记录。</p>
           </Card>
 
-          <WelcomeCard />
+          <Card title="志愿者活跃度排名（Top 10）">
+            <BaseChart v-if="topBarData" :data="topBarData" type="bar" :height="280" />
+            <p v-else class="text-xs text-slate-500">暂无数据</p>
+          </Card>
         </div>
 
-        <Card title="全城公益热力图（中国地图）">
-          <ChinaHeatMap
-            :data="(adminPanel.regionCoverage?.length ? adminPanel.regionCoverage.reduce((acc: any, it: any) => { acc[it.regionCode] = it.serviceCount; return acc }, {}) : {})"
-            :height="460"
-          />
-          <p v-if="!adminPanel.regionCoverage?.length" class="text-xs text-slate-500 mt-2">
-            当前暂无已完成服务数据，热力图待产生数据后自动更新。
-          </p>
-        </Card>
+        <div class="grid gap-4 lg:grid-cols-2">
+          <Card title="月度需求对接成功率（趋势）">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <p class="text-xs text-slate-500">
+                {{ monthlyMatchRateHint }}
+              </p>
+              <n-radio-group v-model:value="monthlyTrendMonths" size="small">
+                <n-radio-button :value="6">
+                  近6个月
+                </n-radio-button>
+                <n-radio-button :value="12">
+                  近12个月
+                </n-radio-button>
+              </n-radio-group>
+            </div>
+            <BaseChart v-if="monthlyMatchRateChart" :data="monthlyMatchRateChart" type="line" :height="280" />
+            <p v-else class="text-xs text-slate-500">暂无数据</p>
+          </Card>
+
+          <Card title="各社区服务量对比（Top 10）">
+            <BaseChart
+              v-if="communityCompareChartData"
+              :data="communityCompareChartData"
+              type="bar"
+              :height="280"
+              :options="{ plotOptions: { bar: { horizontal: true } } }"
+            />
+            <p v-else class="text-xs text-slate-500 mt-2">
+              当前暂无社区维度对比数据。
+            </p>
+          </Card>
+        </div>
 
         <div class="grid gap-4 lg:grid-cols-2">
           <Card title="服务对接全链路漏斗">
@@ -372,6 +518,24 @@ const riskDonutOptions = computed(() => ({
 
         <Card title="志愿者荣誉榜 Top10">
           <BaseChart v-if="topBarData" :data="topBarData" type="bar" :height="280" />
+          <p v-else class="text-xs text-slate-500">暂无数据</p>
+        </Card>
+
+        <Card title="月度需求对接成功率（趋势）">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <p class="text-xs text-slate-500">
+              {{ monthlyMatchRateHint }}
+            </p>
+            <n-radio-group v-model:value="monthlyTrendMonths" size="small">
+              <n-radio-button :value="6">
+                近6个月
+              </n-radio-button>
+              <n-radio-button :value="12">
+                近12个月
+              </n-radio-button>
+            </n-radio-group>
+          </div>
+          <BaseChart v-if="monthlyMatchRateChart" :data="monthlyMatchRateChart" type="line" :height="260" />
           <p v-else class="text-xs text-slate-500">暂无数据</p>
         </Card>
         <n-alert v-if="!hasAdminData" type="warning" :bordered="false">

@@ -232,11 +232,13 @@ menu:
   globalDashboard: 全局数据看板
   backup: 数据导出与备份
   communityRequests: 需求审核
-  communityVolunteers: 志愿者申请审核
+  communityVolunteers: 志愿者管理
   communityMonitor: 服务过程监控
   communityAnnouncements: 信息发布与公告
   communityInviteCodes: 社区邀请码
   communityBanners: 社区轮播图
+  communityScopedUsers: 辖区用户管理
+  communityAudit: 辖区审计日志
   userResident: 居民工作台
   userVolunteer: 志愿者工作台
   user-announcements: 社区公告
@@ -487,7 +489,7 @@ community:
     cardRequestsTitle: 需求审核
     cardRequestsDesc: 审核居民发布的公益服务需求，进行通过或驳回，并标注紧急程度。
     cardRequestsBtn: 进入需求审核
-    cardVolunteersTitle: 志愿者申请审核
+    cardVolunteersTitle: 志愿者管理
     cardVolunteersDesc: 审核志愿者注册信息与资质，匹配适合的服务领域。
     cardVolunteersBtn: 进入志愿者管理
     cardMonitorTitle: 服务过程监控
@@ -554,7 +556,7 @@ community:
     updateFailed: 更新失败
     deleteFailed: 删除失败
   volunteers:
-    title: 志愿者申请审核
+    title: 志愿者管理
     subtitle: 从用户表中筛选具备志愿者身份的账号，查看资质并进行通过/禁用操作。
     searchUser: 按用户名搜索
     auditStatus: 审核状态
@@ -743,6 +745,7 @@ community:
     opFailed: 操作失败
     btnCancel: 取消
     btnSave: 保存
+    btnTestAi: 测试连通
   audit:
     title: 审核日志与审计
     subtitle: 查看全系统操作日志，按操作人、时间范围、模块筛选，支持异常行为追溯。
@@ -859,10 +862,12 @@ community:
     saveOkBasic: 基础参数保存成功
     saveOkNotice: 通知模板保存成功
     saveOkAlert: 预警规则保存成功
+    saveOkAi: AI 配置保存成功
     btnSave: 保存
     collapseBasic: 一、基础参数
     collapseNotice: 二、通知模板
     collapseAlert: 三、预警规则
+    collapseAi: 四、AI 配置
     cardBusiness: 业务规则
     cardCompliance: 合规风控
     cardA11y: 数字无障碍
@@ -870,6 +875,20 @@ community:
     cardKpi: 核心理标预警
     cardCredit: 居民信用与冻结
     cardAnomaly: 异常预警创新规则
+    cardAi: AI 对话服务
+    aiEnabled: 启用 AI 对话
+    aiEnabledHint: 关闭时将使用内置 FAQ 回退，不会调用外部模型。
+    aiBaseUrl: 模型 Base URL
+    aiBaseUrlHint: 兼容 OpenAI 风格接口（/chat/completions）。
+    aiModel: 模型名称
+    aiModelHint: 例如 deepseek-v4-flash / deepseek-v4-pro 等。
+    aiApiKey: API Key（可选）
+    aiApiKeyPh: 留空表示不修改；填写则更新
+    aiApiKeyHint: 出于安全考虑，页面不会展示旧 key；如需更新请重新输入。
+    aiKeyConfigured: 已配置 Key
+    aiKeyMissing: 未配置 Key
+    aiTestOk: '连通成功：{status}，耗时 {ms}ms'
+    aiTestFail: '连通失败：{status}，{err}'
     pointsPerHour: 积分换算（每小时服务）
     pointsPerHourHint: 服务1小时兑换积分，用于社区食堂、家政抵扣等
     demandClassifyHours: 需求分类标注时效（小时）

@@ -70,19 +70,33 @@ function buildQuery(params?: Record<string, any>) {
   return s ? `?${s}` : ''
 }
 
-export async function evaluationPendingList(params: { current: number; size: number }) {
-  return apiService.get<BackendResult<IPage<ServiceEvaluationPendingVO>>>(`my-pending${buildQuery(params)}`)
+export async function evaluationPendingList(params: {
+  current: number
+  size: number
+}) {
+  return apiService.get<BackendResult<IPage<ServiceEvaluationPendingVO>>>(
+    `my-pending${buildQuery(params)}`,
+  )
 }
 
-export async function evaluationHistoryList(params: { current: number; size: number }) {
-  return apiService.get<BackendResult<IPage<ServiceEvaluationHistoryVO>>>(`my-history${buildQuery(params)}`)
+export async function evaluationHistoryList(params: {
+  current: number
+  size: number
+}) {
+  return apiService.get<BackendResult<IPage<ServiceEvaluationHistoryVO>>>(
+    `my-history${buildQuery(params)}`,
+  )
 }
 
 export async function evaluationCreate(payload: ServiceEvaluationDTO) {
   return apiService.post<BackendResult<null>>('', payload)
 }
 
-export async function evaluationMyReceived(params: { current: number; size: number }) {
-  return apiService.get<BackendResult<IPage<VolunteerEvaluationVO>>>(`my-received${buildQuery(params)}`)
+export async function evaluationMyReceived(params: {
+  current: number
+  size: number
+}) {
+  return apiService.get<BackendResult<IPage<VolunteerEvaluationVO>>>(
+    `my-received${buildQuery(params)}`,
+  )
 }
-

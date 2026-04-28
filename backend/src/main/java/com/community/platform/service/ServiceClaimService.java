@@ -40,5 +40,5 @@ public interface ServiceClaimService {
     /**
      * 获取志愿者的服务记录
      */
-    IPage<ServiceClaimVO> getMyServiceRecords(Long volunteerId, Integer current, Integer size);
+    IPage<ServiceClaimVO> getMyServiceRecords(Long volunteerId, Integer current, Integer size, Byte claimStatus, String sortBy, String sortOrder);
 }

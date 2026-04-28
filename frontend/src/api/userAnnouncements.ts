@@ -45,10 +45,11 @@ function buildQuery(params?: Record<string, any>) {
 }
 
 export async function userAnnouncementList(params: AnnouncementQuery) {
-  return apiService.get<BackendResult<IPage<AnnouncementVO>>>(`list${buildQuery(params)}`)
+  return apiService.get<BackendResult<IPage<AnnouncementVO>>>(
+    `list${buildQuery(params)}`,
+  )
 }
 
 export async function userAnnouncementDetail(id: number) {
   return apiService.get<BackendResult<AnnouncementVO>>(`${id}`)
 }
-

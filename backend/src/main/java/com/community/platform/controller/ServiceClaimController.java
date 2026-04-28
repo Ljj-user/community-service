@@ -119,11 +119,14 @@ public class ServiceClaimController {
     @PreAuthorize("hasRole('USER')")
     public Result<com.baomidou.mybatisplus.core.metadata.IPage<com.community.platform.dto.ServiceClaimVO>> getMyServiceRecords(
             @RequestParam(value = "current", defaultValue = "1") Integer current,
-            @RequestParam(value = "size", defaultValue = "10") Integer size) {
+            @RequestParam(value = "size", defaultValue = "10") Integer size,
+            @RequestParam(value = "claimStatus", required = false) Byte claimStatus,
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "sortOrder", required = false) String sortOrder) {
         try {
             Long volunteerId = getCurrentUserId();
             com.baomidou.mybatisplus.core.metadata.IPage<com.community.platform.dto.ServiceClaimVO> page = 
-                    serviceClaimService.getMyServiceRecords(volunteerId, current, size);
+                    serviceClaimService.getMyServiceRecords(volunteerId, current, size, claimStatus, sortBy, sortOrder);
             return Result.success(page);
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());
