@@ -5,6 +5,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,22 +14,31 @@ import org.springframework.stereotype.Component;
  * 娉ㄦ剰锛氳繖閲屽彧鍋?CREATE TABLE IF NOT EXISTS锛堝箓绛夛級锛屼笉鍋氱牬鍧忔€у彉鏇淬€? */
 @Component
 public class DbBootstrapRunner implements ApplicationRunner {
+    private static final Logger log = LoggerFactory.getLogger(DbBootstrapRunner.class);
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(ApplicationArguments args) {
-        ensurePasswordHashColumn();
-        ensureSysNotification();
-        ensureVerificationAndOnboarding();
-        ensureMatchingTags();
-        ensureCommunityInviteCode();
-        ensureCommunityBanner();
-        ensureAnomalyAlertAndCredit();
-        ensureAiAnalysisRecord();
-        ensureDualEvaluationSchema();
-        ensureRuntimeConfig();
+        runSafely("ensurePasswordHashColumn", this::ensurePasswordHashColumn);
+        runSafely("ensureSysNotification", this::ensureSysNotification);
+        runSafely("ensureVerificationAndOnboarding", this::ensureVerificationAndOnboarding);
+        runSafely("ensureMatchingTags", this::ensureMatchingTags);
+        runSafely("ensureCommunityInviteCode", this::ensureCommunityInviteCode);
+        runSafely("ensureCommunityBanner", this::ensureCommunityBanner);
+        runSafely("ensureAnomalyAlertAndCredit", this::ensureAnomalyAlertAndCredit);
+        runSafely("ensureAiAnalysisRecord", this::ensureAiAnalysisRecord);
+        runSafely("ensureDualEvaluationSchema", this::ensureDualEvaluationSchema);
+        runSafely("ensureRuntimeConfig", this::ensureRuntimeConfig);
+    }
+
+    private void runSafely(String stepName, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception ex) {
+            log.warn("Db bootstrap step failed: {}", stepName, ex);
+        }
     }
 
     private void ensurePasswordHashColumn() {
@@ -295,7 +306,8 @@ public class DbBootstrapRunner implements ApplicationRunner {
             try {
                 jdbcTemplate.execute("ALTER TABLE service_evaluation DROP INDEX uk_eval_claim");
             } catch (DataAccessException ex) {
-                // 鍘嗗彶搴撳彲鑳藉瓨鍦ㄢ€滃閿緷璧栧悓鍚嶇储寮曗€濈殑鍦烘櫙锛屾鏃惰烦杩囧垹闄わ紝淇濊瘉搴旂敤鍙惎鍔?            }
+                // 历史库可能存在外键依赖同名索引的场景，此时跳过删除，保证应用可启动。
+            }
         }
 
         Integer hasNewUk = jdbcTemplate.queryForObject("""
