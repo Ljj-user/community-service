@@ -31,9 +31,13 @@ public class MyBatisPlusCodeGenerator {
                 "DB_URL",
                 "jdbc:mysql://localhost:3306/community_service?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
         );
-        String dbUsername = envOrDefault("DB_USERNAME", "root");
+        String dbUsername = envOrDefault("DB_USERNAME", "");
         // 默认密码按你当前本地环境设置；可通过环境变量覆盖
-        String dbPassword = envOrDefault("DB_PASSWORD", "123456");
+        String dbPassword = envOrDefault("DB_PASSWORD", "");
+
+        if (dbUsername.isBlank() || dbPassword.isBlank()) {
+            throw new IllegalStateException("Please set DB_USERNAME and DB_PASSWORD before running the generator.");
+        }
 
         String backendDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath().toString();
         String javaOutDir = Paths.get(backendDir, "src", "main", "java").toString();

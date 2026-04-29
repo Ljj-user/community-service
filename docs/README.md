@@ -1,20 +1,20 @@
 # 项目文档索引
 
-本目录集中存放**毕设 / 论文 / 开题**相关说明与导出文件；代码模块自带的 `README.md`（如 `frontend/README.md`）仍保留在各子项目内。
+本目录集中存放项目研究资料、系统设计说明与导出文件；代码模块自带的 `README.md`（如 `frontend/README.md`）仍保留在各子项目内。
 
 ## 目录说明
 
 | 路径 | 内容 |
 |------|------|
-| `论文与开题/` | 开题报告 Markdown、Word（如有）、流程图等**附图**（`assets/`） |
+| `研究资料/` | 项目背景说明 Markdown、Word（如有）、流程图等附图（`assets/`） |
 | `系统设计/` | 系统架构与功能设想、需求可行性优先级分析等 |
 | `导出-Word用/` | 供 Word 打开的 HTML / 配套 txt、pdf 等导出件 |
 | `../backend/docs/` | **数据库设计**说明、ER 用 DBML、精简 SQL（与后端同仓，便于对照 `schema.sql`） |
-| `../backend/src/main/resources/db/README-ER与论文资料.md` | 数据库论文资料入口说明 |
+| `../backend/src/main/resources/db/README-ER-notes.md` | 数据库设计资料入口说明 |
 
 ## 常用文件
 
-- 开题与流程图：`论文与开题/开题报告.md`（图片在 `论文与开题/assets/`）
+- 项目背景与流程图：`研究资料/项目背景说明.md`（图片在 `研究资料/assets/`）
 - 系统架构说明：`系统设计/系统架构与功能初步设计.md`
 - 需求优先级表：`系统设计/需求可行性优先级分析.md`
 - 架构 Word 导出：`导出-Word用/系统架构与功能初步设计-Word用.html`

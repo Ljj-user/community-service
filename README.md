@@ -76,17 +76,17 @@ DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 ```sql
 USE community_service;
-SOURCE E:/code/毕设/社区公益服务对接管理平台/data.sql;
+SOURCE backend/src/main/resources/db/schema_v2_prd.sql;
 ```
 
 #### 1.3 导入测试数据（可选）
 
 ```sql
 USE community_service;
-SOURCE E:/code/毕设/社区公益服务对接管理平台/Temp_data.sql;
+SOURCE backend/src/main/resources/db/min_demo_data_v2.sql;
 ```
 
-**测试账号（密码均为 `123456`）：**
+**测试账号（口令已脱敏，请在本地初始化时自行设置）：**
 
 - `admin` - 超级管理员
 - `manager` - 社区管理员
@@ -103,8 +103,8 @@ SOURCE E:/code/毕设/社区公益服务对接管理平台/Temp_data.sql;
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/community_service?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456  # 修改为你的 MySQL 密码
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 ```
 
 #### 2.2 启动后端服务
@@ -316,7 +316,7 @@ cd backend
 
 ## 项目说明
 
-本项目严格按照 `docs/论文与开题/开题报告.md` 中的业务逻辑实现，包含以下创新点：
+本项目严格按照 `docs/研究资料/项目背景说明.md` 中的业务逻辑实现，包含以下创新点：
 
 1. **AI 智能匹配**：基于协同过滤算法的需求-志愿者匹配
 2. **智能监管**：需求趋势预测，资源储备建议
@@ -359,7 +359,7 @@ cd backend
 
 ## 开发规范
 
-- 所有代码生成严格遵循 `docs/论文与开题/开题报告.md` 中的业务逻辑
+- 所有代码生成严格遵循 `docs/研究资料/项目背景说明.md` 中的业务逻辑
 - 数据库采用逻辑删除（`is_deleted` 字段）
 - 密码加密使用 MD5（按需求文档技术选型）
 - 统一使用 `Result<T>` 作为 API 响应格式
@@ -409,7 +409,7 @@ cd backend
 ### MySQL 连接失败
 
 - 检查 MySQL 服务是否启动：`Get-Service MySQL80`
-- 确认数据库密码是否正确（默认 `123456`）
+- 确认数据库凭据是否通过环境变量正确注入
 - 检查 `application-dev.yml` 中的数据库配置
 - 如果忘记密码，可通过 `--init-file` 方式重置（参考项目历史记录）
 

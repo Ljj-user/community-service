@@ -10,10 +10,9 @@ import type { LoginViewModel } from '~/models/Account'
 const { t } = useI18n()
 const accountStore = useAccountStore()
 const { isLoading, user } = storeToRefs(accountStore)
-// 对齐后端测试账号：默认 admin / 123456
 const loginInfo = ref<LoginViewModel>({
-  username: 'admin',
-  password: '123456',
+  username: '',
+  password: '',
 })
 const loginFailed = ref(false)
 const router = useRouter()

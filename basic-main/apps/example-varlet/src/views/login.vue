@@ -39,8 +39,7 @@ const onSubmit = form.handleSubmit((values) => {
 
 function testAccount(account: string) {
   form.setFieldValue('account', account)
-  form.setFieldValue('password', '123456')
-  onSubmit()
+  form.setFieldValue('password', '')
 }
 </script>
 

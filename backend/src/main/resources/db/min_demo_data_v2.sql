@@ -1,5 +1,5 @@
 -- 社区公益服务对接管理平台 - PRD v2 最小演示数据
--- 密码均为 123456，兼容 HybridPasswordEncoder 的历史 MD5。
+-- 演示账号口令已脱敏，请在本地初始化说明中自行配置。
 
 USE community_service;
 SET NAMES utf8mb4;
