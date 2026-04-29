@@ -136,14 +136,6 @@ function onGotoVolunteer() {
   router.push('/volunteer-certification')
 }
 
-function onGotoMyRequests() {
-  router.push({ path: '/hall', query: { tab: 'published' } })
-}
-
-function onGotoMyServices() {
-  router.push({ path: '/hall', query: { tab: 'joined' } })
-}
-
 function onGotoConvenience() {
   router.push('/convenience-info')
 }

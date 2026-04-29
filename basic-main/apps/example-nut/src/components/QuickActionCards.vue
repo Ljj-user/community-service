@@ -78,12 +78,12 @@ function emitOrNavigate(type: 'publish' | 'help' | 'myRequest' | 'myService' | '
     return
   }
   if (type === 'myRequest') {
-    if (isHomePage.value) return router.push({ path: '/hall', query: { tab: 'published' } })
+    if (isHomePage.value) return router.push('/my-requests')
     emit('myRequest')
     return
   }
   if (type === 'myService') {
-    if (isHomePage.value) return router.push({ path: '/hall', query: { tab: 'joined' } })
+    if (isHomePage.value) return router.push('/my-services')
     emit('myService')
     return
   }
