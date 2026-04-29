@@ -27,7 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 移动端加入/改绑社区（邀请码/扫码，无审核）
+ * 移动端加入社区（邀请码/扫码，提交后由管理员审核）
  */
 @RestController
 @RequestMapping("/community")
@@ -84,27 +84,31 @@ public class CommunityJoinController {
                 return Result.error("邀请码对应社区不存在");
             }
 
-            int inc = jdbcTemplate.update(
-                    "UPDATE community_invite_code SET used_count=used_count+1, updated_at=NOW(3) " +
-                            "WHERE id=? AND status=1 AND (expires_at IS NULL OR expires_at>NOW(3)) AND used_count < max_uses",
-                    row.id
+            Integer pending = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM community_join_application WHERE user_id=? AND status=0",
+                    Integer.class, userId
             );
-            if (inc <= 0) {
-                return Result.error("邀请码已被用尽或不可用");
+            if (pending != null && pending > 0) {
+                return Result.error("已有待审核的社区加入申请，请等待管理员审核");
             }
 
-            // 改绑/绑定：直接覆盖 sys_user.community_id
+            jdbcTemplate.update(
+                    "INSERT INTO community_join_application(user_id,community_id,invite_code,real_name,phone,address,status,created_at,updated_at) " +
+                            "SELECT id,?, ?, real_name, phone, address, 0, NOW(3), NOW(3) FROM sys_user WHERE id=? AND is_deleted=0",
+                    row.communityId, code, userId
+            );
+
             int updated = jdbcTemplate.update(
-                    "UPDATE sys_user SET community_id=?, updated_at=NOW(3) WHERE id=? AND is_deleted=0",
-                    row.communityId, userId
+                    "UPDATE sys_user SET community_join_status=1, updated_at=NOW(3) WHERE id=? AND is_deleted=0",
+                    userId
             );
             if (updated <= 0) {
                 throw new RuntimeException("用户不存在或已被删除");
             }
 
-            return Result.success("社区绑定成功", authService.getUserInfoById(userId));
+            return Result.success("申请已提交，请等待社区管理员审核", authService.getUserInfoById(userId));
         } catch (Exception e) {
-            return Result.error("绑定失败: " + e.getMessage());
+            return Result.error("提交失败: " + e.getMessage());
         }
     }
 

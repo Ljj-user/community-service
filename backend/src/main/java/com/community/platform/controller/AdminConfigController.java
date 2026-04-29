@@ -65,4 +65,15 @@ public class AdminConfigController {
     public Result<Map<String, Object>> testAi(@RequestBody Map<String, Object> data) {
         return Result.success(adminConfigService.testAi(data));
     }
+
+    @GetMapping("/runtime")
+    public Result<Map<String, Object>> getRuntime() {
+        return Result.success(adminConfigService.getRuntime());
+    }
+
+    @PutMapping("/runtime")
+    public Result<Void> saveRuntime(@RequestBody Map<String, Object> data) {
+        adminConfigService.saveRuntime(data);
+        return Result.success("运行态配置保存成功", null);
+    }
 }

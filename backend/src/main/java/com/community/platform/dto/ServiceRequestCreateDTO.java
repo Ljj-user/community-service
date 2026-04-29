@@ -44,4 +44,9 @@ public class ServiceRequestCreateDTO {
      * 特殊人群/需求标签（如独居老人、残障等）
      */
     private List<String> specialTags;
+
+    /**
+     * AI 分析记录ID（可选）
+     */
+    private Long aiAnalysisRecordId;
 }

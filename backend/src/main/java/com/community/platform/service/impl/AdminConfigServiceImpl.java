@@ -33,6 +33,7 @@ public class AdminConfigServiceImpl implements AdminConfigService {
     private static final String KEY_NOTICE = "notice";
     private static final String KEY_ALERT = "alert";
     private static final String KEY_AI = "ai";
+    private static final String KEY_RUNTIME = "runtime";
     private static final String AI_FIELD_API_KEY = "apiKey";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final HttpClient AI_HTTP = HttpClient.newBuilder()
@@ -196,6 +197,17 @@ public class AdminConfigServiceImpl implements AdminConfigService {
             out.put("error", e.getMessage() == null ? "未知错误" : e.getMessage());
             return out;
         }
+    }
+
+    @Override
+    public Map<String, Object> getRuntime() {
+        return getConfig(KEY_RUNTIME);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveRuntime(Map<String, Object> data) {
+        saveConfig(KEY_RUNTIME, data);
     }
 
     private static String pickString(Map<String, Object> data, String key, String def) {

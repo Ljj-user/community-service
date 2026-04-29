@@ -23,6 +23,7 @@ import com.community.platform.service.UserNotificationService;
 import com.community.platform.util.SubsidyUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +60,9 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
     @Autowired
     private VolunteerCreditService volunteerCreditService;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Override
     @Transactional
     public void claimService(Long volunteerId, ServiceClaimDTO dto) {
@@ -70,6 +74,13 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         
         if (volunteer.getRole() != Constants.ROLE_NORMAL_USER) {
             throw new RuntimeException("只有普通用户可以认领服务");
+        }
+        Integer certified = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM volunteer_profile WHERE user_id=? AND cert_status=2",
+                Integer.class, volunteerId
+        );
+        if (certified == null || certified <= 0) {
+            throw new RuntimeException("请先完成志愿者认证后再接单");
         }
         
         // 查询需求

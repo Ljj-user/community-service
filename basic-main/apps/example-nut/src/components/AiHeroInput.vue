@@ -162,20 +162,20 @@ function toggleVoice() {
     0 1px 0 rgba(255, 255, 255, 0.18) inset;
 }
 
-::global(.dark) .hero-pill {
+:global(.dark) .hero-pill {
   background: rgba(17, 24, 39, 0.86);
   border-color: rgba(148, 163, 184, 0.24);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.06) inset,
     0 8px 16px rgba(0, 0, 0, 0.3);
 }
-::global(.dark) .hero-field {
+:global(.dark) .hero-field {
   color: rgba(243, 244, 246, 0.92);
 }
-::global(.dark) .hero-field::placeholder {
+:global(.dark) .hero-field::placeholder {
   color: rgba(156, 163, 175, 0.92);
 }
-:::global(.dark) .hero-mic {
+:global(.dark) .hero-mic {
   background: rgba(16, 185, 129, 0.12);
   color: rgba(167, 243, 208, 0.88);
 }

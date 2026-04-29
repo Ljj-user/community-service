@@ -43,3 +43,11 @@ export async function configSaveAi(data: Record<string, unknown>) {
 export async function configTestAi(data: Record<string, unknown>) {
   return apiService.post<BackendResult<Record<string, unknown>>>('config/ai/test', data)
 }
+
+export async function configGetRuntime() {
+  return apiService.get<BackendResult<Record<string, unknown>>>('config/runtime')
+}
+
+export async function configSaveRuntime(data: Record<string, unknown>) {
+  return apiService.put<BackendResult<null>>('config/runtime', data)
+}

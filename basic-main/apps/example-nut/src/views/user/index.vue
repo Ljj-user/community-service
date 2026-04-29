@@ -90,8 +90,16 @@ function onGotoTask() {
   router.push({ path: '/hall-overview', query: { kind: 'in-progress' } })
 }
 
+function onGotoVolunteerCert() {
+  router.push('/volunteer-certification')
+}
+
 function onGotoMall() {
   router.push('/mall-404')
+}
+
+function onGotoConvenience() {
+  router.push('/convenience-info')
 }
 
 function onGotoEdit() {
@@ -167,7 +175,15 @@ onMounted(loadProfile)
         </div>
       </section>
 
-      <ProfileQuickActions class="profile-actions" @improve="onEditProfile" @task="onGotoTask" @edit="onGotoEdit" @mall="onGotoMall" />
+      <ProfileQuickActions
+        class="profile-actions"
+        @improve="onEditProfile"
+        @task="onGotoTask"
+        @volunteer="onGotoVolunteerCert"
+        @edit="onGotoEdit"
+        @mall="onGotoMall"
+        @convenience="onGotoConvenience"
+      />
 
       <button type="button" class="logout-btn" @click="appAuthStore.logout()">
         <FmIcon name="mdi:logout" />

@@ -387,8 +387,8 @@ onMounted(() => {
 
 .safe-space { height: 118px; }
 
-::global(.dark) .field-shell { background: rgba(17, 24, 39, 0.62); }
-::global(.dark) .field-input { color: #f3f4f6; }
-::global(.dark) .pill-btn.ghost { background: rgba(17, 24, 39, 0.62); color: #e5e7eb; }
+:global(.dark) .field-shell { background: rgba(17, 24, 39, 0.62); }
+:global(.dark) .field-input { color: #f3f4f6; }
+:global(.dark) .pill-btn.ghost { background: rgba(17, 24, 39, 0.62); color: #e5e7eb; }
 </style>
 

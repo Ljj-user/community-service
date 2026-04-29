@@ -23,6 +23,7 @@ import {
   Eye20Regular,
 } from '@vicons/fluent'
 import { computed, h, resolveComponent } from 'vue'
+import CenteredPreviewModal from '~/components/shared/CenteredPreviewModal.vue'
 import { dtActionBtn, dtActionRowClass } from '~/utils/dataTableActions'
 
 const { t, locale } = useI18n()
@@ -344,100 +345,50 @@ onMounted(() => {
       />
     </Card>
 
-    <n-drawer v-model:show="showDrawer" :width="520" placement="right">
-      <n-drawer-content :title="t('community.requests.drawerTitle')" closable>
-        <n-spin :show="detailLoading">
-          <template v-if="detail">
-            <div class="space-y-4 text-sm">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <div class="text-slate-500 mb-1">
-                    {{ t('community.requests.colStatus') }}
-                  </div>
-                  <n-tag :type="statusTagType(detail.status)" size="small">
-                    {{ statusText(detail.status) }}
-                  </n-tag>
-                </div>
-                <div>
-                  <div class="text-slate-500 mb-1">
-                    {{ t('community.requests.colUrgency') }}
-                  </div>
-                  <n-tag :type="urgencyTagType(detail.urgencyLevel)" size="small">
-                    {{ urgencyText(detail.urgencyLevel) }}
-                  </n-tag>
-                </div>
-              </div>
+    <CenteredPreviewModal
+      v-model:show="showDrawer"
+      :title="detail?.serviceType || t('community.requests.drawerTitle')"
+      subtitle="需求审核与详情预览"
+    >
+      <template #meta>
+        <n-tag v-if="detail" :type="statusTagType(detail.status)" :bordered="false">{{ statusText(detail.status) }}</n-tag>
+        <n-tag v-if="detail" :type="urgencyTagType(detail.urgencyLevel)" :bordered="false">{{ urgencyText(detail.urgencyLevel) }}</n-tag>
+        <n-tag v-if="detail?.communityName" :bordered="false">{{ detail.communityName }}</n-tag>
+      </template>
 
-              <div>
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.colServiceType') }}
-                </div>
-                <div>{{ detail.serviceType }}</div>
-              </div>
-              <div>
-                <div class="text-slate-500 mb-1">
-                  所属社区
-                </div>
-                <div>{{ detail.communityName || '-' }}</div>
-              </div>
-              <div>
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.labelServiceAddr') }}
-                </div>
-                <div>{{ detail.serviceAddress }}</div>
-              </div>
-              <div v-if="detail.expectedTime">
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.labelExpectedTime') }}
-                </div>
-                <div>{{ new Date(detail.expectedTime).toLocaleString(dateLocale()) }}</div>
-              </div>
-              <div v-if="detail.requesterName">
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.colResident') }}
-                </div>
-                <div>{{ detail.requesterName }}</div>
-              </div>
-              <div v-if="detail.specialTags?.length">
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.specialTags') }}
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <n-tag v-for="tag in detail.specialTags" :key="tag" size="small">
-                    {{ tag }}
-                  </n-tag>
-                </div>
-              </div>
-              <div v-if="detail.description">
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.description') }}
-                </div>
-                <div class="whitespace-pre-wrap break-words">
-                  {{ detail.description }}
-                </div>
-              </div>
-              <div v-if="detail.status === 4 && detail.rejectReason">
-                <div class="text-slate-500 mb-1">
-                  {{ t('community.requests.rejectLabel') }}
-                </div>
-                <div class="text-red-500 whitespace-pre-wrap break-words">
-                  {{ detail.rejectReason }}
-                </div>
-              </div>
-
-              <div v-if="detail.status === 0" class="pt-2 flex gap-2 justify-end">
-                <n-button type="error" ghost @click="openReject(detail)">
-                  {{ t('community.requests.reject') }}
-                </n-button>
-                <n-button type="success" @click="approve(detail)">
-                  {{ t('community.requests.approvePublish') }}
-                </n-button>
-              </div>
+      <n-spin :show="detailLoading">
+        <template v-if="detail">
+          <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <div class="grid gap-3 md:grid-cols-2 text-sm">
+              <div><span class="text-slate-500">居民：</span>{{ detail.requesterName || '-' }}</div>
+              <div><span class="text-slate-500">期望时间：</span>{{ detail.expectedTime ? new Date(detail.expectedTime).toLocaleString(dateLocale()) : '-' }}</div>
+              <div><span class="text-slate-500">服务地址：</span>{{ detail.serviceAddress || '-' }}</div>
+              <div><span class="text-slate-500">所属社区：</span>{{ detail.communityName || '-' }}</div>
             </div>
-          </template>
-        </n-spin>
-      </n-drawer-content>
-    </n-drawer>
+          </div>
+          <div v-if="detail.specialTags?.length" class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <div class="mb-2 text-sm font-semibold">{{ t('community.requests.specialTags') }}</div>
+            <div class="flex flex-wrap gap-2">
+              <n-tag v-for="tag in detail.specialTags" :key="tag" size="small">{{ tag }}</n-tag>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <div class="mb-2 text-sm font-semibold">{{ t('community.requests.description') }}</div>
+            <div class="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700 dark:text-slate-200">{{ detail.description || '暂无描述' }}</div>
+          </div>
+          <div v-if="detail.status === 4 && detail.rejectReason" class="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 dark:border-rose-900 dark:bg-rose-950/30">
+            <div class="mb-2 text-sm font-semibold text-rose-600 dark:text-rose-300">{{ t('community.requests.rejectLabel') }}</div>
+            <div class="whitespace-pre-wrap break-words text-sm text-rose-600 dark:text-rose-200">{{ detail.rejectReason }}</div>
+          </div>
+        </template>
+      </n-spin>
+
+      <template #footer>
+        <n-button @click="showDrawer = false">{{ t('common.cancel') }}</n-button>
+        <n-button v-if="detail?.status === 0" type="error" ghost @click="openReject(detail)">{{ t('community.requests.reject') }}</n-button>
+        <n-button v-if="detail?.status === 0" type="success" @click="approve(detail)">{{ t('community.requests.approvePublish') }}</n-button>
+      </template>
+    </CenteredPreviewModal>
 
     <n-modal v-model:show="rejectModal" preset="card" :title="t('community.requests.rejectModalTitle')" style="width: 560px">
       <n-form ref="rejectFormRef" :model="rejectForm" :rules="rejectRules" label-placement="top">

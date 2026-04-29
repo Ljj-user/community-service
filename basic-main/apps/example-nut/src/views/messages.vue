@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { getMyAiRecords, markAiRecordApplied, type AiAnalysisRecord } from '@/api/modules/ai'
+import { listUserAnnouncements, type AnnouncementVO } from '@/api/modules/announcements'
 import MainTopBar from '@/components/MainTopBar.vue'
 import ThreeSectionPage from '@/components/ThreeSectionPage.vue'
+import { saveAiDemandDraft } from '@/utils/aiDraft'
 
 definePage({
   meta: {
@@ -14,6 +17,10 @@ const appAuthStore = useAppAuthStore()
 const resolvedCommunityName = computed(() => appAuthStore.user?.communityName || '未绑定社区')
 const headerDistance = computed(() => (appAuthStore.user?.communityName ? '已绑定' : '去绑定'))
 
+const loading = ref(false)
+const aiRows = ref<AiAnalysisRecord[]>([])
+const announcements = ref<AnnouncementVO[]>([])
+
 function onOpenAi() {
   router.push('/ai-assistant')
 }
@@ -22,43 +29,59 @@ function onChangeCommunity() {
   router.push('/join-community')
 }
 
-const importantNotices = [
-  {
-    icon: 'mdi:robot-outline',
-    title: 'AI 助手提醒',
-    desc: '你有 2 条服务建议可查看',
-    time: '刚刚',
-    accent: 'ai',
-  },
-  {
-    icon: 'mdi:bullhorn-outline',
-    title: '社区公告',
-    desc: '本周六上午 9 点开展便民活动',
-    time: '10 分钟前',
-    accent: 'notice',
-  },
-] as const
+function fmtTime(v?: string) {
+  if (!v) return '刚刚'
+  return v.replace('T', ' ').slice(5, 16)
+}
 
-const chats = [
-  {
-    name: '张阿姨',
-    avatar: 'https://picsum.photos/seed/chat-a/120/120',
-    text: '孩子，周末有空帮我看下电灯吗？',
-    time: '12:20',
-  },
-  {
-    name: '李叔',
-    avatar: 'https://picsum.photos/seed/chat-b/120/120',
-    text: '谢谢你上次送药，辛苦啦。',
-    time: '昨天',
-  },
-  {
-    name: '社区管家',
-    avatar: 'https://picsum.photos/seed/chat-c/120/120',
-    text: '你提交的志愿记录已通过。',
-    time: '周五',
-  },
-] as const
+function parseDraft(row: AiAnalysisRecord) {
+  try {
+    const parsed = JSON.parse(String(row.resultJson || '{}'))
+    return parsed?.orderDraft || null
+  }
+  catch {
+    return null
+  }
+}
+
+async function loadData() {
+  loading.value = true
+  try {
+    const [aiRes, annRes] = await Promise.all([
+      getMyAiRecords(1, 6),
+      listUserAnnouncements(1, 6),
+    ])
+    aiRows.value = (aiRes.data?.records || []).filter(x => x.resultMode === 'DEMAND_DRAFT')
+    announcements.value = annRes.data?.records || []
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+async function continueDraft(row: AiAnalysisRecord) {
+  const draft = parseDraft(row)
+  if (!draft) {
+    router.push('/ai-assistant')
+    return
+  }
+  saveAiDemandDraft({
+    analysisRecordId: row.id,
+    inputText: row.inputText,
+    draft,
+  })
+  try {
+    await markAiRecordApplied(row.id)
+  }
+  catch {}
+  router.push('/hall-publish')
+}
+
+function openAnnouncement(item: AnnouncementVO) {
+  router.push({ path: '/notices', query: { id: String(item.id) } })
+}
+
+onMounted(loadData)
 </script>
 
 <template>
@@ -74,48 +97,76 @@ const chats = [
         />
       </template>
 
-      <label class="search-wrap">
-        <FmIcon name="mdi:magnify" />
-        <input type="text" placeholder="搜索联系人或消息">
-      </label>
-
       <section class="section">
         <div class="section-title">
-          <h3>重要通知</h3>
-          <span>查看全部</span>
+          <h3>AI 助手提醒</h3>
+          <span @click="router.push('/ai-assistant')">去对话</span>
         </div>
         <article
-          v-for="n in importantNotices"
-          :key="n.title"
-          class="notice-card"
+          v-for="item in aiRows"
+          :key="`ai-${item.id}`"
+          class="notice-card clickable"
+          @click="continueDraft(item)"
         >
-          <span class="notice-icon" :class="`accent-${n.accent}`">
-            <FmIcon :name="n.icon" />
+          <span class="notice-icon accent-ai">
+            <FmIcon name="mdi:robot-outline" />
           </span>
           <span class="notice-main">
-            <b>{{ n.title }}</b>
-            <small>{{ n.desc }}</small>
+            <b>草稿已生成</b>
+            <small>{{ item.inputText || '有一条可继续填写的求助草稿' }}</small>
           </span>
-          <time>{{ n.time }}</time>
+          <time>{{ fmtTime(item.createdAt) }}</time>
         </article>
+        <div v-if="!loading && !aiRows.length" class="empty-hint">
+          还没有新的 AI 提醒
+        </div>
       </section>
 
       <section class="section">
         <div class="section-title">
-          <h3>邻里会话</h3>
-          <span class="section-note">演示</span>
+          <h3>社区公告</h3>
+          <span @click="router.push('/notices')">查看全部</span>
         </div>
         <article
-          v-for="chat in chats"
-          :key="chat.name"
-          class="chat-card"
+          v-for="item in announcements"
+          :key="`ann-${item.id}`"
+          class="notice-card clickable"
+          @click="openAnnouncement(item)"
         >
-          <img :src="chat.avatar" :alt="chat.name">
-          <span class="chat-main">
-            <b>{{ chat.name }}</b>
-            <small>{{ chat.text }}</small>
+          <span class="notice-icon accent-notice">
+            <FmIcon name="mdi:bullhorn-outline" />
           </span>
-          <time>{{ chat.time }}</time>
+          <span class="notice-main">
+            <b>{{ item.title }}</b>
+            <small>{{ item.publisherName || '社区发布' }}</small>
+          </span>
+          <time>{{ fmtTime(item.publishedAt || item.createdAt) }}</time>
+        </article>
+        <div v-if="!loading && !announcements.length" class="empty-hint">
+          当前没有新的公告
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h3>最近会话</h3>
+          <span class="section-note">演示</span>
+        </div>
+        <article class="chat-card">
+          <img src="https://picsum.photos/seed/chat-a/120/120" alt="社区管家">
+          <span class="chat-main">
+            <b>社区管家</b>
+            <small>私信功能本轮不做，这里保留展示位。</small>
+          </span>
+          <time>演示</time>
+        </article>
+        <article class="chat-card">
+          <img src="https://picsum.photos/seed/chat-b/120/120" alt="邻里互助">
+          <span class="chat-main">
+            <b>邻里互助</b>
+            <small>接单、完成、评价消息已经并入真实业务流。</small>
+          </span>
+          <time>演示</time>
         </article>
       </section>
 
@@ -130,62 +181,39 @@ const chats = [
   background:
     radial-gradient(120% 84% at 50% -10%, #fafcfb 0%, #f4f7f6 62%, #eff3f2 100%);
 }
+
 .msg-content {
   padding: 10px 12px 0;
   display: grid;
   gap: 14px;
   align-content: start;
 }
-.search-wrap {
-  width: 100%;
-  height: 46px;
-  border-radius: 16px;
-  margin-bottom: 6px;
-  background: color-mix(in srgb, #ffffff 86%, transparent);
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 10px 22px rgba(15, 23, 42, 0.08);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  color: #9ca3af;
-}
-.search-wrap input {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  color: #111827;
-}
+
 .section {
   display: grid;
   gap: 8px;
 }
-.section + .section {
-  margin-top: 6px;
-}
+
 .section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 2px;
 }
+
 .section-title h3 {
   margin: 0;
   font-size: 17px;
   font-weight: 800;
   color: #111827;
 }
+
 .section-title span {
   font-size: 12px;
   font-weight: 700;
   color: #16a34a;
 }
+
 .section-note {
   font-size: 11px;
   font-weight: 800;
@@ -195,6 +223,7 @@ const chats = [
   color: #047857;
   border: 1px solid rgba(16, 185, 129, 0.22);
 }
+
 .notice-card,
 .chat-card {
   border-radius: 16px;
@@ -206,6 +235,7 @@ const chats = [
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
     0 10px 22px rgba(15, 23, 42, 0.08);
 }
+
 .notice-card {
   padding: 10px 12px;
   display: grid;
@@ -213,6 +243,11 @@ const chats = [
   align-items: center;
   gap: 10px;
 }
+
+.clickable {
+  cursor: pointer;
+}
+
 .notice-icon {
   width: 32px;
   height: 32px;
@@ -222,75 +257,79 @@ const chats = [
   justify-content: center;
   font-size: 18px;
 }
+
 .accent-ai {
   background: #eefbf2;
   color: #16a34a;
 }
+
 .accent-notice {
   background: #f4f6f8;
-  color: #4b5563;
+  color: #334155;
 }
-.notice-main,
-.chat-main {
-  display: grid;
+
+.notice-main {
   min-width: 0;
+  display: grid;
+  gap: 4px;
 }
-.notice-main b,
+
+.notice-main b {
+  font-size: 14px;
+  color: #111827;
+}
+
+.notice-main small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.notice-card time,
+.chat-card time {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.chat-card {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-card img {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+.chat-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
 .chat-main b {
   font-size: 14px;
   color: #111827;
 }
-.notice-main small,
+
 .chat-main small {
   font-size: 12px;
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.notice-card time,
-.chat-card time {
-  font-size: 11px;
-  color: #9ca3af;
-}
-.chat-card {
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-  cursor: default;
-}
-.chat-card img {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  object-fit: cover;
-}
-.safe-space {
-  height: 24px;
+  line-height: 1.45;
+  color: #64748b;
 }
 
-:global(.dark) .msg-page {
-  background: #111827;
-}
-:global(.dark) .search-wrap,
-:global(.dark) .notice-card,
-:global(.dark) .chat-card {
-  background: color-mix(in srgb, #1f2937 84%, transparent);
-  border-color: #374151;
-}
-:global(.dark) .search-wrap input,
-:global(.dark) .section-title h3,
-:global(.dark) .notice-main b,
-:global(.dark) .chat-main b {
-  color: #f3f4f6;
-}
-:global(.dark) .notice-main small,
-:global(.dark) .chat-main small,
-:global(.dark) .notice-card time,
-:global(.dark) .chat-card time {
-  color: #9ca3af;
+.empty-hint {
+  border-radius: 14px;
+  padding: 14px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
 }
 </style>
-

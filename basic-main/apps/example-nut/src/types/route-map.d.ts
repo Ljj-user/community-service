@@ -48,6 +48,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/convenience-info': RouteRecordInfo<
+      '/convenience-info',
+      '/convenience-info',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     'forgot-password': RouteRecordInfo<
       'forgot-password',
       '/forgot-password',
@@ -160,6 +167,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    'volunteer-certification': RouteRecordInfo<
+      'volunteer-certification',
+      '/volunteer-certification',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -188,6 +202,12 @@ declare module 'vue-router/auto-routes' {
     'src/views/ai-assistant.vue': {
       routes:
         | '/ai-assistant'
+      views:
+        | never
+    }
+    'src/views/convenience-info.vue': {
+      routes:
+        | '/convenience-info'
       views:
         | never
     }
@@ -284,6 +304,12 @@ declare module 'vue-router/auto-routes' {
     'src/views/user/index.vue': {
       routes:
         | '/user/'
+      views:
+        | never
+    }
+    'src/views/volunteer-certification.vue': {
+      routes:
+        | 'volunteer-certification'
       views:
         | never
     }

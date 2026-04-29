@@ -80,14 +80,14 @@ async function loadData() {
     const bound = appAuthStore.user?.communityName
     if (bound && communityOptions.includes(bound))
       noticeCommunity.value = bound
-    const [bannerRes, annRes] = await Promise.all([
+    const [bannerResult, annResult] = await Promise.allSettled([
       listBanners(),
       listUserAnnouncements(1, 30),
     ])
     // 若用户快速切换分类/刷新，只应用最后一次请求结果
     if (seq !== loadSeq) return
-    if (bannerRes.code === 200 && Array.isArray(bannerRes.data)) {
-      const mapped = (bannerRes.data as BannerVO[])
+    if (bannerResult.status === 'fulfilled' && bannerResult.value.code === 200 && Array.isArray(bannerResult.value.data)) {
+      const mapped = (bannerResult.value.data as BannerVO[])
         .filter(x => x && x.title)
         .map(x => ({ id: x.id, title: x.title, sub: x.subtitle || '' }))
       bannerList.value = mapped.length ? mapped : bannerFallback
@@ -95,8 +95,8 @@ async function loadData() {
     else {
       bannerList.value = bannerFallback
     }
-    if (annRes.code === 200)
-      announcementRows.value = annRes.data.records || []
+    if (annResult.status === 'fulfilled' && annResult.value.code === 200)
+      announcementRows.value = annResult.value.data.records || []
     else
       announcementRows.value = []
   }
@@ -130,6 +130,22 @@ function onGotoHelp() {
 
 function onGotoPublish() {
   router.push('/hall-publish')
+}
+
+function onGotoVolunteer() {
+  router.push('/volunteer-certification')
+}
+
+function onGotoMyRequests() {
+  router.push({ path: '/hall', query: { tab: 'published' } })
+}
+
+function onGotoMyServices() {
+  router.push({ path: '/hall', query: { tab: 'joined' } })
+}
+
+function onGotoConvenience() {
+  router.push('/convenience-info')
 }
 
 function heroStyle(id: number) {
@@ -234,8 +250,14 @@ onMounted(loadData)
           help-sub="浏览并帮助他人"
           publish-title="我有难处"
           publish-sub="一键发布求助"
+          volunteer-title="志愿者认证"
+          volunteer-sub="通过后再接单"
+          convenience-title="便民信息"
+          convenience-sub="电话、药店、地址"
           @help="onGotoHelp"
           @publish="onGotoPublish"
+          @volunteer="onGotoVolunteer"
+          @convenience="onGotoConvenience"
         />
 
         <!-- 底部：AI 输入框 -->

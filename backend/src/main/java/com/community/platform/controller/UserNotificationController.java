@@ -37,9 +37,9 @@ public class UserNotificationController {
 
     @GetMapping("/mine")
     public Result<IPage<UserNotificationVO>> mine(
-            @RequestParam(required = false) Byte category,
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size) {
+            @RequestParam(value = "category", required = false) Byte category,
+            @RequestParam(value = "page", defaultValue = "1") long page,
+            @RequestParam(value = "size", defaultValue = "20") long size) {
         return Result.success(userNotificationService.pageMine(currentUserId(), category, page, size));
     }
 
@@ -48,9 +48,9 @@ public class UserNotificationController {
      */
     @GetMapping("/mobile/alerts")
     public Result<IPage<MobileAlertCardVO>> mobileAlerts(
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size,
-            @RequestParam(required = false) Boolean unreadOnly) {
+            @RequestParam(value = "page", defaultValue = "1") long page,
+            @RequestParam(value = "size", defaultValue = "20") long size,
+            @RequestParam(value = "unreadOnly", required = false) Boolean unreadOnly) {
         return Result.success(userNotificationService.pageMyAlertNotifications(currentUserId(), page, size, unreadOnly));
     }
 
@@ -63,13 +63,13 @@ public class UserNotificationController {
     }
 
     @PutMapping("/{id}/read")
-    public Result<Void> markRead(@PathVariable Long id) {
+    public Result<Void> markRead(@PathVariable("id") Long id) {
         userNotificationService.markRead(currentUserId(), id);
         return Result.success("已标记已读", null);
     }
 
     @PutMapping("/mark-all-read")
-    public Result<Void> markAllRead(@RequestParam(required = false) Byte category) {
+    public Result<Void> markAllRead(@RequestParam(value = "category", required = false) Byte category) {
         userNotificationService.markAllRead(currentUserId(), category);
         return Result.success("已全部标记已读", null);
     }

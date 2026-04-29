@@ -15,6 +15,7 @@ import { NTag, useMessage } from 'naive-ui'
 import { serviceMonitorList, type ServiceMonitorItem } from '~/api/serviceMonitor'
 import { adminCommunityOptions } from '~/api/adminCommunity'
 import httpClient from '~/common/api/http-client'
+import CenteredPreviewModal from '~/components/shared/CenteredPreviewModal.vue'
 import { dtActionBtn, dtActionRowClass } from '~/utils/dataTableActions'
 
 const { t, locale } = useI18n()
@@ -321,61 +322,51 @@ onMounted(() => {
       />
     </Card>
 
-    <n-drawer v-model:show="detailVisible" :width="420">
-      <n-drawer-content :title="`${t('community.monitor.detailTitle')} #${currentRow?.requestId ?? ''}`">
-        <div v-if="currentRow" class="space-y-2 text-sm">
-          <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-3 mb-2">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-slate-500">状态编码</span>
-              <n-tag :type="currentRow.status === 4 ? 'error' : 'info'" size="small" :bordered="false">
-                {{ statusCodeText(currentRow.status) }}
-              </n-tag>
-            </div>
-            <n-steps :current="statusStepIndex(currentRow.status)" size="small">
-              <n-step title="发布" />
-              <n-step title="审核" />
-              <n-step title="进行中" />
-              <n-step title="完成" />
-            </n-steps>
+    <CenteredPreviewModal
+      v-model:show="detailVisible"
+      :title="`${t('community.monitor.detailTitle')} #${currentRow?.requestId ?? ''}`"
+      subtitle="服务风险、过程状态与建议动作"
+      :width="920"
+    >
+      <template #meta>
+        <n-tag v-if="currentRow" :type="currentRow.riskType === 1 ? 'warning' : 'error'" :bordered="false">{{ renderRiskType(currentRow.riskType) }}</n-tag>
+        <n-tag v-if="currentRow" :bordered="false">{{ statusCodeText(currentRow.status) }}</n-tag>
+      </template>
+      <div v-if="currentRow" class="grid gap-4">
+        <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">服务进度</span>
+            <span class="text-xs text-slate-500">社区：{{ currentRow.communityName || '-' }}</span>
           </div>
-          <div>
-            <span class="text-slate-500">所属社区：</span>{{ currentRow.communityName ? `${currentRow.communityName}（${currentRow.communityId ?? '-'}）` : '-' }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelServiceType') }}：</span>{{ currentRow.serviceType }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelAddress') }}：</span>{{ currentRow.serviceAddress }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelExpected') }}：</span>{{ formatDateTime(currentRow.expectedTime) }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelUrgency') }}：</span>{{ renderUrgency(currentRow.urgencyLevel) }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelRequester') }}：</span>{{ currentRow.requesterName }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelVolunteer') }}：</span>{{ currentRow.volunteerName || t('community.monitor.volunteerNone') }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelStatus') }}：</span>{{ renderRiskType(currentRow.riskType) }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelRule') }}：</span>{{ currentRow.triggerRule || '-' }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelAdvice') }}：</span>{{ currentRow.suggestionAction || '-' }}
-          </div>
-          <div>
-            <span class="text-slate-500">{{ t('community.monitor.labelOvertime') }}：</span>{{ currentRow.overtimeMinutes }} {{ t('community.monitor.minutes') }}
-          </div>
-          <div v-if="currentRow.rating">
-            <span class="text-slate-500">{{ t('community.monitor.labelRating') }}：</span>{{ currentRow.rating }} {{ t('community.monitor.stars') }}
+          <n-steps :current="statusStepIndex(currentRow.status)" size="small">
+            <n-step title="发布" />
+            <n-step title="审核" />
+            <n-step title="进行中" />
+            <n-step title="完成" />
+          </n-steps>
+        </div>
+        <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div class="grid gap-3 md:grid-cols-2 text-sm">
+            <div><span class="text-slate-500">服务类型：</span>{{ currentRow.serviceType || '-' }}</div>
+            <div><span class="text-slate-500">紧急程度：</span>{{ renderUrgency(currentRow.urgencyLevel) }}</div>
+            <div><span class="text-slate-500">居民：</span>{{ currentRow.requesterName || '-' }}</div>
+            <div><span class="text-slate-500">志愿者：</span>{{ currentRow.volunteerName || t('community.monitor.volunteerNone') }}</div>
+            <div><span class="text-slate-500">期望时间：</span>{{ formatDateTime(currentRow.expectedTime) }}</div>
+            <div><span class="text-slate-500">超时：</span>{{ currentRow.overtimeMinutes }} {{ t('community.monitor.minutes') }}</div>
+            <div class="md:col-span-2"><span class="text-slate-500">服务地址：</span>{{ currentRow.serviceAddress || '-' }}</div>
           </div>
         </div>
-      </n-drawer-content>
-    </n-drawer>
+        <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div class="mb-2 text-sm font-semibold">规则说明</div>
+          <div class="whitespace-pre-wrap text-sm leading-7 text-slate-700 dark:text-slate-200">{{ currentRow.triggerRule || '-' }}</div>
+          <div class="mt-4 mb-2 text-sm font-semibold">建议动作</div>
+          <div class="whitespace-pre-wrap text-sm leading-7 text-slate-700 dark:text-slate-200">{{ currentRow.suggestionAction || '-' }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <n-button @click="detailVisible = false">关闭</n-button>
+        <n-button type="warning" @click="currentRow && handleRemind(currentRow)">{{ t('community.monitor.actionRemind') }}</n-button>
+      </template>
+    </CenteredPreviewModal>
   </div>
 </template>

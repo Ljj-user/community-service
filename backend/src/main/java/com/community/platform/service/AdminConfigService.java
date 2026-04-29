@@ -20,4 +20,7 @@ public interface AdminConfigService {
     void saveAi(Map<String, Object> data);
 
     Map<String, Object> testAi(Map<String, Object> data);
+
+    Map<String, Object> getRuntime();
+    void saveRuntime(Map<String, Object> data);
 }

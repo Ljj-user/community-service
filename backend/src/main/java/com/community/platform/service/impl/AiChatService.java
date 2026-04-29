@@ -1,13 +1,16 @@
 package com.community.platform.service.impl;
 
 import com.community.platform.dto.AiChatResponseVO;
+import com.community.platform.dto.AiAnalysisRecordVO;
 import com.community.platform.dto.AiOrderDraftVO;
 import com.community.platform.dto.AiChatRequest;
+import com.community.platform.dto.PageResult;
 import com.community.platform.generated.entity.SysConfig;
 import com.community.platform.generated.mapper.SysConfigMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 @Service
 public class AiChatService {
@@ -43,6 +47,9 @@ public class AiChatService {
 
     @Autowired(required = false)
     private SysConfigMapper sysConfigMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -95,28 +102,28 @@ public class AiChatService {
         return "";
     }
 
-    public AiChatResponseVO chat(String message, List<AiChatRequest.HistoryMessage> history) {
+    public AiChatResponseVO chat(Long userId, String message, List<AiChatRequest.HistoryMessage> history) {
         AiRuntimeConfig cfg = runtimeConfig();
         String text = message == null ? "" : message.trim();
         if (text.isEmpty()) {
             throw new RuntimeException("消息不能为空");
         }
         if (looksLikeDateTimeQuestion(text)) {
-            return buildDateTimeAnswer();
+            return storeRecord(userId, text, buildDateTimeAnswer(), "mobile_assistant");
         }
         if (looksLikeModelQuestion(text)) {
-            return buildModelAnswer(cfg);
+            return storeRecord(userId, text, buildModelAnswer(cfg), "mobile_assistant");
         }
         if (looksLikeDemand(text)) {
-            return buildDemandDraft(text);
+            return storeRecord(userId, text, buildDemandDraft(text), "mobile_assistant");
         }
         if (cfg.enabled && cfg.apiKey != null && !cfg.apiKey.isBlank()) {
             AiChatResponseVO byModel = callModelForFaq(text, history);
             if (byModel != null) {
-                return byModel;
+                return storeRecord(userId, text, byModel, "mobile_assistant");
             }
         }
-        return buildFaqFallback(text);
+        return storeRecord(userId, text, buildFaqFallback(text), "mobile_assistant");
     }
 
     private boolean looksLikeDemand(String text) {
@@ -187,6 +194,31 @@ public class AiChatService {
         vo.setOrderDraft(draft);
         vo.setReply("我已根据你的描述生成需求草稿，你可以一键创建订单。");
         return vo;
+    }
+
+    private AiChatResponseVO storeRecord(Long userId, String inputText, AiChatResponseVO response, String scene) {
+        if (userId == null || response == null) return response;
+        try {
+            Long communityId = jdbcTemplate.queryForObject(
+                    "SELECT community_id FROM sys_user WHERE id=? LIMIT 1",
+                    Long.class,
+                    userId
+            );
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("mode", response.getMode());
+            result.put("reply", response.getReply());
+            result.put("orderDraft", response.getOrderDraft());
+            String resultJson = objectMapper.writeValueAsString(result);
+            jdbcTemplate.update("""
+                    INSERT INTO ai_analysis_record(user_id, community_id, scene, input_text, result_mode, result_json, applied_to_form, submitted_success, created_at, updated_at)
+                    VALUES(?,?,?,?,?,?,0,0,NOW(3),NOW(3))
+                    """, userId, communityId, scene, inputText, response.getMode(), resultJson);
+            Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+            response.setAnalysisRecordId(id);
+        } catch (Exception ignored) {
+            // AI 记录失败不能影响主链路
+        }
+        return response;
     }
 
     private String detectServiceType(String text) {
@@ -349,5 +381,161 @@ public class AiChatService {
         String baseUrl;
         String model;
         String apiKey;
+    }
+
+    public PageResult<AiAnalysisRecordVO> listMine(Long userId, long page, long size) {
+        long offset = Math.max(0, page - 1) * size;
+        Integer total = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM ai_analysis_record WHERE user_id=?",
+                Integer.class,
+                userId
+        );
+        List<AiAnalysisRecordVO> rows = jdbcTemplate.query("""
+                SELECT a.id,
+                       a.user_id AS userId,
+                       u.username,
+                       u.real_name AS realName,
+                       a.community_id AS communityId,
+                       r.name AS communityName,
+                       a.scene,
+                       a.input_text AS inputText,
+                       a.result_mode AS resultMode,
+                       CAST(a.result_json AS CHAR) AS resultJson,
+                       a.applied_to_form AS appliedToForm,
+                       a.submitted_success AS submittedSuccess,
+                       DATE_FORMAT(a.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt
+                FROM ai_analysis_record a
+                LEFT JOIN sys_user u ON u.id=a.user_id
+                LEFT JOIN sys_region r ON r.id=a.community_id
+                WHERE a.user_id=?
+                ORDER BY a.id DESC
+                LIMIT ? OFFSET ?
+                """, (rs, rowNum) -> {
+            AiAnalysisRecordVO vo = new AiAnalysisRecordVO();
+            vo.setId(rs.getLong("id"));
+            vo.setUserId(rs.getLong("userId"));
+            vo.setUsername(rs.getString("username"));
+            vo.setRealName(rs.getString("realName"));
+            vo.setCommunityId(toLong(rs.getObject("communityId")));
+            vo.setCommunityName(rs.getString("communityName"));
+            vo.setScene(rs.getString("scene"));
+            vo.setInputText(rs.getString("inputText"));
+            vo.setResultMode(rs.getString("resultMode"));
+            vo.setResultJson(rs.getString("resultJson"));
+            vo.setAppliedToForm(rs.getInt("appliedToForm"));
+            vo.setSubmittedSuccess(rs.getInt("submittedSuccess"));
+            vo.setCreatedAt(rs.getString("createdAt"));
+            return vo;
+        }, userId, size, offset);
+        return PageResult.of(rows, total == null ? 0 : total, page, size);
+    }
+
+    public void markApplied(Long userId, Long id) {
+        int affected = jdbcTemplate.update("""
+                UPDATE ai_analysis_record
+                SET applied_to_form=1, updated_at=NOW(3)
+                WHERE id=? AND user_id=?
+                """, id, userId);
+        if (affected <= 0) throw new RuntimeException("AI 记录不存在或无权限");
+    }
+
+    public void markSubmitted(Long userId, Long id) {
+        if (id == null) return;
+        jdbcTemplate.update("""
+                UPDATE ai_analysis_record
+                SET applied_to_form=1, submitted_success=1, updated_at=NOW(3)
+                WHERE id=? AND user_id=?
+                """, id, userId);
+    }
+
+    public PageResult<AiAnalysisRecordVO> listAdmin(long page, long size) {
+        long offset = Math.max(0, page - 1) * size;
+        Integer total = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM ai_analysis_record", Integer.class);
+        List<AiAnalysisRecordVO> rows = jdbcTemplate.query("""
+                SELECT a.id,
+                       a.user_id AS userId,
+                       u.username,
+                       u.real_name AS realName,
+                       a.community_id AS communityId,
+                       r.name AS communityName,
+                       a.scene,
+                       a.input_text AS inputText,
+                       a.result_mode AS resultMode,
+                       CAST(a.result_json AS CHAR) AS resultJson,
+                       a.applied_to_form AS appliedToForm,
+                       a.submitted_success AS submittedSuccess,
+                       DATE_FORMAT(a.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt
+                FROM ai_analysis_record a
+                LEFT JOIN sys_user u ON u.id=a.user_id
+                LEFT JOIN sys_region r ON r.id=a.community_id
+                ORDER BY a.id DESC
+                LIMIT ? OFFSET ?
+                """, (rs, rowNum) -> {
+            AiAnalysisRecordVO vo = new AiAnalysisRecordVO();
+            vo.setId(rs.getLong("id"));
+            vo.setUserId(rs.getLong("userId"));
+            vo.setUsername(rs.getString("username"));
+            vo.setRealName(rs.getString("realName"));
+            vo.setCommunityId(toLong(rs.getObject("communityId")));
+            vo.setCommunityName(rs.getString("communityName"));
+            vo.setScene(rs.getString("scene"));
+            vo.setInputText(rs.getString("inputText"));
+            vo.setResultMode(rs.getString("resultMode"));
+            vo.setResultJson(rs.getString("resultJson"));
+            vo.setAppliedToForm(rs.getInt("appliedToForm"));
+            vo.setSubmittedSuccess(rs.getInt("submittedSuccess"));
+            vo.setCreatedAt(rs.getString("createdAt"));
+            return vo;
+        }, size, offset);
+        return PageResult.of(rows, total == null ? 0 : total, page, size);
+    }
+
+    public AiAnalysisRecordVO detailAdmin(Long id) {
+        List<AiAnalysisRecordVO> rows = jdbcTemplate.query("""
+                SELECT a.id,
+                       a.user_id AS userId,
+                       u.username,
+                       u.real_name AS realName,
+                       a.community_id AS communityId,
+                       r.name AS communityName,
+                       a.scene,
+                       a.input_text AS inputText,
+                       a.result_mode AS resultMode,
+                       CAST(a.result_json AS CHAR) AS resultJson,
+                       a.applied_to_form AS appliedToForm,
+                       a.submitted_success AS submittedSuccess,
+                       DATE_FORMAT(a.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt
+                FROM ai_analysis_record a
+                LEFT JOIN sys_user u ON u.id=a.user_id
+                LEFT JOIN sys_region r ON r.id=a.community_id
+                WHERE a.id=?
+                LIMIT 1
+                """, (rs, rowNum) -> {
+            AiAnalysisRecordVO vo = new AiAnalysisRecordVO();
+            vo.setId(rs.getLong("id"));
+            vo.setUserId(rs.getLong("userId"));
+            vo.setUsername(rs.getString("username"));
+            vo.setRealName(rs.getString("realName"));
+            vo.setCommunityId(toLong(rs.getObject("communityId")));
+            vo.setCommunityName(rs.getString("communityName"));
+            vo.setScene(rs.getString("scene"));
+            vo.setInputText(rs.getString("inputText"));
+            vo.setResultMode(rs.getString("resultMode"));
+            vo.setResultJson(rs.getString("resultJson"));
+            vo.setAppliedToForm(rs.getInt("appliedToForm"));
+            vo.setSubmittedSuccess(rs.getInt("submittedSuccess"));
+            vo.setCreatedAt(rs.getString("createdAt"));
+            return vo;
+        }, id);
+        if (rows.isEmpty()) throw new RuntimeException("AI 记录不存在");
+        return rows.get(0);
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number number) return number.longValue();
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) return null;
+        return Long.parseLong(text);
     }
 }

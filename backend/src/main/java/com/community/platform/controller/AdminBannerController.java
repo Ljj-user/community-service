@@ -18,14 +18,15 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * 管理端：轮播图管理（社区管理员/系统管理员）
+ * Admin banner compatibility API. The menu is hidden, but keeping the endpoint
+ * prevents old routes from failing while the product scope is being reduced.
  */
 @RestController
 @RequestMapping("/admin/banner")
@@ -59,26 +60,40 @@ public class AdminBannerController {
             Long scope = resolveScope(op, req.getCommunityId());
             if (req.getId() == null) {
                 jdbcTemplate.update(
-                        "INSERT INTO community_banner(community_id,title,subtitle,image_url,link_url,sort_no,status,created_by,created_at,updated_at) " +
-                                "VALUES(?,?,?,?,?,?,?, ?, NOW(3), NOW(3))",
-                        scope, req.getTitle().trim(), trimOrNull(req.getSubtitle()),
-                        trimOrNull(req.getImageUrl()), trimOrNull(req.getLinkUrl()),
-                        req.getSortNo(), req.getStatus(), op.userId
+                        """
+                        INSERT INTO community_banner(community_id,title,image_url,link_url,sort_no,status,created_at,updated_at)
+                        VALUES(?,?,?,?,?,?,NOW(3),NOW(3))
+                        """,
+                        scope,
+                        req.getTitle().trim(),
+                        trimOrNull(req.getImageUrl()),
+                        trimOrNull(req.getLinkUrl()),
+                        req.getSortNo(),
+                        req.getStatus()
                 );
             } else {
-                // 限制社区管理员只能改本社区 banner
                 Integer cnt = jdbcTemplate.queryForObject(
                         "SELECT COUNT(1) FROM community_banner WHERE id=? AND ((? IS NULL AND community_id IS NULL) OR community_id=?)",
-                        Integer.class, req.getId(), scope, scope
+                        Integer.class,
+                        req.getId(),
+                        scope,
+                        scope
                 );
                 if (cnt == null || cnt <= 0) {
                     return Result.error("记录不存在或无权限");
                 }
                 jdbcTemplate.update(
-                        "UPDATE community_banner SET title=?, subtitle=?, image_url=?, link_url=?, sort_no=?, status=?, updated_at=NOW(3) WHERE id=?",
-                        req.getTitle().trim(), trimOrNull(req.getSubtitle()),
-                        trimOrNull(req.getImageUrl()), trimOrNull(req.getLinkUrl()),
-                        req.getSortNo(), req.getStatus(), req.getId()
+                        """
+                        UPDATE community_banner
+                        SET title=?, image_url=?, link_url=?, sort_no=?, status=?, updated_at=NOW(3)
+                        WHERE id=?
+                        """,
+                        req.getTitle().trim(),
+                        trimOrNull(req.getImageUrl()),
+                        trimOrNull(req.getLinkUrl()),
+                        req.getSortNo(),
+                        req.getStatus(),
+                        req.getId()
                 );
             }
             return Result.success("保存成功", null);
@@ -89,13 +104,17 @@ public class AdminBannerController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
-    public Result<Void> delete(@PathVariable("id") Long id, @RequestParam(value = "communityId", required = false) Long communityId) {
+    public Result<Void> delete(@PathVariable("id") Long id,
+                               @RequestParam(value = "communityId", required = false) Long communityId) {
         try {
             Operator op = currentOperator();
             Long scope = resolveScope(op, communityId);
             Integer cnt = jdbcTemplate.queryForObject(
                     "SELECT COUNT(1) FROM community_banner WHERE id=? AND ((? IS NULL AND community_id IS NULL) OR community_id=?)",
-                    Integer.class, id, scope, scope
+                    Integer.class,
+                    id,
+                    scope,
+                    scope
             );
             if (cnt == null || cnt <= 0) {
                 return Result.error("记录不存在或无权限");
@@ -126,7 +145,7 @@ public class AdminBannerController {
 
         File uploadRoot = new File(bannerUploadDir).getAbsoluteFile();
         if (!uploadRoot.exists() && !uploadRoot.mkdirs()) {
-            return Result.error("上传失败：无法创建目录");
+            return Result.error("上传失败: 无法创建目录");
         }
         File dest = new File(uploadRoot, filename);
         try {
@@ -137,16 +156,19 @@ public class AdminBannerController {
 
         String base = bannerBaseUrl == null ? "/static/banner/" : bannerBaseUrl.trim();
         if (!base.endsWith("/")) base = base + "/";
-        String imageUrl = base + filename;
-        return Result.success(Map.of("imageUrl", imageUrl));
+        return Result.success(Map.of("imageUrl", base + filename));
     }
 
     private List<BannerVO> query(Long scopeCommunityId) {
         return jdbcTemplate.query(
-                "SELECT b.id,b.community_id,r.name AS community_name,b.title,b.subtitle,b.image_url,b.link_url FROM community_banner b " +
-                        "LEFT JOIN sys_region r ON r.id=b.community_id " +
-                        "WHERE ((? IS NULL AND b.community_id IS NULL) OR b.community_id=?) " +
-                        "ORDER BY sort_no ASC, id ASC LIMIT 50",
+                """
+                SELECT b.id,b.community_id,r.name AS community_name,b.title,b.image_url,b.link_url
+                FROM community_banner b
+                LEFT JOIN sys_region r ON r.id=b.community_id
+                WHERE ((? IS NULL AND b.community_id IS NULL) OR b.community_id=?)
+                ORDER BY sort_no ASC, id ASC
+                LIMIT 50
+                """,
                 (rs, rowNum) -> {
                     BannerVO vo = new BannerVO();
                     vo.setId(rs.getLong("id"));
@@ -154,12 +176,13 @@ public class AdminBannerController {
                     vo.setCommunityId(cid);
                     vo.setCommunityName(rs.getString("community_name"));
                     vo.setTitle(rs.getString("title"));
-                    vo.setSubtitle(rs.getString("subtitle"));
+                    vo.setSubtitle("社区公益服务");
                     vo.setImageUrl(rs.getString("image_url"));
                     vo.setLinkUrl(rs.getString("link_url"));
                     return vo;
                 },
-                scopeCommunityId, scopeCommunityId
+                scopeCommunityId,
+                scopeCommunityId
         );
     }
 
@@ -170,14 +193,13 @@ public class AdminBannerController {
     }
 
     private static Long resolveScope(Operator op, Long requested) {
-        if (op.role != null && op.role == Constants.ROLE_COMMUNITY_ADMIN) {
+        if (Constants.ROLE_COMMUNITY_ADMIN.equals(op.role)) {
             if (op.communityId == null) throw new RuntimeException("当前社区管理员未绑定社区");
             if (requested != null && !requested.equals(op.communityId)) {
                 throw new RuntimeException("社区管理员只能管理本社区轮播图");
             }
             return op.communityId;
         }
-        // 超管：requested 可为 null（全局默认）
         return requested;
     }
 
@@ -199,4 +221,3 @@ public class AdminBannerController {
         Long communityId;
     }
 }
-

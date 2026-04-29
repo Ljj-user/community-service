@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { createServiceRequest } from '@/api/modules/serviceRequests'
 import { toast } from 'vue-sonner'
+import { clearAiDemandDraft, loadAiDemandDraft } from '@/utils/aiDraft'
 
 definePage({
   meta: {
@@ -119,8 +120,11 @@ async function submit() {
       emergencyContactPhone: form.emergencyContactPhone.trim(),
       emergencyContactRelation: form.emergencyContactRelation.trim() || undefined,
       expectedTime: plusHours(2),
+      specialTags: loadAiDemandDraft()?.draft.tags,
+      aiAnalysisRecordId: loadAiDemandDraft()?.analysisRecordId,
     })
     if (res.code !== 200) throw new Error(res.message || '发布失败')
+    clearAiDemandDraft()
     toast.success('发布成功，已提交审核')
     router.back()
   }
@@ -141,7 +145,21 @@ onMounted(async () => {
   const u = appAuthStore.user
   if (!form.serviceAddress.trim()) form.serviceAddress = (u?.communityName || u?.address || '').trim()
   if (!form.emergencyContactName.trim()) form.emergencyContactName = (u?.realName || u?.username || '').trim()
-  resetTemplate()
+  const draft = loadAiDemandDraft()
+  if (draft?.draft) {
+    form.serviceType = (draft.draft.serviceType as any) || form.serviceType
+    form.urgencyLevel = Number(draft.draft.urgencyLevel || form.urgencyLevel)
+    if (draft.draft.expectedTime) {
+      // 仅展示草稿生成的目标时间说明，由正式提交时重新按当前表单生成 expectedTime
+    }
+    if (draft.draft.description?.trim()) {
+      form.description = draft.draft.description
+    } else {
+      resetTemplate()
+    }
+  } else {
+    resetTemplate()
+  }
 })
 </script>
 

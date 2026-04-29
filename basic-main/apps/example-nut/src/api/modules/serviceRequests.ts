@@ -61,6 +61,7 @@ export interface ServiceRequestCreateDTO {
   emergencyContactPhone?: string
   emergencyContactRelation?: string
   specialTags?: string[]
+  aiAnalysisRecordId?: number
 }
 
 export function getPublishedRequests(current = 1, size = 10, serviceType?: string) {

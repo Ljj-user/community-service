@@ -590,20 +590,20 @@ async function onSubmit() {
   margin-left: 4px;
 }
 
-::global(.dark) .register-page { background: #111827; }
-::global(.dark) .identity-card,
-::global(.dark) .mode-btn,
-::global(.dark) .form-card,
-::global(.dark) .field-input,
-::global(.dark) .skill-block,
-::global(.dark) .skill-chip { background: rgba(17, 24, 39, 0.62); border-color: rgba(148, 163, 184, 0.20); }
-::global(.dark) .field-input { color: #f3f4f6; }
-::global(.dark) :deep(.field-label) { color: #cbd5e1; }
-::global(.dark) .identity-name,
-::global(.dark) .top-title,
-::global(.dark) .headline h1 { color: #f3f4f6; }
-::global(.dark) .headline p,
-::global(.dark) .section-title,
-::global(.dark) .login-row { color: #9ca3af; }
+:global(.dark) .register-page { background: #111827; }
+:global(.dark) .identity-card,
+:global(.dark) .mode-btn,
+:global(.dark) .form-card,
+:global(.dark) .field-input,
+:global(.dark) .skill-block,
+:global(.dark) .skill-chip { background: rgba(17, 24, 39, 0.62); border-color: rgba(148, 163, 184, 0.20); }
+:global(.dark) .field-input { color: #f3f4f6; }
+:global(.dark) :deep(.field-label) { color: #cbd5e1; }
+:global(.dark) .identity-name,
+:global(.dark) .top-title,
+:global(.dark) .headline h1 { color: #f3f4f6; }
+:global(.dark) .headline p,
+:global(.dark) .section-title,
+:global(.dark) .login-row { color: #9ca3af; }
 </style>
 

@@ -9,5 +9,6 @@ public class AiChatResponseVO {
      */
     private String mode;
     private String reply;
+    private Long analysisRecordId;
     private AiOrderDraftVO orderDraft;
 }

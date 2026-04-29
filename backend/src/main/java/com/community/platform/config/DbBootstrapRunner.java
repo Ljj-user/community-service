@@ -8,10 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * 运行期兜底：当本机数据库未执行 init_all.sql 时，确保关键表存在，避免启动即报错。
- *
- * 注意：这里只做 CREATE TABLE IF NOT EXISTS（幂等），不做破坏性变更。
- */
+ * 杩愯鏈熷厹搴曪細褰撴湰鏈烘暟鎹簱鏈墽琛?init_all.sql 鏃讹紝纭繚鍏抽敭琛ㄥ瓨鍦紝閬垮厤鍚姩鍗虫姤閿欍€? *
+ * 娉ㄦ剰锛氳繖閲屽彧鍋?CREATE TABLE IF NOT EXISTS锛堝箓绛夛級锛屼笉鍋氱牬鍧忔€у彉鏇淬€? */
 @Component
 public class DbBootstrapRunner implements ApplicationRunner {
 
@@ -24,11 +22,12 @@ public class DbBootstrapRunner implements ApplicationRunner {
         ensureSysNotification();
         ensureVerificationAndOnboarding();
         ensureMatchingTags();
-        ensureMutualAidPostAndBarter();
         ensureCommunityInviteCode();
         ensureCommunityBanner();
         ensureAnomalyAlertAndCredit();
+        ensureAiAnalysisRecord();
         ensureDualEvaluationSchema();
+        ensureRuntimeConfig();
     }
 
     private void ensurePasswordHashColumn() {
@@ -46,7 +45,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
         if (cnt != null && cnt > 0) {
             jdbcTemplate.execute("""
                     ALTER TABLE sys_user
-                    MODIFY COLUMN password_md5 VARCHAR(100) NOT NULL COMMENT '密码哈希（字段名沿用；兼容历史MD5与当前BCrypt）'
+                    MODIFY COLUMN password_md5 VARCHAR(100) NOT NULL COMMENT '瀵嗙爜鍝堝笇锛堝瓧娈靛悕娌跨敤锛涘吋瀹瑰巻鍙睲D5涓庡綋鍓岯Crypt锛?
                     """);
         }
     }
@@ -54,19 +53,19 @@ public class DbBootstrapRunner implements ApplicationRunner {
     private void ensureSysNotification() {
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS sys_notification (
-                  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-                  recipient_user_id BIGINT UNSIGNED NOT NULL COMMENT '接收人用户ID',
-                  title             VARCHAR(200)     NOT NULL COMMENT '标题',
-                  summary           VARCHAR(500)     NULL COMMENT '摘要',
-                  msg_category      TINYINT UNSIGNED NOT NULL COMMENT '1业务待办 2系统公告',
-                  read_status       TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0未读 1已读',
-                  ref_type          VARCHAR(32)      NULL COMMENT '关联业务类型',
-                  ref_id            BIGINT UNSIGNED  NULL COMMENT '关联业务主键',
-                  created_at        DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+                  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '涓婚敭',
+                  recipient_user_id BIGINT UNSIGNED NOT NULL COMMENT '鎺ユ敹浜虹敤鎴稩D',
+                  title             VARCHAR(200)     NOT NULL COMMENT '鏍囬',
+                  summary           VARCHAR(500)     NULL COMMENT '鎽樿',
+                  msg_category      TINYINT UNSIGNED NOT NULL COMMENT '1涓氬姟寰呭姙 2绯荤粺鍏憡',
+                  read_status       TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0鏈 1宸茶',
+                  ref_type          VARCHAR(32)      NULL COMMENT '鍏宠仈涓氬姟绫诲瀷',
+                  ref_id            BIGINT UNSIGNED  NULL COMMENT '鍏宠仈涓氬姟涓婚敭',
+                  created_at        DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '鍒涘缓鏃堕棿',
                   PRIMARY KEY (id),
                   KEY idx_notif_user_read (recipient_user_id, read_status),
                   KEY idx_notif_user_cat_time (recipient_user_id, msg_category, created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='站内消息通知';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='绔欏唴娑堟伅閫氱煡';
                 """);
     }
 
@@ -84,7 +83,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                   INDEX idx_verify_target_scene (target, scene),
                   INDEX idx_verify_expire (expires_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='验证码票据表';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='楠岃瘉鐮佺エ鎹〃';
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS user_onboarding_profile (
@@ -94,7 +93,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   intent_note VARCHAR(500) NULL,
                   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户引导问卷主表';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='鐢ㄦ埛寮曞闂嵎涓昏〃';
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS user_onboarding_answer (
@@ -105,7 +104,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                   INDEX idx_onboarding_answer_user (user_id),
                   INDEX idx_onboarding_answer_key (question_key)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户引导问卷答案表';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='鐢ㄦ埛寮曞闂嵎绛旀琛?;
                 """);
     }
 
@@ -118,7 +117,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                   UNIQUE KEY uk_user_skill (user_id, skill_tag),
                   INDEX idx_user_skill_user (user_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户技能表';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='鐢ㄦ埛鎶€鑳借〃';
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS service_request_tag (
@@ -128,155 +127,57 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                   UNIQUE KEY uk_request_tag (request_id, tag_name),
                   INDEX idx_request_tag_req (request_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='需求标签表';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='闇€姹傛爣绛捐〃';
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS skill_tag_stat (
                   skill_tag VARCHAR(64) PRIMARY KEY,
                   user_count INT NOT NULL DEFAULT 0,
                   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='技能热度统计（用于新用户推荐冷启动）';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='鎶€鑳界儹搴︾粺璁★紙鐢ㄤ簬鏂扮敤鎴锋帹鑽愬喎鍚姩锛?;
                 """);
     }
 
-    private void ensureMutualAidPostAndBarter() {
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS mutual_aid_post (
-                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-                  community_id BIGINT UNSIGNED NOT NULL COMMENT '所属社区ID',
-                  author_user_id BIGINT UNSIGNED NOT NULL COMMENT '发布人用户ID',
-                  post_type TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1求助 2互助信息 3闲置/交换信息（预留）',
-                  title VARCHAR(200) NOT NULL COMMENT '标题',
-                  content TEXT NOT NULL COMMENT '正文',
-                  contact VARCHAR(100) NULL COMMENT '联系方式（可选）',
-                  location VARCHAR(200) NULL COMMENT '位置描述（可选）',
-                  status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0待审核 1已发布 2已关闭 3已删除(逻辑)',
-                  view_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '浏览量',
-                  like_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '点赞数',
-                  comment_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '评论数',
-                  is_deleted TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0否 1是',
-                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-                  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
-                  PRIMARY KEY (id),
-                  KEY idx_post_comm_status_time (community_id, status, created_at),
-                  KEY idx_post_author_time (author_user_id, created_at),
-                  FULLTEXT KEY ftx_post_title_content (title, content)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='互助社区帖子（预留）';
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS mutual_aid_post_tag (
-                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                  post_id BIGINT UNSIGNED NOT NULL,
-                  tag_name VARCHAR(64) NOT NULL,
-                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-                  PRIMARY KEY (id),
-                  UNIQUE KEY uk_post_tag (post_id, tag_name),
-                  KEY idx_post_tag_tag (tag_name)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子标签（预留）';
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS mutual_aid_post_comment (
-                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                  post_id BIGINT UNSIGNED NOT NULL,
-                  user_id BIGINT UNSIGNED NOT NULL,
-                  parent_id BIGINT UNSIGNED NULL COMMENT '父评论ID（楼中楼）',
-                  content VARCHAR(1000) NOT NULL,
-                  like_count INT UNSIGNED NOT NULL DEFAULT 0,
-                  is_deleted TINYINT UNSIGNED NOT NULL DEFAULT 0,
-                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-                  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-                  PRIMARY KEY (id),
-                  KEY idx_post_comment_post_time (post_id, created_at),
-                  KEY idx_post_comment_user_time (user_id, created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='帖子评论（预留）';
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS barter_listing (
-                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-                  community_id BIGINT UNSIGNED NOT NULL COMMENT '所属社区ID',
-                  owner_user_id BIGINT UNSIGNED NOT NULL COMMENT '物品所有者用户ID',
-                  title VARCHAR(200) NOT NULL COMMENT '标题',
-                  description TEXT NOT NULL COMMENT '描述',
-                  category VARCHAR(64) NULL COMMENT '分类（可选）',
-                  condition_level TINYINT UNSIGNED NULL COMMENT '成色/新旧程度（可选）',
-                  expected_item VARCHAR(200) NULL COMMENT '期望交换物（可选）',
-                  status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1上架 2已预定 3已成交 4已下架',
-                  view_count INT UNSIGNED NOT NULL DEFAULT 0,
-                  is_deleted TINYINT UNSIGNED NOT NULL DEFAULT 0,
-                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-                  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-                  PRIMARY KEY (id),
-                  KEY idx_barter_comm_status_time (community_id, status, created_at),
-                  KEY idx_barter_owner_time (owner_user_id, created_at),
-                  FULLTEXT KEY ftx_barter_title_desc (title, description)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='以物换物挂牌（预留）';
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS barter_listing_image (
-                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                  listing_id BIGINT UNSIGNED NOT NULL,
-                  image_url VARCHAR(500) NOT NULL,
-                  sort_no INT UNSIGNED NOT NULL DEFAULT 0,
-                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-                  PRIMARY KEY (id),
-                  KEY idx_barter_img_listing (listing_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='挂牌图片（预留）';
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS barter_offer (
-                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                  listing_id BIGINT UNSIGNED NOT NULL COMMENT '挂牌ID',
-                  proposer_user_id BIGINT UNSIGNED NOT NULL COMMENT '提出交换的用户ID',
-                  offer_text VARCHAR(500) NOT NULL COMMENT '交换提议说明',
-                  status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0待处理 1同意 2拒绝 3撤回',
-                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-                  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-                  PRIMARY KEY (id),
-                  KEY idx_barter_offer_listing_time (listing_id, created_at),
-                  KEY idx_barter_offer_user_time (proposer_user_id, created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='以物换物交换提议（预留）';
-                """);
-    }
 
     private void ensureCommunityInviteCode() {
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS community_invite_code (
-                  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-                  community_id  BIGINT UNSIGNED NOT NULL COMMENT '社区ID（sys_region.id，通常 level=3）',
-                  code          VARCHAR(32)      NOT NULL COMMENT '邀请码（短码）',
-                  status        TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '0禁用 1启用',
-                  expires_at    DATETIME(3)      NULL COMMENT '过期时间（NULL=不过期）',
-                  max_uses      INT UNSIGNED     NOT NULL DEFAULT 100 COMMENT '最大可用次数',
-                  used_count    INT UNSIGNED     NOT NULL DEFAULT 0 COMMENT '已使用次数',
-                  created_by    BIGINT UNSIGNED  NULL COMMENT '创建人用户ID',
-                  created_at    DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-                  updated_at    DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+                  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '涓婚敭',
+                  community_id  BIGINT UNSIGNED NOT NULL COMMENT '绀惧尯ID锛坰ys_region.id锛岄€氬父 level=3锛?,
+                  code          VARCHAR(32)      NOT NULL COMMENT '閭€璇风爜锛堢煭鐮侊級',
+                  status        TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '0绂佺敤 1鍚敤',
+                  expires_at    DATETIME(3)      NULL COMMENT '杩囨湡鏃堕棿锛圢ULL=涓嶈繃鏈燂級',
+                  max_uses      INT UNSIGNED     NOT NULL DEFAULT 100 COMMENT '鏈€澶у彲鐢ㄦ鏁?,
+                  used_count    INT UNSIGNED     NOT NULL DEFAULT 0 COMMENT '宸蹭娇鐢ㄦ鏁?,
+                  created_by    BIGINT UNSIGNED  NULL COMMENT '鍒涘缓浜虹敤鎴稩D',
+                  created_at    DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '鍒涘缓鏃堕棿',
+                  updated_at    DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '鏇存柊鏃堕棿',
                   PRIMARY KEY (id),
                   UNIQUE KEY uk_invite_code (code),
                   KEY idx_invite_comm_status (community_id, status),
                   KEY idx_invite_expire (expires_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='社区邀请码';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='绀惧尯閭€璇风爜';
                 """);
     }
 
     private void ensureCommunityBanner() {
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS community_banner (
-                  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-                  community_id BIGINT UNSIGNED NULL COMMENT '社区ID（NULL=全局默认）',
-                  title        VARCHAR(100)    NOT NULL COMMENT '主标题',
-                  subtitle     VARCHAR(200)    NULL COMMENT '副标题',
-                  image_url    VARCHAR(500)    NULL COMMENT '图片URL（可空：纯文案卡片）',
-                  link_url     VARCHAR(500)    NULL COMMENT '点击跳转链接（可空）',
-                  sort_no      INT             NOT NULL DEFAULT 0 COMMENT '排序（小在前）',
-                  status       TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '0禁用 1启用',
-                  created_by   BIGINT UNSIGNED NULL COMMENT '创建人用户ID',
+                  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '涓婚敭',
+                  community_id BIGINT UNSIGNED NULL COMMENT '绀惧尯ID锛圢ULL=鍏ㄥ眬榛樿锛?,
+                  title        VARCHAR(100)    NOT NULL COMMENT '涓绘爣棰?,
+                  subtitle     VARCHAR(200)    NULL COMMENT '鍓爣棰?,
+                  image_url    VARCHAR(500)    NULL COMMENT '鍥剧墖URL锛堝彲绌猴細绾枃妗堝崱鐗囷級',
+                  link_url     VARCHAR(500)    NULL COMMENT '鐐瑰嚮璺宠浆閾炬帴锛堝彲绌猴級',
+                  sort_no      INT             NOT NULL DEFAULT 0 COMMENT '鎺掑簭锛堝皬鍦ㄥ墠锛?,
+                  status       TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '0绂佺敤 1鍚敤',
+                  created_by   BIGINT UNSIGNED NULL COMMENT '鍒涘缓浜虹敤鎴稩D',
                   created_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                   updated_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
                   PRIMARY KEY (id),
                   KEY idx_banner_comm_status_sort (community_id, status, sort_no),
                   KEY idx_banner_comm_time (community_id, created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='社区轮播图';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='绀惧尯杞挱鍥?;
                 """);
     }
 
@@ -299,7 +200,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   KEY idx_alert_code_time (alert_code, occurred_at),
                   KEY idx_alert_comm_time (community_id, occurred_at),
                   KEY idx_alert_req_time (request_id, occurred_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异常预警事件';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='寮傚父棰勮浜嬩欢';
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS volunteer_credit_ledger (
@@ -316,7 +217,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   PRIMARY KEY (id),
                   UNIQUE KEY uk_credit_claim (claim_id),
                   KEY idx_credit_user_time (user_id, created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='志愿者信用明细账本';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='蹇楁効鑰呬俊鐢ㄦ槑缁嗚处鏈?;
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS volunteer_credit_snapshot (
@@ -327,14 +228,44 @@ public class DbBootstrapRunner implements ApplicationRunner {
                   credit_score DECIMAL(12,2) NOT NULL DEFAULT 0,
                   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                   PRIMARY KEY (user_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='志愿者信用快照';
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='蹇楁効鑰呬俊鐢ㄥ揩鐓?;
                 """);
     }
 
+    private void ensureAiAnalysisRecord() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS ai_analysis_record (
+                  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                  user_id BIGINT UNSIGNED NOT NULL,
+                  community_id BIGINT UNSIGNED NULL,
+                  scene VARCHAR(32) NOT NULL DEFAULT 'mobile_assistant',
+                  input_text TEXT NOT NULL,
+                  result_mode VARCHAR(32) NOT NULL DEFAULT 'FAQ',
+                  result_json JSON NULL,
+                  applied_to_form TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                  submitted_success TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+                  PRIMARY KEY (id),
+                  KEY idx_ai_analysis_user_time (user_id, created_at),
+                  KEY idx_ai_analysis_comm_time (community_id, created_at),
+                  KEY idx_ai_analysis_mode_time (result_mode, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI鍒嗘瀽璁板綍';
+                """);
+    }
+
+    private void ensureRuntimeConfig() {
+        Integer cnt = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM sys_config WHERE config_key='runtime'", Integer.class);
+        if (cnt == null || cnt == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO sys_config(config_key, config_value, created_at, updated_at)
+                    VALUES('runtime', CAST(? AS JSON), NOW(3), NOW(3))
+                    """, "{\"demoModeEnabled\":true}");
+        }
+    }
+
     /**
-     * 双向评价字段/索引兜底：
-     * - evaluator_role 列
-     * - 唯一索引由 uk_eval_claim 升级为 uk_eval_claim_role(claim_id, evaluator_role)
+     * 鍙屽悜璇勪环瀛楁/绱㈠紩鍏滃簳锛?     * - evaluator_role 鍒?     * - 鍞竴绱㈠紩鐢?uk_eval_claim 鍗囩骇涓?uk_eval_claim_role(claim_id, evaluator_role)
      */
     private void ensureDualEvaluationSchema() {
         Integer hasColumn = jdbcTemplate.queryForObject("""
@@ -348,7 +279,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
             jdbcTemplate.execute("""
                     ALTER TABLE service_evaluation
                     ADD COLUMN evaluator_role TINYINT UNSIGNED NOT NULL DEFAULT 1
-                    COMMENT '评价方角色：1居民 2志愿者'
+                    COMMENT '璇勪环鏂硅鑹诧細1灞呮皯 2蹇楁効鑰?
                     AFTER volunteer_user_id
                     """);
         }
@@ -364,8 +295,7 @@ public class DbBootstrapRunner implements ApplicationRunner {
             try {
                 jdbcTemplate.execute("ALTER TABLE service_evaluation DROP INDEX uk_eval_claim");
             } catch (DataAccessException ex) {
-                // 历史库可能存在“外键依赖同名索引”的场景，此时跳过删除，保证应用可启动
-            }
+                // 鍘嗗彶搴撳彲鑳藉瓨鍦ㄢ€滃閿緷璧栧悓鍚嶇储寮曗€濈殑鍦烘櫙锛屾鏃惰烦杩囧垹闄わ紝淇濊瘉搴旂敤鍙惎鍔?            }
         }
 
         Integer hasNewUk = jdbcTemplate.queryForObject("""
@@ -397,4 +327,3 @@ public class DbBootstrapRunner implements ApplicationRunner {
         }
     }
 }
-

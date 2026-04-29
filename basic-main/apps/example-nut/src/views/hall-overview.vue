@@ -6,6 +6,7 @@ import {
   getMyReceivedReviews,
   getMyReviewHistory,
 } from '@/api/modules/hall'
+import RequestProgressCard from '@/components/hall/RequestProgressCard.vue'
 import ThreeSectionPage from '@/components/ThreeSectionPage.vue'
 
 definePage({
@@ -125,10 +126,22 @@ watch([kind, reviewMode], loadData, { immediate: true })
         <div v-if="loading" class="status">加载中...</div>
         <div v-else-if="error" class="status err">{{ error }}</div>
         <div v-else class="list">
-          <article v-for="item in rows" :key="item.id" class="row-card">
+          <article v-for="item in rows" :key="item.id" class="row-card" :class="{ progress: kind === 'in-progress' }">
             <h4>{{ item.serviceType || item.requestTitle || '社区服务' }}</h4>
-            <p>{{ item.description || item.content || '暂无描述' }}</p>
-            <small>{{ item.createdAt?.replace('T', ' ').slice(0, 16) || '暂无时间' }}</small>
+            <template v-if="kind === 'in-progress'">
+              <RequestProgressCard :status="2" :claim-status="item.claimStatus" />
+              <div class="meta-grid">
+                <div><b>居民</b><span>{{ item.requesterName || '未登记' }}</span></div>
+                <div><b>志愿者</b><span>{{ item.volunteerName || '待接单' }}</span></div>
+                <div><b>服务时间</b><span>{{ item.claimAt?.replace('T', ' ').slice(0, 16) || '待安排' }}</span></div>
+                <div><b>处理状态</b><span>{{ item.claimStatus === 2 ? '待确认' : item.claimStatus === 1 ? '服务中' : '待认领' }}</span></div>
+              </div>
+              <p class="detail-pre">{{ item.completionNote || item.requestAddress || '当前单子正在推进中。' }}</p>
+            </template>
+            <template v-else>
+              <p class="detail-pre">{{ item.description || item.content || '暂无描述' }}</p>
+              <small>{{ item.createdAt?.replace('T', ' ').slice(0, 16) || '暂无时间' }}</small>
+            </template>
           </article>
           <div v-if="rows.length === 0" class="status">暂无数据</div>
         </div>
@@ -182,4 +195,32 @@ watch([kind, reviewMode], loadData, { immediate: true })
 .row-card h4 { margin: 0; color: #111827; font-size: 14px; }
 .row-card p { margin: 6px 0 4px; color: #475569; font-size: 12px; line-height: 1.6; }
 .row-card small { color: #9ca3af; font-size: 11px; }
+.row-card.progress {
+  border-color: rgba(16, 185, 129, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 251, 247, 0.98));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+.meta-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+.meta-grid div {
+  display: grid;
+  gap: 3px;
+}
+.meta-grid b {
+  font-size: 11px;
+  color: #64748b;
+}
+.meta-grid span {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 700;
+}
+.detail-pre {
+  white-space: pre-wrap;
+}
 </style>

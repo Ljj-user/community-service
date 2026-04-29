@@ -71,6 +71,9 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AiChatService aiChatService;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -132,6 +135,7 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
         request.setIsDeleted((byte) 0);
         
         serviceRequestMapper.insert(request);
+        aiChatService.markSubmitted(userId, dto.getAiAnalysisRecordId());
         
         return convertToVO(request);
     }

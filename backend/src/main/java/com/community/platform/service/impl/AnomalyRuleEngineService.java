@@ -58,24 +58,31 @@ public class AnomalyRuleEngineService {
         LocalDate today = LocalDate.now();
         LocalDateTime todayStart = today.atStartOfDay();
 
-        LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
-        w.eq(SysUser::getIsDeleted, 0)
-                .eq(SysUser::getStatus, Constants.USER_STATUS_ENABLED)
-                .eq(SysUser::getRole, Constants.ROLE_NORMAL_USER)
-                .isNotNull(SysUser::getCommunityId)
-                .and(q -> q.isNull(SysUser::getLastLoginAt).or().lt(SysUser::getLastLoginAt, cutoff))
-                .like(SysUser::getIdentityTag, "孤寡老人");
-        List<SysUser> candidates = sysUserMapper.selectList(w);
-        for (SysUser user : candidates) {
-            Long communityId = user.getCommunityId();
+        List<Map<String, Object>> candidates = jdbcTemplate.queryForList("""
+                SELECT u.id AS user_id, u.community_id
+                FROM sys_user u
+                INNER JOIN care_subject_profile c ON c.user_id=u.id
+                WHERE u.is_deleted=0
+                  AND u.status=?
+                  AND u.role=?
+                  AND u.community_id IS NOT NULL
+                  AND c.is_deleted=0
+                  AND c.monitor_enabled=1
+                  AND (u.last_login_at IS NULL OR u.last_login_at < ?)
+                """, Constants.USER_STATUS_ENABLED, Constants.ROLE_NORMAL_USER, cutoff);
+        for (Map<String, Object> row : candidates) {
+            Long userId = asLong(row.get("user_id"), null);
+            Long communityId = asLong(row.get("community_id"), null);
             if (communityId == null) continue;
-            String dedupKey = "CARE_INACTIVE:" + user.getId() + ":" + today;
+            String dedupKey = "CARE_INACTIVE:" + userId + ":" + today;
             if (existsAlertToday(dedupKey, todayStart)) {
                 continue;
             }
+            SysUser user = sysUserMapper.selectById(userId);
+            if (user == null) continue;
             String triggerRule = "连续" + inactiveDays + "天未登录";
             String action = "建议社区管理员主动电话关怀或上门核实";
-            createAlertEvent("CARE_INACTIVE", communityId, null, user.getId(), 2, triggerRule, action,
+            createAlertEvent("CARE_INACTIVE", communityId, null, userId, 2, triggerRule, action,
                     "{\"days\":" + inactiveDays + "}", dedupKey);
             dispatchAlertNotifications(config, communityId,
                     "关怀预警：重点人群未登录",

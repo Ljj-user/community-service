@@ -60,7 +60,7 @@ public class UserDashboardServiceImpl implements UserDashboardService {
             throw new RuntimeException("仅普通用户可使用该接口");
         }
         UserDashboardSummaryVO vo = new UserDashboardSummaryVO();
-        if (Objects.equals(u.getIdentityType(), Constants.IDENTITY_VOLUNTEER)) {
+        if (isCertifiedVolunteer(userId)) {
             vo.setPanelType("VOLUNTEER");
             vo.setVolunteer(buildVolunteer(userId));
         } else {
@@ -68,6 +68,14 @@ public class UserDashboardServiceImpl implements UserDashboardService {
             vo.setResident(buildResident(userId));
         }
         return vo;
+    }
+
+    private boolean isCertifiedVolunteer(Long userId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM volunteer_profile WHERE user_id=? AND cert_status=2",
+                Integer.class, userId
+        );
+        return count != null && count > 0;
     }
 
     private ResidentDashboardVO buildResident(Long userId) {

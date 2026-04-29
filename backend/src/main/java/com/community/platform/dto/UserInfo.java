@@ -17,6 +17,8 @@ public class UserInfo {
     private Byte identityType;
     /** 绑定社区区域 ID（sys_region.id） */
     private Long communityId;
+    /** 社区加入状态：0未加入 1待审核 2已加入 3已拒绝 */
+    private Byte communityJoinStatus;
     /** 绑定社区名称（由 community_id 关联 sys_region 查询） */
     private String communityName;
     /** 省（展示用，来自 sys_region） */

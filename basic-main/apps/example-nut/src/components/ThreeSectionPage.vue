@@ -52,12 +52,12 @@ defineProps<{
   border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-::global(.dark) .three-page,
-::global(.dark) .three-header,
-::global(.dark) .three-footer {
+:global(.dark) .three-page,
+:global(.dark) .three-header,
+:global(.dark) .three-footer {
   background: #111827;
 }
-::global(.dark) .three-footer {
+:global(.dark) .three-footer {
   border-top-color: rgba(148, 163, 184, 0.16);
 }
 </style>

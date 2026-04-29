@@ -64,6 +64,12 @@ public class SysUser implements Serializable {
     private Long communityId;
 
     /**
+     * 社区加入状态：0未加入 1待审核 2已加入 3已拒绝
+     */
+    @TableField("community_join_status")
+    private Byte communityJoinStatus;
+
+    /**
      * 当前可用时间币
      */
     @TableField("time_coins")

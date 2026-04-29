@@ -4,10 +4,12 @@ import {
   configGetAi,
   configGetBasic,
   configGetNotice,
+  configGetRuntime,
   configSaveAlert,
   configSaveAi,
   configSaveBasic,
   configSaveNotice,
+  configSaveRuntime,
   configTestAi,
 } from '~/api/adminConfig'
 import { isRecord } from '~/utils'
@@ -56,6 +58,10 @@ export interface AdminSystemAiConfig {
   model: string
   hasApiKey?: boolean
   apiKey?: string
+}
+
+export interface AdminRuntimeConfig {
+  demoModeEnabled: boolean
 }
 
 function applyIfRecord(target: Record<string, any>, res?: BackendResult<any>) {
@@ -122,20 +128,26 @@ export function useAdminSystemConfig() {
     apiKey: '',
   })
 
+  const runtimeConfig = reactive<AdminRuntimeConfig>({
+    demoModeEnabled: true,
+  })
+
   async function load() {
     loading.value = true
     try {
-      const [basicRes, noticeRes, alertRes, aiRes] = await Promise.all([
+      const [basicRes, noticeRes, alertRes, aiRes, runtimeRes] = await Promise.all([
         configGetBasic(),
         configGetNotice(),
         configGetAlert(),
         configGetAi(),
+        configGetRuntime(),
       ])
 
       applyIfRecord(basicParams as any, basicRes)
       applyIfRecord(noticeTemplates as any, noticeRes)
       applyIfRecord(alertRules as any, alertRes)
       applyIfRecord(aiConfig as any, aiRes)
+      applyIfRecord(runtimeConfig as any, runtimeRes)
     } catch {
       message.error(t('community.systemConfig.loadFailed'))
     } finally {
@@ -200,6 +212,18 @@ export function useAdminSystemConfig() {
     }
   }
 
+  async function saveRuntime() {
+    saving.value = true
+    try {
+      const res = await configSaveRuntime({ ...runtimeConfig })
+      message.success(res?.message || '运行态配置已保存')
+    } catch {
+      message.error(t('community.systemConfig.saveFailed'))
+    } finally {
+      saving.value = false
+    }
+  }
+
   async function testAi() {
     saving.value = true
     try {
@@ -225,11 +249,13 @@ export function useAdminSystemConfig() {
     noticeTemplates,
     alertRules,
     aiConfig,
+    runtimeConfig,
     load,
     saveBasic,
     saveNotice,
     saveAlert,
     saveAi,
+    saveRuntime,
     testAi,
   }
 }

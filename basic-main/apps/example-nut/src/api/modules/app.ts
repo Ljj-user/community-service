@@ -22,6 +22,12 @@ interface InviteVerifyVO {
   usedCount?: number
 }
 
+export interface AppRuntimeVO {
+  demoModeEnabled: boolean
+  demoModeLabel?: string
+  demoDataHint?: string
+}
+
 export default {
   // 登录
   login: (data: {
@@ -57,4 +63,6 @@ export default {
 
   joinCommunity: (data: { code: string }) =>
     api.post<any, BackendResult<UserInfo>>('/community/join', data),
+
+  runtime: () => api.get<any, BackendResult<AppRuntimeVO>>('/app/runtime'),
 }

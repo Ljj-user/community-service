@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import apiApp from '@/api/modules/app'
 
 definePage({
   meta: {
@@ -11,6 +12,7 @@ definePage({
 const router = useRouter()
 const appSettingsStore = useAppSettingsStore()
 const prefs = useAppPrefsStore()
+const runtime = ref<{ demoModeEnabled?: boolean; demoModeLabel?: string; demoDataHint?: string } | null>(null)
 
 const themeMode = computed({
   get: () => appSettingsStore.settings.theme.colorScheme,
@@ -33,6 +35,17 @@ const versionText = computed(() => {
   const v = import.meta.env.VITE_APP_VERSION
   return v ? String(v) : '未配置'
 })
+
+async function loadRuntime() {
+  try {
+    const res = await apiApp.runtime()
+    runtime.value = res.data
+  } catch {
+    runtime.value = null
+  }
+}
+
+onMounted(loadRuntime)
 </script>
 
 <template>
@@ -120,9 +133,9 @@ const versionText = computed(() => {
           开发与演示
         </div>
         <t-cell-group inset>
-          <t-cell title="使用演示数据" description="消息页/部分列表以假数据展示">
-            <template #rightIcon>
-              <t-switch v-model="prefs.demoMock" />
+          <t-cell title="运行环境" :note="runtime?.demoModeLabel || '未读取到'">
+            <template #description>
+              {{ runtime?.demoDataHint || '当前环境会直接读取后端真实演示数据。' }}
             </template>
           </t-cell>
           <t-cell title="调试面板（演示）" description="开发时可打开 vconsole/eruda">

@@ -155,6 +155,7 @@ public class SecurityConfig {
 
                         // 用户与角色管理（按业务再做社区范围约束）
                         .requestMatchers("/admin/users/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/admin/community-join/**", "/admin/volunteer/**", "/admin/care-subject/**", "/admin/convenience-info/**", "/admin/alerts/**", "/admin/ai-analysis/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
                         // 社区邀请码（社区管理员/系统管理员）
                         .requestMatchers("/admin/invite-code/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
                         // 轮播图管理（社区管理员/系统管理员）
@@ -166,7 +167,8 @@ public class SecurityConfig {
                         .requestMatchers("/community/**", "/dashboard/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
                         
                         // 普通用户：发布需求、认领服务、评价、个人待办、全局点赞
-                        .requestMatchers("/user/**", "/request/**", "/service/**", "/service-request/**", "/service-claim/**", "/service-evaluation/**", "/support/**", "/ai/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/app/runtime").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/user/**", "/volunteer/**", "/convenience-info/**", "/request/**", "/service/**", "/service-request/**", "/service-claim/**", "/service-evaluation/**", "/support/**", "/ai/**").hasAnyRole("USER", "COMMUNITY_ADMIN", "SUPER_ADMIN")
                         
                         // 其他接口需要认证
                         .anyRequest().authenticated()

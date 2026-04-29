@@ -14,6 +14,7 @@ definePage({
   },
 })
 
+const route = useRoute()
 const router = useRouter()
 const appAuthStore = useAppAuthStore()
 const loading = ref(false)
@@ -79,6 +80,11 @@ function onChangeCommunity() {
 
 function openListTab(tab: 'joined' | 'published') {
   activeTab.value = tab
+  router.replace({ path: '/hall', query: { ...route.query, tab } })
+}
+
+function syncTabFromRoute() {
+  activeTab.value = route.query.tab === 'published' ? 'published' : 'joined'
 }
 
 const joinedFilterOptions = [
@@ -423,10 +429,17 @@ async function onCompleteCurrentClaim() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  syncTabFromRoute()
+  loadData()
+})
 
 watch([joinedStatusFilter, joinedSortFilter, publishedStatusFilter, publishedSortFilter], () => {
   loadData()
+})
+
+watch(() => route.query.tab, () => {
+  syncTabFromRoute()
 })
 </script>
 
@@ -750,7 +763,7 @@ watch([joinedStatusFilter, joinedSortFilter, publishedStatusFilter, publishedSor
 }
 .info-grid p.wide { grid-column: 1 / -1; }
 .info-grid b { color: #64748b; font-size: 11px; }
-.info-grid span { color: #111827; font-size: 13px; font-weight: 800; word-break: break-word; }
+.info-grid span { color: #111827; font-size: 13px; font-weight: 800; word-break: break-word; white-space: pre-wrap; }
 .floating-create {
   position: fixed;
   right: calc(max((100vw - min(100vw, var(--m-device-max-width))) / 2, 0px) + 16px);

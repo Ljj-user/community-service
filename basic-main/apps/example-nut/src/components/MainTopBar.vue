@@ -81,7 +81,7 @@ const emit = defineEmits<{
 .distance { font-size: 11px; color: var(--m-color-muted); line-height: 1.1; }
 .right-ai-icon { width: 20px; height: 20px; border-radius: 7px; object-fit: cover; display: block; }
 
-::global(.dark) .biz-header {
+:global(.dark) .biz-header {
   border-color: rgba(148, 163, 184, 0.22);
   background: rgba(17, 24, 39, 0.55);
   box-shadow:
@@ -89,19 +89,19 @@ const emit = defineEmits<{
     0 10px 22px rgba(0, 0, 0, 0.40),
     0 2px 6px rgba(0, 0, 0, 0.28);
 }
-::global(.dark) .community-switch { color: #f3f4f6; }
-::global(.dark) .distance { color: #9ca3af; }
-::global(.dark) .right-btn {
+:global(.dark) .community-switch { color: #f3f4f6; }
+:global(.dark) .distance { color: #9ca3af; }
+:global(.dark) .right-btn {
   border-color: rgba(148, 163, 184, 0.22);
   background: rgba(31, 41, 55, 0.45);
   color: #d1fae5;
 }
 
-::global(.m-a11y-large) .community-main {
+:global(.m-a11y-large) .community-main {
   font-size: 16px;
   max-width: calc(100% - 30px);
 }
-::global(.m-a11y-large) .distance {
+:global(.m-a11y-large) .distance {
   font-size: 12px;
 }
 </style>

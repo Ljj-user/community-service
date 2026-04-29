@@ -1,7 +1,9 @@
 <script setup lang="ts">
 const emit = defineEmits<{
   improve: []
+  volunteer: []
   task: []
+  convenience: []
   edit: []
   mall: []
 }>()
@@ -27,12 +29,30 @@ const emit = defineEmits<{
       </span>
       <FmIcon name="i-carbon:chevron-right" class="arrow" />
     </button>
+    <button type="button" class="menu-item" @click="emit('volunteer')">
+      <span class="left">
+        <span class="icon-wrap">
+          <FmIcon name="mdi:shield-check-outline" />
+        </span>
+        <span class="label">志愿者认证</span>
+      </span>
+      <FmIcon name="i-carbon:chevron-right" class="arrow" />
+    </button>
     <button type="button" class="menu-item" @click="emit('mall')">
       <span class="left">
         <span class="icon-wrap">
           <FmIcon name="mdi:storefront-outline" />
         </span>
         <span class="label">爱心商城</span>
+      </span>
+      <FmIcon name="i-carbon:chevron-right" class="arrow" />
+    </button>
+    <button type="button" class="menu-item" @click="emit('convenience')">
+      <span class="left">
+        <span class="icon-wrap">
+          <FmIcon name="mdi:phone-in-talk-outline" />
+        </span>
+        <span class="label">便民信息</span>
       </span>
       <FmIcon name="i-carbon:chevron-right" class="arrow" />
     </button>

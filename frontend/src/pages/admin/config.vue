@@ -20,10 +20,12 @@ const {
   noticeTemplates,
   alertRules,
   aiConfig,
+  runtimeConfig,
   saveBasic,
   saveNotice,
   saveAlert,
   saveAi,
+  saveRuntime,
   testAi,
 } = useAdminSystemConfig()
 
@@ -84,6 +86,22 @@ async function onTestAi() {
                 <n-input-number v-model:value="basicParams.feedbackDays" :min="1" :max="30" class="w-full" />
               </n-form-item>
               <FieldHint :text="t('community.systemConfig.feedbackDaysHint')" />
+            </div>
+          </div>
+        </Card>
+        <Card title="演示环境" class="mt-4">
+          <div class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div>
+              <div class="text-sm font-semibold text-slate-800 dark:text-slate-100">统一演示模式</div>
+              <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                当前项目使用真实后端演示数据，不再依赖前端假列表开关。
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <n-tag :type="runtimeConfig.demoModeEnabled ? 'success' : 'default'" :bordered="false">
+                {{ runtimeConfig.demoModeEnabled ? '已开启' : '已关闭' }}
+              </n-tag>
+              <n-switch v-model:value="runtimeConfig.demoModeEnabled" @update:value="() => saveRuntime()" />
             </div>
           </div>
         </Card>

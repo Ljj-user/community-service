@@ -25,7 +25,7 @@ function go(path: string) {
       {{ t('community.dashboard.intro') }}
     </p>
 
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div class="dashboard-grid">
       <Card :title="t('community.dashboard.cardRequestsTitle')" class="cursor-pointer" @click="go('/community/requests')">
         <p class="text-sm text-slate-600 dark:text-slate-300">
           {{ t('community.dashboard.cardRequestsDesc') }}
@@ -44,6 +44,17 @@ function go(path: string) {
         <div class="mt-3 flex gap-2">
           <n-button size="small" type="primary" @click.stop="go('/community/volunteers')">
             {{ t('community.dashboard.cardVolunteersBtn') }}
+          </n-button>
+        </div>
+      </Card>
+
+      <Card title="社区加入审核" class="cursor-pointer" @click="go('/community/join-applications')">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          处理居民绑定申请，避免数据串社区。
+        </p>
+        <div class="mt-3 flex gap-2">
+          <n-button size="small" type="primary" @click.stop="go('/community/join-applications')">
+            去审核
           </n-button>
         </div>
       </Card>
@@ -70,6 +81,39 @@ function go(path: string) {
         </div>
       </Card>
 
+      <Card title="重点关怀对象" class="cursor-pointer" @click="go('/community/care-subjects')">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          管理独居老人、残障居民等重点对象。
+        </p>
+        <div class="mt-3 flex gap-2">
+          <n-button size="small" @click.stop="go('/community/care-subjects')">
+            打开名单
+          </n-button>
+        </div>
+      </Card>
+
+      <Card title="便民信息" class="cursor-pointer" @click="go('/community/convenience-info')">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          维护药店、医院、维修电话这些常用信息。
+        </p>
+        <div class="mt-3 flex gap-2">
+          <n-button size="small" @click.stop="go('/community/convenience-info')">
+            去维护
+          </n-button>
+        </div>
+      </Card>
+
+      <Card title="异常预警" class="cursor-pointer" @click="go('/community/alerts')">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          跟进多日未登录、求助骤增等风险提示。
+        </p>
+        <div class="mt-3 flex gap-2">
+          <n-button size="small" type="warning" @click.stop="go('/community/alerts')">
+            看预警
+          </n-button>
+        </div>
+      </Card>
+
       <Card :title="t('community.dashboard.cardStatsTitle')" class="cursor-pointer" @click="go('/admin/global-dashboard')">
         <p class="text-sm text-slate-600 dark:text-slate-300">
           {{ t('community.dashboard.cardStatsDesc') }}
@@ -86,7 +130,7 @@ function go(path: string) {
       <h2 class="text-lg font-semibold mb-3">
         {{ t('community.dashboard.sectionSystemTitle') }}
       </h2>
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div class="dashboard-grid dashboard-grid-small">
         <Card :title="t('community.dashboard.cardUsersTitle')" class="cursor-pointer" @click="go('/admin/users')">
           <p class="text-sm text-slate-600 dark:text-slate-300">
             {{ t('community.dashboard.cardUsersDesc') }}
@@ -112,3 +156,41 @@ function go(path: string) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.86fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.dashboard-grid > :nth-child(4n + 1) {
+  min-height: 156px;
+}
+
+.dashboard-grid > :nth-child(4n + 2) {
+  transform: translateY(10px);
+}
+
+.dashboard-grid-small {
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+}
+
+@media (max-width: 1180px) {
+  .dashboard-grid,
+  .dashboard-grid-small {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-grid,
+  .dashboard-grid-small {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid > :nth-child(4n + 2) {
+    transform: none;
+  }
+}
+</style>

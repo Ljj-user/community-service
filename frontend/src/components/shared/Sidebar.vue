@@ -71,97 +71,156 @@ function buildSettingsSubmenu(): SidebarMenuOption {
   }
 }
 
+function buildBusinessGroup(): SidebarMenuOption {
+  return {
+    label: '业务管理',
+    key: 'group-business',
+    icon: CustomersIcon,
+    activeIcon: CustomersIconActive,
+    children: [
+      {
+        label: '需求审核',
+        route: '/community/requests',
+        key: 'communityRequests',
+        icon: ErrorIcon,
+      },
+      {
+        label: '服务过程监控',
+        route: '/community/monitor',
+        key: 'communityMonitor',
+        icon: DashboardIcon2,
+      },
+      {
+        label: '志愿者认证',
+        route: '/community/volunteers',
+        key: 'communityVolunteers',
+        icon: CustomersIcon,
+        activeIcon: CustomersIconActive,
+      },
+    ],
+  }
+}
+
+function buildGovernanceGroup(withAudit: boolean): SidebarMenuOption {
+  const children: SidebarMenuOption[] = [
+    {
+      label: '社区加入审核',
+      route: '/community/join-applications',
+      key: 'communityJoinApplications',
+      icon: FormsIcon,
+      activeIcon: FormsIcon,
+    },
+    {
+      label: '重点关怀对象',
+      route: '/community/care-subjects',
+      key: 'communityCareSubjects',
+      icon: TodoAppIcon,
+      activeIcon: TodoAppIconActive,
+    },
+    {
+      label: '便民信息',
+      route: '/community/convenience-info',
+      key: 'communityConvenienceInfo',
+      icon: PagesIcon,
+    },
+    {
+      label: t('menu.communityAnnouncements'),
+      route: '/community/announcements',
+      key: 'communityAnnouncements',
+      icon: PagesIcon,
+    },
+    {
+      label: t('menu.communityInviteCodes'),
+      route: '/community/invite-codes',
+      key: 'communityInviteCodes',
+      icon: FormsIcon,
+      activeIcon: FormsIcon,
+    },
+    {
+      label: '异常预警',
+      route: '/community/alerts',
+      key: 'communityAlerts',
+      icon: ErrorIcon,
+    },
+  ]
+  if (withAudit) {
+    children.push({
+      label: t('menu.communityAudit'),
+      route: '/admin/audit',
+      key: 'community-audit',
+      icon: ErrorIcon,
+    })
+  }
+  return {
+    label: '社区管辖',
+    key: 'group-governance',
+    icon: PagesIcon,
+    children,
+  }
+}
+
+function buildSystemGroup(includeUsers: boolean): SidebarMenuOption {
+  const children: SidebarMenuOption[] = []
+  if (includeUsers) {
+    children.push({
+      label: t('menu.admin-users'),
+      route: '/admin/users',
+      key: 'admin-users',
+      icon: CustomersIcon,
+      activeIcon: CustomersIconActive,
+    })
+  } else {
+    children.push({
+      label: t('menu.communityScopedUsers'),
+      route: '/admin/users',
+      key: 'community-users',
+      icon: CustomersIcon,
+      activeIcon: CustomersIconActive,
+    })
+  }
+  children.push(
+    {
+      label: 'AI 分析记录',
+      route: '/admin/ai-analysis',
+      key: 'admin-ai-analysis',
+      icon: ChartsIcon,
+    },
+    {
+      label: t('menu.admin-global-dashboard'),
+      route: '/admin/global-dashboard',
+      key: 'admin-global-dashboard',
+      icon: ChartsIcon,
+    },
+    {
+      label: t('menu.admin-config'),
+      route: '/admin/config',
+      key: 'admin-config',
+      icon: SettingsIcon,
+    },
+    {
+      label: t('menu.admin-backup'),
+      route: '/admin/backup',
+      key: 'admin-backup',
+      icon: DataIcon,
+      activeIcon: DataIconActive,
+    },
+  )
+  return {
+    label: '系统管理',
+    key: 'group-system',
+    icon: DataIcon,
+    activeIcon: DataIconActive,
+    children,
+  }
+}
+
 const superAdminMenuOptions = computed<SidebarMenuOption[]>(() => {
   void locale.value
   return [
     homeBoardItem.value,
-    {
-      label: t('menu.adminOpsGroup'),
-      key: 'group-admin-ops',
-      icon: CustomersIcon,
-      activeIcon: CustomersIconActive,
-      children: [
-        {
-          label: t('menu.admin-users'),
-          route: '/admin/users',
-          key: 'admin-users',
-          icon: CustomersIcon,
-          activeIcon: CustomersIconActive,
-        },
-        {
-          label: t('menu.communityRequests'),
-          route: '/community/requests',
-          key: 'communityRequests',
-          icon: ErrorIcon,
-        },
-        {
-          label: t('menu.communityVolunteers'),
-          route: '/community/volunteers',
-          key: 'communityVolunteers',
-          icon: CustomersIcon,
-          activeIcon: CustomersIconActive,
-        },
-        {
-          label: t('menu.communityMonitor'),
-          route: '/community/monitor',
-          key: 'communityMonitor',
-          icon: DashboardIcon2,
-        },
-        {
-          label: t('menu.communityAnnouncements'),
-          route: '/community/announcements',
-          key: 'communityAnnouncements',
-          icon: PagesIcon,
-        },
-        {
-          label: t('menu.communityInviteCodes'),
-          route: '/community/invite-codes',
-          key: 'communityInviteCodes',
-          icon: FormsIcon,
-          activeIcon: FormsIcon,
-        },
-        {
-          label: t('menu.communityBanners'),
-          route: '/community/banners',
-          key: 'communityBanners',
-          icon: BrandsIcon,
-          activeIcon: BrandsIconActive,
-        },
-      ],
-    },
-    {
-      label: t('menu.adminSystemGroup'),
-      key: 'group-admin-sys',
-      icon: DataIcon,
-      activeIcon: DataIconActive,
-      children: [
-        {
-          label: t('menu.admin-audit'),
-          route: '/admin/audit',
-          key: 'admin-audit',
-          icon: ErrorIcon,
-        },
-        {
-          label: t('menu.admin-global-dashboard'),
-          route: '/admin/global-dashboard',
-          key: 'admin-global-dashboard',
-          icon: ChartsIcon,
-        },
-        {
-          label: t('menu.admin-config'),
-          route: '/admin/config',
-          key: 'admin-config',
-          icon: SettingsIcon,
-        },
-        {
-          label: t('menu.admin-backup'),
-          route: '/admin/backup',
-          key: 'admin-backup',
-          icon: DataIcon,
-          activeIcon: DataIconActive,
-        },
-      ],
-    },
+    buildBusinessGroup(),
+    buildGovernanceGroup(false),
+    buildSystemGroup(true),
     buildSettingsSubmenu(),
   ]
 })
@@ -170,66 +229,9 @@ const communityAdminMenuOptions = computed<SidebarMenuOption[]>(() => {
   void locale.value
   return [
     homeBoardItem.value,
-    {
-      label: t('menu.adminOpsGroup'),
-      key: 'group-admin-ops',
-      icon: CustomersIcon,
-      activeIcon: CustomersIconActive,
-      children: [
-        {
-          label: t('menu.communityScopedUsers'),
-          route: '/admin/users',
-          key: 'community-users',
-          icon: CustomersIcon,
-          activeIcon: CustomersIconActive,
-        },
-        {
-          label: t('menu.communityRequests'),
-          route: '/community/requests',
-          key: 'communityRequests',
-          icon: ErrorIcon,
-        },
-        {
-          label: t('menu.communityVolunteers'),
-          route: '/community/volunteers',
-          key: 'communityVolunteers',
-          icon: CustomersIcon,
-          activeIcon: CustomersIconActive,
-        },
-        {
-          label: t('menu.communityMonitor'),
-          route: '/community/monitor',
-          key: 'communityMonitor',
-          icon: DashboardIcon2,
-        },
-        {
-          label: t('menu.communityAnnouncements'),
-          route: '/community/announcements',
-          key: 'communityAnnouncements',
-          icon: PagesIcon,
-        },
-        {
-          label: t('menu.communityInviteCodes'),
-          route: '/community/invite-codes',
-          key: 'communityInviteCodes',
-          icon: FormsIcon,
-          activeIcon: FormsIcon,
-        },
-        {
-          label: t('menu.communityBanners'),
-          route: '/community/banners',
-          key: 'communityBanners',
-          icon: BrandsIcon,
-          activeIcon: BrandsIconActive,
-        },
-        {
-          label: t('menu.communityAudit'),
-          route: '/admin/audit',
-          key: 'community-audit',
-          icon: ErrorIcon,
-        },
-      ],
-    },
+    buildBusinessGroup(),
+    buildGovernanceGroup(true),
+    buildSystemGroup(false),
     buildSettingsSubmenu(),
   ]
 })

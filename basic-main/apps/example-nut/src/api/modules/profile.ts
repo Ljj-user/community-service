@@ -36,6 +36,29 @@ export interface UserProfileUpdateRequest {
   identityTag?: string
 }
 
+export interface VolunteerProfileResponse {
+  id: number
+  userId: number
+  communityId?: number
+  certStatus: 0 | 1 | 2 | 3
+  realName?: string
+  idCardNo?: string
+  skillTags?: string[] | string
+  serviceRadiusKm?: number | string
+  availableTime?: string
+  certifiedAt?: string
+  rejectReason?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface VolunteerApplyRequest {
+  idCardNo?: string
+  skillTags: string[]
+  serviceRadiusKm?: number
+  availableTime?: string
+}
+
 export function getMyProfile() {
   return api.get<any, BackendResult<UserProfileResponse>>('/user/profile')
 }
@@ -50,5 +73,13 @@ export function uploadMyAvatar(file: File) {
   return api.post<any, BackendResult<UserProfileResponse>>('/user/avatar', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+}
+
+export function getMyVolunteerProfile() {
+  return api.get<any, BackendResult<VolunteerProfileResponse | null>>('/volunteer/profile')
+}
+
+export function applyVolunteerProfile(data: VolunteerApplyRequest) {
+  return api.post<any, BackendResult<null>>('/volunteer/apply', data)
 }
 

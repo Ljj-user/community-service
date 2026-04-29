@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { aiChat, type AiChatHistoryMessage } from '@/api/modules/ai'
+import { markAiRecordApplied } from '@/api/modules/ai'
 import { toast } from 'vue-sonner'
 import AiHeroInput from '@/components/AiHeroInput.vue'
+import { saveAiDemandDraft } from '@/utils/aiDraft'
 
 definePage({
   meta: { title: 'AI助手', auth: true },
@@ -12,7 +14,7 @@ const router = useRouter()
 const loading = ref(false)
 const inputText = ref('')
 const quickPrompts = ['我该怎么发布需求？', '怎么接取任务？', '怎么查看服务统计？', '帮我写一段求助说明'] as const
-const chatRows = ref<Array<{ role: 'user' | 'ai'; text: string; time: string }>>([
+const chatRows = ref<Array<{ role: 'user' | 'ai'; text: string; time: string; draft?: any; analysisRecordId?: number }>>([
   { role: 'ai', text: '您好，我是邻里互助 AI 助手。可以直接描述您的问题。', time: '刚刚' },
 ])
 
@@ -32,7 +34,13 @@ async function sendMessage() {
   loading.value = true
   try {
     const res = await aiChat(text, history)
-    chatRows.value.push({ role: 'ai', text: res.data?.reply || '已收到。', time: nowTime() })
+    chatRows.value.push({
+      role: 'ai',
+      text: res.data?.reply || '已收到。',
+      time: nowTime(),
+      draft: res.data?.orderDraft,
+      analysisRecordId: res.data?.analysisRecordId,
+    })
   }
   catch (e: any) {
     toast.error(e?.message || 'AI 服务暂不可用')
@@ -41,6 +49,22 @@ async function sendMessage() {
   finally {
     loading.value = false
   }
+}
+
+async function applyDraft(row: { draft?: any; analysisRecordId?: number; text: string }) {
+  if (!row.draft) return
+  saveAiDemandDraft({
+    analysisRecordId: row.analysisRecordId,
+    inputText: row.text,
+    reply: row.text,
+    draft: row.draft,
+  })
+  if (row.analysisRecordId) {
+    try {
+      await markAiRecordApplied(row.analysisRecordId)
+    } catch {}
+  }
+  router.push('/hall-publish')
 }
 
 function usePrompt(prompt: string) {
@@ -74,6 +98,19 @@ onMounted(() => {
       <div class="chat">
         <article v-for="(row, idx) in chatRows" :key="idx" class="bubble-wrap" :class="row.role">
           <div class="bubble" :class="row.role">{{ row.text }}</div>
+          <div v-if="row.role === 'ai' && row.draft" class="draft-card">
+            <div class="draft-head">
+              <strong>{{ row.draft.serviceType || '需求草稿' }}</strong>
+              <span>AI 草稿</span>
+            </div>
+            <div class="draft-grid">
+              <div>紧急程度：{{ row.draft.urgencyLevel || '2' }}</div>
+              <div>期望时间：{{ row.draft.expectedTime || '待补充' }}</div>
+              <div class="full">标签：{{ row.draft.tags?.join('、') || '社区互助' }}</div>
+              <div class="full draft-desc">{{ row.draft.description || '暂无描述' }}</div>
+            </div>
+            <button type="button" class="draft-action" @click="applyDraft(row)">带入发布需求</button>
+          </div>
           <small>{{ row.time }}</small>
         </article>
 
@@ -115,4 +152,54 @@ onMounted(() => {
 .prompts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .prompts button { border: 0; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 800; padding: 8px 10px; }
 .input-bar { margin-top: 2px; }
+.draft-card {
+  margin-top: 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+.draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.draft-head strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+.draft-head span {
+  font-size: 11px;
+  font-weight: 800;
+  color: #166534;
+  background: #ecfdf5;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.draft-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  font-size: 12px;
+  color: #475569;
+}
+.draft-grid .full {
+  grid-column: 1 / -1;
+}
+.draft-desc {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.draft-action {
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
 </style>
