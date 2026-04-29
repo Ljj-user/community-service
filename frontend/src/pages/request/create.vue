@@ -21,14 +21,12 @@ const profileLoading = ref(false)
 const currentCommunityText = ref('未绑定社区')
 
 const serviceTypeOptions = [
-  { label: '助老', value: '助老' },
-  { label: '清洁', value: '清洁' },
-  { label: '教育', value: '教育' },
-  { label: '助浴', value: '助浴' },
-  { label: '陪伴', value: '陪伴' },
-  { label: '维修', value: '维修' },
-  { label: '就医陪护', value: '就医陪护' },
-  { label: '其他', value: '其他' },
+  { label: '助老服务（陪护 / 陪诊）', value: '助老服务（陪护 / 陪诊）' },
+  { label: '代办服务（买菜 / 取药）', value: '代办服务（买菜 / 取药）' },
+  { label: '家政清洁', value: '家政清洁' },
+  { label: '心理陪伴 / 聊天', value: '心理陪伴 / 聊天' },
+  { label: '应急帮助（紧急求助）', value: '应急帮助（紧急求助）' },
+  { label: '社区活动支持', value: '社区活动支持' },
 ]
 
 const urgencyOptions = [

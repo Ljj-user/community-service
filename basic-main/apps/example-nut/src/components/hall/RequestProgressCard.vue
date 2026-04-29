@@ -9,7 +9,7 @@ const steps = [
   { title: '审核', hint: '等通过' },
   { title: '进行中', hint: '已接单' },
   { title: '待确认', hint: '等核销' },
-  { title: '完成', hint: '+5 时间币' },
+  { title: '完成', hint: '按时长结算' },
 ] as const
 
 const currentIndex = computed(() => {

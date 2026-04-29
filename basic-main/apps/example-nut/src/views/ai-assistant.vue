@@ -13,9 +13,9 @@ const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const inputText = ref('')
-const quickPrompts = ['我该怎么发布需求？', '怎么接取任务？', '怎么查看服务统计？', '帮我写一段求助说明'] as const
-const chatRows = ref<Array<{ role: 'user' | 'ai'; text: string; time: string; draft?: any; analysisRecordId?: number }>>([
-  { role: 'ai', text: '您好，我是邻里互助 AI 助手。可以直接描述您的问题。', time: '刚刚' },
+const quickPrompts = ['帮我整理陪诊需求', '我想找人上门打扫', '教我怎么发布求助', '帮我写一段简短说明'] as const
+const chatRows = ref<Array<{ role: 'user' | 'ai'; text: string; time: string; draft?: any; analysisRecordId?: number; sourceText?: string }>>([
+  { role: 'ai', text: '直接说需求就行，比如“明天上午想找人陪老人去医院”。我会帮你整理成可提交的表单内容。', time: '刚刚' },
 ])
 
 function nowTime() {
@@ -40,6 +40,7 @@ async function sendMessage() {
       time: nowTime(),
       draft: res.data?.orderDraft,
       analysisRecordId: res.data?.analysisRecordId,
+      sourceText: text,
     })
   }
   catch (e: any) {
@@ -51,11 +52,11 @@ async function sendMessage() {
   }
 }
 
-async function applyDraft(row: { draft?: any; analysisRecordId?: number; text: string }) {
+async function applyDraft(row: { draft?: any; analysisRecordId?: number; text: string; sourceText?: string }) {
   if (!row.draft) return
   saveAiDemandDraft({
     analysisRecordId: row.analysisRecordId,
-    inputText: row.text,
+    inputText: row.sourceText,
     reply: row.text,
     draft: row.draft,
   })
@@ -101,7 +102,7 @@ onMounted(() => {
           <div v-if="row.role === 'ai' && row.draft" class="draft-card">
             <div class="draft-head">
               <strong>{{ row.draft.serviceType || '需求草稿' }}</strong>
-              <span>AI 草稿</span>
+              <span>建议填写</span>
             </div>
             <div class="draft-grid">
               <div>紧急程度：{{ row.draft.urgencyLevel || '2' }}</div>
@@ -109,7 +110,7 @@ onMounted(() => {
               <div class="full">标签：{{ row.draft.tags?.join('、') || '社区互助' }}</div>
               <div class="full draft-desc">{{ row.draft.description || '暂无描述' }}</div>
             </div>
-            <button type="button" class="draft-action" @click="applyDraft(row)">带入发布需求</button>
+            <button type="button" class="draft-action" @click="applyDraft(row)">带入表单继续补充</button>
           </div>
           <small>{{ row.time }}</small>
         </article>
@@ -121,7 +122,7 @@ onMounted(() => {
         </div>
 
         <article v-if="loading" class="bubble-wrap ai">
-          <div class="bubble ai">正在思考中...</div>
+          <div class="bubble ai">正在整理中...</div>
         </article>
       </div>
 
@@ -129,7 +130,7 @@ onMounted(() => {
         v-model="inputText"
         class="input-bar"
         :show-voice="false"
-        placeholder="输入问题后按回车即可发送"
+        placeholder="输入一句需求，按回车就能生成草稿"
         @send="sendMessage"
       />
     </div>

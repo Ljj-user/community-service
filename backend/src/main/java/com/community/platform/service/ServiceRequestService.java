@@ -37,7 +37,7 @@ public interface ServiceRequestService {
     /**
      * 获取需求详情
      */
-    ServiceRequestVO getRequestDetail(Long requestId);
+    ServiceRequestVO getRequestDetail(Long requestId, Long currentUserId);
 
     /**
      * 服务过程监控列表

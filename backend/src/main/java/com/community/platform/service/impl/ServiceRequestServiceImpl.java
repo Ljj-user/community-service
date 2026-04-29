@@ -355,11 +355,15 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
     }
     
     @Override
-    public ServiceRequestVO getRequestDetail(Long requestId) {
+    public ServiceRequestVO getRequestDetail(Long requestId, Long currentUserId) {
+        if (currentUserId == null) {
+            throw new RuntimeException("未登录");
+        }
         ServiceRequest request = serviceRequestMapper.selectById(requestId);
         if (request == null || request.getIsDeleted() == 1) {
             throw new RuntimeException("需求不存在");
         }
+        assertCanViewRequestDetail(request, currentUserId);
         
         ServiceRequestVO vo = convertToVO(request);
         fillUserInfo(List.of(vo));
@@ -697,6 +701,50 @@ public class ServiceRequestServiceImpl extends ServiceImpl<ServiceRequestMapper,
                 }
             }
         }
+    }
+
+    private void assertCanViewRequestDetail(ServiceRequest request, Long currentUserId) {
+        SysUser currentUser = sysUserMapper.selectById(currentUserId);
+        if (currentUser == null || currentUser.getIsDeleted() == 1) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        if (Constants.ROLE_SUPER_ADMIN.equals(currentUser.getRole())) {
+            return;
+        }
+
+        if (Constants.ROLE_COMMUNITY_ADMIN.equals(currentUser.getRole())) {
+            if (currentUser.getCommunityId() != null && currentUser.getCommunityId().equals(request.getCommunityId())) {
+                return;
+            }
+            throw new RuntimeException("无权查看该需求");
+        }
+
+        if (!Constants.ROLE_NORMAL_USER.equals(currentUser.getRole())) {
+            throw new RuntimeException("无权查看该需求");
+        }
+
+        if (currentUserId.equals(request.getRequesterUserId())) {
+            return;
+        }
+
+        boolean isVolunteerParticipant = serviceClaimMapper.selectCount(
+                new LambdaQueryWrapper<ServiceClaim>()
+                        .eq(ServiceClaim::getRequestId, request.getId())
+                        .eq(ServiceClaim::getVolunteerUserId, currentUserId)
+                        .eq(ServiceClaim::getIsDeleted, 0)
+        ) > 0;
+        if (isVolunteerParticipant) {
+            return;
+        }
+
+        if (request.getStatus() == Constants.REQUEST_STATUS_PUBLISHED
+                && currentUser.getCommunityId() != null
+                && currentUser.getCommunityId().equals(request.getCommunityId())) {
+            return;
+        }
+
+        throw new RuntimeException("无权查看该需求");
     }
 
     private void fillMatchExplain(List<ServiceRequestVO> voList, Long currentUserId) {

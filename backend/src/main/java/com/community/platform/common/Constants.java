@@ -64,9 +64,10 @@ public class Constants {
     public static final Byte EVAL_ROLE_VOLUNTEER = 2;
 
     /**
-     * 时间币结算：志愿者每完成一单固定获得 5 个时间币。
+     * 时间币结算：默认按 1 小时 = 1 时间币折算，四舍五入到最近整数，每单至少 1 币。
      */
-    public static final Long TIME_COINS_PER_COMPLETED_SERVICE = 5L;
+    public static final Long TIME_COINS_PER_SERVICE_HOUR = 1L;
+    public static final Long MIN_TIME_COINS_PER_COMPLETED_SERVICE = 1L;
 
     /**
      * 允许发布的服务类型白名单

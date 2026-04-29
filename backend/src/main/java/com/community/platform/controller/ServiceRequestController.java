@@ -108,7 +108,8 @@ public class ServiceRequestController {
     @GetMapping("/{id}")
     public Result<ServiceRequestVO> getRequestDetail(@PathVariable("id") Long id) {
         try {
-            ServiceRequestVO vo = serviceRequestService.getRequestDetail(id);
+            Long currentUserId = getCurrentUserId();
+            ServiceRequestVO vo = serviceRequestService.getRequestDetail(id, currentUserId);
             return Result.success(vo);
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());

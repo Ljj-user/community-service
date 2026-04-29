@@ -27,6 +27,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +84,9 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         if (certified == null || certified <= 0) {
             throw new RuntimeException("请先完成志愿者认证后再接单");
         }
+        if (volunteer.getCommunityId() == null) {
+            throw new RuntimeException("请先加入社区后再认领服务");
+        }
         
         // 查询需求
         ServiceRequest request = serviceRequestMapper.selectById(dto.getRequestId());
@@ -95,10 +100,11 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
 
         // 网格化隔离：仅允许同社区流转
         SysUser requester = sysUserMapper.selectById(request.getRequesterUserId());
-        if (requester != null && requester.getCommunityId() != null && volunteer.getCommunityId() != null) {
-            if (!requester.getCommunityId().equals(volunteer.getCommunityId())) {
-                throw new RuntimeException("仅允许认领同社区需求");
-            }
+        if (request.getCommunityId() == null) {
+            throw new RuntimeException("该需求未绑定社区，无法认领");
+        }
+        if (!request.getCommunityId().equals(volunteer.getCommunityId())) {
+            throw new RuntimeException("仅允许认领同社区需求");
         }
         
         // 检查是否已被认领
@@ -325,7 +331,7 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
             throw new RuntimeException("用户不存在");
         }
 
-        long coins = Constants.TIME_COINS_PER_COMPLETED_SERVICE;
+        long coins = calcSettlementCoins(claim.getServiceHours());
         if (coins <= 0) {
             throw new RuntimeException("核销时长无效");
         }
@@ -395,6 +401,15 @@ public class ServiceClaimServiceImpl implements ServiceClaimService {
         serviceRequestMapper.updateById(request);
 
         volunteerCreditService.onServiceConfirmed(request, claim);
+    }
+
+    private long calcSettlementCoins(BigDecimal serviceHours) {
+        if (serviceHours == null || serviceHours.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0L;
+        }
+        BigDecimal rawCoins = serviceHours.multiply(BigDecimal.valueOf(Constants.TIME_COINS_PER_SERVICE_HOUR));
+        long rounded = rawCoins.setScale(0, RoundingMode.HALF_UP).longValue();
+        return Math.max(Constants.MIN_TIME_COINS_PER_COMPLETED_SERVICE, rounded);
     }
     
     @Override

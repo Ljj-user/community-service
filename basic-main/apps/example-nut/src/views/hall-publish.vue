@@ -13,6 +13,7 @@ definePage({
 const router = useRouter()
 const appAuthStore = useAppAuthStore()
 const loading = ref(false)
+const aiDraftState = ref<ReturnType<typeof loadAiDemandDraft>>(null)
 const SERVICE_TYPES = [
   '助老服务（陪护 / 陪诊）',
   '代办服务（买菜 / 取药）',
@@ -44,54 +45,52 @@ function onGotoStats() {
   router.push({ path: '/hall-overview', query: { kind: 'stats' } })
 }
 
-function getDescriptionTemplate(serviceType: string) {
-  if (serviceType === '助老服务（陪护 / 陪诊）') {
-    return `【服务类型】助老服务（陪护 / 陪诊）
-【需求内容】需要陪同老人就医或日常照看
-【服务时间】请填写可服务时段
-【联系人】请填写姓名与联系电话`
-  }
-  if (serviceType === '代办服务（买菜 / 取药）') {
-    const addressLine = form.serviceAddress.trim() || '请填写具体地址'
-    return `【服务类型】代办服务（买菜 / 取药）
-【代办事项】请填写需要代办的内容（买菜/取药）
-【配送地址】${addressLine}
-【联系人】请填写姓名与联系电话`
-  }
-  if (serviceType === '家政清洁') {
-    return `【服务类型】家政清洁
-【清洁范围】请填写需要清洁的区域（如厨房/卫生间）
-【上门时间】请填写期望上门时间
-【备注】如有工具或注意事项请补充`
-  }
-  if (serviceType === '心理陪伴 / 聊天') {
-    return `【服务类型】心理陪伴 / 聊天
-【需求说明】希望有人倾听与交流
-【陪伴方式】可线下或电话沟通
-【时间安排】请填写方便联系的时间`
-  }
-  if (serviceType === '应急帮助（紧急求助）') {
-    return `【服务类型】应急帮助（紧急求助）
-【紧急事项】请简要说明当前紧急情况
-【所在位置】请填写详细地址与楼栋门牌
-【联系方式】请立即填写可联系手机号`
-  }
-  return `【服务类型】社区活动支持
-【活动名称】请填写活动主题
-【需要支持】如秩序维护/物资搬运/现场引导
-【活动时间地点】请填写具体时间与地点`
+function onGotoAiAssistant() {
+  const seed = form.description.trim() || `帮我整理一条${form.serviceType}需求，服务地址是${form.serviceAddress.trim() || '待补充'}。`
+  router.push({ path: '/ai-assistant', query: { q: seed } })
 }
 
-watch(() => form.serviceType, (nextType) => {
-  if (form.description.trim()) return
-  form.description = getDescriptionTemplate(nextType)
-}, { immediate: true })
+function getDescriptionTemplate(serviceType: string) {
+  if (serviceType === '助老服务（陪护 / 陪诊）') {
+    return `需求内容：需要陪同老人就医或办检查。
+服务时间：请补充具体日期和时段。
+补充说明：如需轮椅、挂号或取报告，请一并写明。`
+  }
+  if (serviceType === '代办服务（买菜 / 取药）') {
+    const addressLine = form.serviceAddress.trim() || '请补充详细地址'
+    return `需求内容：需要帮忙买菜、取药或短距离代办。
+服务地址：${addressLine}。
+补充说明：请写清代办事项和联系人。`
+  }
+  if (serviceType === '家政清洁') {
+    return `需求内容：需要上门协助打扫。
+清洁范围：请补充房间区域或具体事项。
+服务时间：请写明方便上门的时段。`
+  }
+  if (serviceType === '心理陪伴 / 聊天') {
+    return `需求内容：希望有人陪聊、陪伴或上门看看。
+联系方式：请补充方便联系的时间。
+补充说明：如需线下陪伴，可写明地点。`
+  }
+  if (serviceType === '应急帮助（紧急求助）') {
+    return `需求内容：当前遇到紧急情况，需要尽快协助。
+当前位置：请补充楼栋、门牌或明显位置。
+联系方式：请写明能立即接通的电话。`
+  }
+  return `需求内容：需要志愿者支持社区现场事务。
+具体事项：请补充活动主题和需要帮忙的环节。
+服务时间：请写明活动时间和地点。`
+}
 
-watch(() => form.serviceAddress, () => {
-  if (form.serviceType !== '代办服务（买菜 / 取药）') return
-  if (form.description.trim()) return
+function fillDescriptionReference() {
   form.description = getDescriptionTemplate(form.serviceType)
-})
+}
+
+function removeAiDraft() {
+  aiDraftState.value = null
+  clearAiDemandDraft()
+  toast.success('已移除 AI 草稿，可继续手动填写')
+}
 
 function plusHours(hours: number) {
   const d = new Date(Date.now() + hours * 60 * 60 * 1000)
@@ -120,10 +119,11 @@ async function submit() {
       emergencyContactPhone: form.emergencyContactPhone.trim(),
       emergencyContactRelation: form.emergencyContactRelation.trim() || undefined,
       expectedTime: plusHours(2),
-      specialTags: loadAiDemandDraft()?.draft.tags,
-      aiAnalysisRecordId: loadAiDemandDraft()?.analysisRecordId,
+      specialTags: aiDraftState.value?.draft.tags,
+      aiAnalysisRecordId: aiDraftState.value?.analysisRecordId,
     })
     if (res.code !== 200) throw new Error(res.message || '发布失败')
+    aiDraftState.value = null
     clearAiDemandDraft()
     toast.success('发布成功，已提交审核')
     router.back()
@@ -136,29 +136,19 @@ async function submit() {
   }
 }
 
-function resetTemplate() {
-  form.description = getDescriptionTemplate(form.serviceType)
-}
-
 onMounted(async () => {
   await appAuthStore.hydrateUser()
   const u = appAuthStore.user
   if (!form.serviceAddress.trim()) form.serviceAddress = (u?.communityName || u?.address || '').trim()
   if (!form.emergencyContactName.trim()) form.emergencyContactName = (u?.realName || u?.username || '').trim()
   const draft = loadAiDemandDraft()
+  aiDraftState.value = draft
   if (draft?.draft) {
     form.serviceType = (draft.draft.serviceType as any) || form.serviceType
     form.urgencyLevel = Number(draft.draft.urgencyLevel || form.urgencyLevel)
-    if (draft.draft.expectedTime) {
-      // 仅展示草稿生成的目标时间说明，由正式提交时重新按当前表单生成 expectedTime
-    }
     if (draft.draft.description?.trim()) {
       form.description = draft.draft.description
-    } else {
-      resetTemplate()
     }
-  } else {
-    resetTemplate()
   }
 })
 </script>
@@ -199,22 +189,32 @@ onMounted(async () => {
           <div class="level">
             <button type="button" :class="{ active: form.urgencyLevel === 1 }" @click="form.urgencyLevel = 1">普通</button>
             <button type="button" :class="{ active: form.urgencyLevel === 2 }" @click="form.urgencyLevel = 2">中等</button>
-            <button type="button" :class="{ active: form.urgencyLevel >= 3 }" @click="form.urgencyLevel = 4">极紧急</button>
+            <button type="button" :class="{ active: form.urgencyLevel >= 3 }" @click="form.urgencyLevel = 4">较紧急</button>
           </div>
         </div>
 
         <div class="form-card">
           <div class="label">服务地址</div>
-          <NutInput v-model="form.serviceAddress" placeholder="如：幸福小区1栋101" />
+          <NutInput v-model="form.serviceAddress" placeholder="如：幸福小区 1 栋 101" />
         </div>
 
         <div class="form-card">
+          <div v-if="aiDraftState?.draft" class="draft-banner">
+            <div class="draft-banner__text">
+              <strong>已带入 AI 草稿</strong>
+              <span>现在可以继续改，也可以先删掉。</span>
+            </div>
+            <button type="button" class="draft-banner__remove" @click="removeAiDraft">删除草稿</button>
+          </div>
           <div class="label-row">
             <div class="label">需求描述</div>
-            <button type="button" class="template-reset" @click="resetTemplate">重置模板</button>
+            <div class="desc-actions">
+              <button type="button" class="template-reset" @click="fillDescriptionReference">插入参考</button>
+              <button type="button" class="template-reset ai-entry" @click="onGotoAiAssistant">AI帮我写</button>
+            </div>
           </div>
           <NutTextarea v-model="form.description" rows="7" placeholder="请描述需要帮助的内容" />
-          <p class="desc-tip">可在模板基础上补充细节</p>
+          <p class="desc-tip">可直接手写，也可先让 AI 帮你整理。</p>
         </div>
 
         <div class="form-card">
@@ -250,8 +250,43 @@ onMounted(async () => {
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 .label { margin-bottom: 8px; color: #0f172a; font-size: 13px; font-weight: 700; }
-.label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.desc-actions { display: flex; align-items: center; gap: 8px; }
 .template-reset { border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; font-size: 11px; color: #334155; padding: 3px 10px; }
+.ai-entry { border-color: #a7f3d0; background: #ecfdf5; color: #166534; }
+.draft-banner {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.96) 0%, rgba(240, 253, 244, 0.88) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.draft-banner__text {
+  display: grid;
+  gap: 2px;
+}
+.draft-banner__text strong {
+  color: #166534;
+  font-size: 13px;
+}
+.draft-banner__text span {
+  color: #4b5563;
+  font-size: 11px;
+}
+.draft-banner__remove {
+  border: 0;
+  border-radius: 999px;
+  background: #166534;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
 .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .type-card {
   border: 1px solid #d1d5db; border-radius: 10px; background: #fff; color: #374151; padding: 10px 12px; font-size: 12px; line-height: 1.35;

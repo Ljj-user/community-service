@@ -51,7 +51,9 @@ async function loadData() {
       getMyAiRecords(1, 6),
       listUserAnnouncements(1, 6),
     ])
-    aiRows.value = (aiRes.data?.records || []).filter(x => x.resultMode === 'DEMAND_DRAFT')
+    aiRows.value = (aiRes.data?.records || []).filter(x =>
+      x.resultMode === 'DEMAND_DRAFT' && !x.appliedToForm && !x.submittedSuccess,
+    )
     announcements.value = annRes.data?.records || []
   }
   finally {
@@ -65,6 +67,7 @@ async function continueDraft(row: AiAnalysisRecord) {
     router.push('/ai-assistant')
     return
   }
+  aiRows.value = aiRows.value.filter(item => item.id !== row.id)
   saveAiDemandDraft({
     analysisRecordId: row.id,
     inputText: row.inputText,

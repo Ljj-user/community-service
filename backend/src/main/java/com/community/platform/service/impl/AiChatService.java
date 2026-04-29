@@ -222,23 +222,25 @@ public class AiChatService {
     }
 
     private String detectServiceType(String text) {
-        // 必须命中后端发布白名单（存中文），否则 AI 草稿无法“一键发布”
-        if (text.contains("紧急") || text.contains("求助") || text.contains("摔倒") || text.contains("晕") || text.contains("救")) {
+        // 必须命中后端发布白名单中的中文枚举，否则 AI 草稿无法一键带入发布页
+        if (containsAny(text, "立即", "马上", "现在就要", "紧急", "摔倒", "晕倒", "受伤", "报警", "急救")) {
             return "应急帮助（紧急求助）";
         }
-        if (text.contains("活动") || text.contains("志愿") || text.contains("签到") || text.contains("布置") || text.contains("搬运")) {
-            return "社区活动支持";
+        if (containsAny(text, "陪诊", "陪护", "就医", "看病", "挂号", "取报告", "老人", "老年", "长者")) {
+            return "助老服务（陪护 / 陪诊）";
         }
-        if (text.contains("聊天") || text.contains("陪伴") || text.contains("倾诉") || text.contains("心理")) {
-            return "心理陪伴 / 聊天";
-        }
-        if (text.contains("清洁") || text.contains("打扫") || text.contains("家政")) {
-            return "家政清洁";
-        }
-        if (text.contains("买") || text.contains("跑腿") || text.contains("取药") || text.contains("代办")) {
+        if (containsAny(text, "买菜", "代买", "跑腿", "取药", "送药", "代办")) {
             return "代办服务（买菜 / 取药）";
         }
-        // 默认归到助老
+        if (containsAny(text, "打扫", "清洁", "保洁", "家政", "卫生")) {
+            return "家政清洁";
+        }
+        if (containsAny(text, "聊天", "陪伴", "倾诉", "心理", "说说话", "解闷")) {
+            return "心理陪伴 / 聊天";
+        }
+        if (containsAny(text, "活动", "签到", "布置", "搬运", "现场引导", "秩序维护")) {
+            return "社区活动支持";
+        }
         return "助老服务（陪护 / 陪诊）";
     }
 
@@ -261,15 +263,44 @@ public class AiChatService {
 
     private List<String> detectTags(String text) {
         List<String> tags = new ArrayList<>();
-        if (text.contains("老人") || text.contains("老年")) tags.add("老人");
-        if (text.contains("残疾")) tags.add("残疾");
-        if (text.contains("独居")) tags.add("独居");
+        if (containsAny(text, "老人", "老年", "长者")) tags.add("老人关怀");
+        if (containsAny(text, "残疾", "行动不便", "轮椅")) tags.add("行动不便");
+        if (containsAny(text, "独居", "一个人住")) tags.add("独居");
+        if (containsAny(text, "陪诊", "就医", "看病", "挂号")) tags.add("就医陪诊");
+        if (containsAny(text, "买菜", "取药", "跑腿", "代办")) tags.add("生活代办");
         if (tags.isEmpty()) tags.add("社区互助");
         return tags;
     }
 
     private String buildDescription(String raw, AiOrderDraftVO draft) {
-        return String.format(Locale.ROOT, "AI生成：%s；类型=%s；标签=%s。", raw, draft.getServiceType(), String.join("、", draft.getTags()));
+        String cleaned = raw == null ? "" : raw
+                .replace("AI生成：", "")
+                .replace("ai生成：", "")
+                .replace("AI生成", "")
+                .trim();
+        cleaned = cleaned.replaceAll("[；;。]+$", "");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("需求内容：").append(cleaned.isBlank() ? "需要志愿者协助处理线下服务" : cleaned).append("。");
+
+        if (draft.getServiceType() != null && !draft.getServiceType().isBlank()) {
+            sb.append("\n服务类型：").append(draft.getServiceType()).append("。");
+        }
+        if (draft.getTags() != null && !draft.getTags().isEmpty()) {
+            sb.append("\n补充标签：").append(String.join("、", draft.getTags())).append("。");
+        }
+        sb.append("\n请志愿者提前电话联系，再确认上门或陪同时间。");
+        return sb.toString();
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        if (text == null || text.isBlank() || keywords == null) return false;
+        for (String keyword : keywords) {
+            if (keyword != null && !keyword.isBlank() && text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private AiChatResponseVO buildFaqFallback(String text) {
