@@ -8,8 +8,8 @@ CREATE DATABASE IF NOT EXISTS community_service
 
 USE community_service;
 
--- 1) 导入当前 PRD v2 表结构
+-- 1) Load current PRD v2 schema
 SOURCE backend/src/main/resources/db/schema_v2_prd.sql;
 
--- 2) 导入当前模拟数据
+-- 2) Load current temp data
 SOURCE backend/src/main/resources/db/temp_data.sql;
