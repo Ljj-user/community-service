@@ -64,7 +64,7 @@ docs/         研究资料、系统设计、导出文档
 
 ## 目录入口
 
-- 产品需求文档：[`PRD.md`](D:/Coding/毕设/毕设/PRD.md)
+- 产品需求文档：[`docs/产品与技术资料/PRD.md`](D:/Coding/毕设/毕设/docs/产品与技术资料/PRD.md)
 - 文档索引：[`docs/README.md`](D:/Coding/毕设/毕设/docs/README.md)
 - 数据库设计：[`backend/docs/database-design.md`](D:/Coding/毕设/毕设/backend/docs/database-design.md)
 - 数据库脚本说明：[`backend/src/main/resources/db/README-ER-notes.md`](D:/Coding/毕设/毕设/backend/src/main/resources/db/README-ER-notes.md)
@@ -238,7 +238,7 @@ pnpm run dev
 
 如果你是继续开发这个项目，建议按这个顺序看：
 
-1. [`PRD.md`](D:/Coding/毕设/毕设/PRD.md)
+1. [`docs/产品与技术资料/PRD.md`](D:/Coding/毕设/毕设/docs/产品与技术资料/PRD.md)
 2. [`backend/docs/database-design.md`](D:/Coding/毕设/毕设/backend/docs/database-design.md)
 3. [`docs/系统设计/系统架构与功能初步设计.md`](D:/Coding/毕设/毕设/docs/系统设计/系统架构与功能初步设计.md)
 4. [`docs/系统设计/需求可行性优先级分析.md`](D:/Coding/毕设/毕设/docs/系统设计/需求可行性优先级分析.md)

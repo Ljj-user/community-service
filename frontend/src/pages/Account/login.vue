@@ -88,9 +88,11 @@ meta:
 </route>
 
 <template>
-  <div class="bg flex justify-center items-center h-screen">
+  <div class="login-shell flex justify-center items-center h-screen">
+    <div class="login-scene" aria-hidden="true" />
+    <div class="login-noise" aria-hidden="true" />
     <div class="login-box w-full px-3 md:px-0">
-      <div class="md:shadow-lg bg-white dark:bg-slate-800  rounded-md w-full" :class="{ failed: loginFailed }">
+      <div class="login-card rounded-md w-full" :class="{ failed: loginFailed }">
         <div class="p-5">
           <div class="text-2xl font-medium mb-8">
             {{ t('login.title') }}
@@ -163,10 +165,51 @@ meta:
 </template>
 
 <style lang='scss'>
+.login-shell {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(248, 244, 235, 0.95) 0%, rgba(241, 232, 214, 0.88) 45%, rgba(232, 242, 234, 0.86) 100%);
+}
+
+.login-scene,
+.login-noise {
+  position: absolute;
+  inset: 0;
+}
+
+.login-scene {
+  background:
+    linear-gradient(115deg, rgba(255, 248, 236, 0.16) 0%, rgba(255, 248, 236, 0.72) 34%, rgba(244, 235, 219, 0.9) 100%),
+    url('/assets/images/community-login-bg.png') center bottom / min(1080px, 86vw) no-repeat;
+  filter: saturate(1.05);
+}
+
+.login-noise {
+  opacity: 0.3;
+  background-image:
+    radial-gradient(rgba(104, 85, 48, 0.14) 0.7px, transparent 0.7px),
+    radial-gradient(rgba(255, 255, 255, 0.45) 0.7px, transparent 0.7px);
+  background-position: 0 0, 10px 10px;
+  background-size: 20px 20px;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
 .login-box {
   max-width: 380px;
   position: relative;
   z-index: 2;
+
+  .login-card {
+    background: rgba(255, 252, 247, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    box-shadow:
+      0 18px 48px rgba(92, 72, 35, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
 
   .failed {
     animation: shake 0.82s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
@@ -225,6 +268,35 @@ select:-webkit-autofill:focus {
     position: absolute;
     left: calc(50% - 45px);
     padding: 0 0.3rem;
+  }
+}
+
+.dark {
+  .login-shell {
+    background:
+      linear-gradient(135deg, rgba(28, 38, 32, 0.96) 0%, rgba(41, 34, 24, 0.92) 48%, rgba(17, 24, 39, 0.95) 100%);
+  }
+
+  .login-scene {
+    background:
+      linear-gradient(115deg, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.7) 38%, rgba(20, 20, 20, 0.82) 100%),
+      url('/assets/images/community-login-bg.png') center bottom / min(1080px, 86vw) no-repeat;
+    filter: saturate(0.92) brightness(0.72);
+  }
+
+  .login-card {
+    background: rgba(22, 28, 37, 0.72) !important;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+}
+
+@media (max-width: 640px) {
+  .login-scene {
+    background-size: 145vw;
+    background-position: center bottom;
   }
 }
 </style>

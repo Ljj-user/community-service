@@ -166,7 +166,7 @@ backend/      Spring Boot 后端
 frontend/     Vue 3 管理端
 basic-main/   Vue 3 + NutUI 移动端
 docs/         研究资料、系统设计、导出文档
-PRD.md        当前产品需求文档
+docs/产品与技术资料/PRD.md        当前产品需求文档
 ```
 
 ### 技术栈
@@ -195,7 +195,7 @@ PRD.md        当前产品需求文档
 
 ### 当前重要文档入口
 
-- `PRD.md`
+- `docs/产品与技术资料/PRD.md`
 - `docs/README.md`
 - `backend/docs/database-design.md`
 - `backend/src/main/resources/db/README-ER-notes.md`
@@ -270,48 +270,82 @@ PRD.md        当前产品需求文档
 任何新增设计、页面、接口、字段，先问自己一句：
 
 > 它是不是在强化“社区公益服务对接与治理”这条主线？
-4.4.1  程序首页实现
-（1）页面布局与实现
-小程序首页包含轮播图浏览框、学校信息简介、页面跳转按钮、校园天气等。用户可以在程序首页查看包括轮播图中精美的校园照片、建校时间、校徽、办校类型、等高校基本信息，还可以点击学校简介进入学校简介页面查看详细文字介绍和宣传视频。在常用功能框，用户点击地图导航、校园指南、地点热度按钮分别可以跳转到地图页、校园指南页和地点热度页，点击友情链接可以查看学校官方公众号或跳转至学校图书馆座位预约小程序。在首页底部可查看到校园天气，帮助用户查看校园实时天气状况。平台首页页面布局结构图如图 22所示，平台首页页面实现如图 23所示。
 
-图 22  首页布局结构图
+### 论文接力补充
 
-图 23  首页
+后续如果继续修改毕业论文，必须默认以当前新系统为准，不要再沿用旧项目里“校园导览、小程序首页、地点热度、论坛/闲置/时间银行”那套表述。
 
-（2）关键技术和代码
-首页顶部轮播图使用swiper视图容器组件实现，在首页底部的校园天气布局中，调用wx.request向和风天气API发出请求并返回相关天气数据并渲染到前端页面。首页前端布局中具有跳转功能的图片构成，利用image组件进行布局并绑定处理函数bingtap，小程序会调用wx.navigateTo()和wx.switchTab()函数用于不同类型的页面跳转。在友情链接功能中使用weUI组件库中mp-dialog对话框组件进行布局，后端调用wx.navigateToMiniProgram()，跳转至对应的小程序。关键代码如下：
-map() {
-        wx.switchTab({
-            url: '../map/map',
-        })
-    }
-toMiniProgram() {
-      wx.navigateToMiniProgram({
-          appId: this.data.AppID,
-          success(res) {},
-          fail(res) {}})},
-getWeather() {
-	var that =this
-	wx.request({
-		url: 'https://devapi.qweather.com/v7/weather/now?key=' + that.data.APIKEY + 
-		"&location=" + that.data.school_location,
-		success(result) {
-			var res = result.data
-			that.setData({
-			now: res.now})}})}
+论文主线固定为：
 
-4.4.2  地点热度页面实现
-（1）页面布局与实现
-地点热度页面主要对全校地点信息进行分页查询处理，点击底部按钮可实现以二十个地点为一区间查询排名。地点热度页面实现如图 24所示。
-图 24  地点热度页面
+> 登录注册与社区加入 -> 居民发布求助 -> 管理员审核 -> 志愿者认证/接单 -> 服务完成 -> 评价反馈 -> 数据统计 -> 异常预警
 
-（2）关键技术和代码
-本页面通过在云端部署云函数，通过调用云开发数据库中指定构建查询条件函数collection().orderBy()、collection().limit()、collection().skip()实现分页查询功能。orderBy函数指定查询按browse降序排列，desc参数指定按降序查询，并利用skip和limit函数实现查询从指定序列查询指定最大数量JSON对象。关键代码如下：
-// 获取所有数据，orderBy排序，desc从大到小，skip跳过，limit限制
-const data = await db.collection('site')
-	.orderBy('browse', 'desc')
-	.skip((pagination.current - 1) * pagination.pageSize)
-	.limit(pagination.pageSize)
-	.get();
+论文中的核心业务点优先写这些：
 
-```
+- 社区绑定与 `community_id` 数据隔离
+- 社区加入审核
+- 公益需求发布与审核
+- 志愿者认证与服务认领
+- 服务完成与评价反馈
+- 社区公告与便民信息
+- 重点关怀对象管理
+- 异常预警与后台治理
+- AI 草稿辅助与 AI 分析记录
+
+论文第 4 章目前应保持的模块口径：
+
+- `4.1` 系统结构模块设计：写移动端、管理端、后端服务层、数据库层，以及用户端/社区管理员端/系统管理员端的真实模块划分
+- `4.2` 系统流程实现：重点写“需求状态流转”和“社区加入 + 后台审核治理”两条流程
+- `4.3` 数据库存储设计：以 `backend/src/main/resources/db/schema_v2_prd.sql` 为准，优先介绍 `sys_user`、`community_join_application`、`volunteer_profile`、`care_subject_profile`、`service_request`、`service_claim`、`service_evaluation`、`announcement`、`convenience_info`、`anomaly_alert_event`、`audit_log`
+- `4.4` 系统实现：每个页面只写两部分，“页面布局与实现”和“关键技术与代码”，而且都要短
+
+论文写法上的约束：
+
+- 页面布局只讲“用户能做什么”，不要堆很多无效描述
+- 关键技术与代码每页挑 1 到 2 个点就够
+- 不要把运维辅助页当成系统主页面大写特写
+- AI 功能写成辅助能力，不要写成替代人工审核的核心决策模块
+- 如果页面、表名、流程和代码不一致，优先以当前代码、PRD 和主库脚本为准
+
+论文相关优先参考：
+
+- `docs/产品与技术资料/PRD.md`
+- `backend/docs/database-design.md`
+- `backend/src/main/resources/db/schema_v2_prd.sql`
+- `docs/README.md`
+
+当前论文修订进度也要记住：
+
+- `4.1` 到 `4.4` 已经按新系统方向完成同步
+- `5.1 本文所做的主要工作` 也已改成当前项目表述
+- 如果后续继续改 `.docx`，优先在现有修订版基础上同步，不要再回写旧系统描述
+
+### 论文内容重做版约束
+
+当前论文继续修订时，默认工作文件为：
+
+- `毕业论文/天津商业大学毕业设计(论文)张正豪v4.1-内容重做版.docx`
+
+这一版的修订原则必须固定为：
+
+- 只改和系统挂钩的正文内容
+- 不改标题样式
+- 不改目录
+- 不改分页
+- 不改图片位置
+- 不改表格外观
+
+允许修改的范围主要是：
+
+- 摘要与关键词
+- 第 1 章中与系统目标、研究内容、章节安排有关的表述
+- 第 3 章系统规划、角色分析、用例分析
+- 第 4 章系统结构、流程、数据库、页面实现
+- 第 5 章主要工作与后续研究方向
+
+数据库部分后续若继续改，优先保持：
+
+- 表格格式不动
+- 只替换表名、字段名、字段说明
+- 以 `backend/src/main/resources/db/schema_v2_prd.sql` 为准
+
+如果发现论文中的图题、页题已经手工摆好，后续 Agent 不要再批量重排，只做内容对齐。

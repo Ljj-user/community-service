@@ -129,7 +129,6 @@ onMounted(() => {
       <AiHeroInput
         v-model="inputText"
         class="input-bar"
-        :show-voice="false"
         placeholder="输入一句需求，按回车就能生成草稿"
         @send="sendMessage"
       />
