@@ -1,5 +1,5 @@
 -- 社区公益服务对接管理平台 — 精简 DDL（用于 ER 工具导入 / 论文附录）
--- 与 src/main/resources/db/schema.sql 结构一致，区别：
+-- 与旧版 src/main/resources/db/archive/legacy-sql/schema.sql 结构一致，区别：
 --   1) 无 DROP TABLE，请在空库 community_service 中执行
 --   2) 待办相关索引改为普通 CREATE INDEX（无动态 SQL），便于 Navicat/部分工具解析
 --

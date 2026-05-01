@@ -1,13 +1,19 @@
-# 数据库说明与 ER 图资料
+# 数据库说明与 ER 资料
 
-完整表结构脚本：**本目录 `schema.sql`**（权威）。
+当前完整表结构脚本：`schema_v2_prd.sql`
 
-用于生成 ER 图、整理数据库设计说明的文档在：
+用于整理数据库设计、绘制 ER 图的说明文档位于：
+`backend/docs/database-design.md`
 
-**`backend/docs/`**
+常用文件如下：
 
 | 文件 | 说明 |
 |------|------|
-| `database-design.md` | 表清单、外键与逻辑关联、业务流程、Mermaid ER 图、工具使用说明 |
-| `schema-for-er.dbml` | 导入 [dbdiagram.io](https://dbdiagram.io) 生成可导出图片的 ER 图 |
-| `schema-clean-for-er.sql` | 无 DROP、无动态 SQL 的建表脚本，便于导入空库后用 Navicat / Workbench 逆向 |
+| `schema_v2_prd.sql` | 当前 PRD v2 完整建表脚本 |
+| `temp_data.sql` | 当前模拟数据主入口 |
+| `min_demo_data_v2.sql` | 兼容保留的旧数据脚本 |
+| `init_all.sql` | 一键初始化入口 |
+| `init-db.cmd` | Windows 一键初始化脚本 |
+| `README-usage.md` | DB 目录脚本分工说明 |
+
+如果论文、ER 图、旧说明文档和代码不一致，优先以当前 `schema_v2_prd.sql` 为准。
