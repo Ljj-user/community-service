@@ -2,6 +2,7 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import generatedRoutes from 'virtual:generated-pages'
 import { createRouter, createWebHistory } from 'vue-router'
 import i18n from '~/modules/i18n'
+import tokenService from '~/common/api/token.service'
 import App from './App.vue'
 import type { AppModule } from './types'
 
@@ -58,6 +59,27 @@ Object.values(
 
 router.beforeEach((to, _, next) => {
   const { t } = i18n.global
+  const currentUser = tokenService.getUser?.() || {}
+  const role = Number(currentUser.role ?? 0)
+
+  const superAdminOnlyPaths = [
+    '/admin/super',
+    '/admin/global-dashboard',
+    '/admin/config',
+    '/admin/backup',
+    '/admin/ai-analysis',
+  ]
+
+  if (role === 2 && superAdminOnlyPaths.some(path => to.path.startsWith(path))) {
+    next('/admin/dashboard')
+    return
+  }
+
+  if (role === 3 && (to.path.startsWith('/admin/') || to.path.startsWith('/community/'))) {
+    next('/dashboard')
+    return
+  }
+
   let title = t('title')
   if (to.meta.title) title = `${t(`menu.${to.meta.title}`)} - ${title}`
 

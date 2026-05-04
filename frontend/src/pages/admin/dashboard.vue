@@ -10,6 +10,9 @@ meta:
 <script setup lang="ts">
 const router = useRouter()
 const { t } = useI18n()
+const accountStore = useAccountStore()
+
+const isSuperAdmin = computed(() => accountStore.user?.role === 1)
 
 function go(path: string) {
   router.push(path)
@@ -33,6 +36,17 @@ function go(path: string) {
         <div class="mt-3 flex gap-2">
           <n-button size="small" type="primary" @click.stop="go('/community/requests')">
             {{ t('community.dashboard.cardRequestsBtn') }}
+          </n-button>
+        </div>
+      </Card>
+
+      <Card title="历史需求记录" class="cursor-pointer" @click="go('/community/request-history')">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          看已完成、已驳回和处理中记录。
+        </p>
+        <div class="mt-3 flex gap-2">
+          <n-button size="small" @click.stop="go('/community/request-history')">
+            打开记录
           </n-button>
         </div>
       </Card>
@@ -113,22 +127,11 @@ function go(path: string) {
           </n-button>
         </div>
       </Card>
-
-      <Card :title="t('community.dashboard.cardStatsTitle')" class="cursor-pointer" @click="go('/admin/global-dashboard')">
-        <p class="text-sm text-slate-600 dark:text-slate-300">
-          {{ t('community.dashboard.cardStatsDesc') }}
-        </p>
-        <div class="mt-3 flex gap-2">
-          <n-button size="small" @click.stop="go('/admin/global-dashboard')">
-            {{ t('community.dashboard.cardStatsBtn') }}
-          </n-button>
-        </div>
-      </Card>
     </div>
 
     <div class="mt-6">
       <h2 class="text-lg font-semibold mb-3">
-        {{ t('community.dashboard.sectionSystemTitle') }}
+        {{ isSuperAdmin ? t('community.dashboard.sectionSystemTitle') : t('menu.communityScopedUsers') }}
       </h2>
       <div class="dashboard-grid dashboard-grid-small">
         <Card :title="t('community.dashboard.cardUsersTitle')" class="cursor-pointer" @click="go('/admin/users')">
@@ -142,7 +145,7 @@ function go(path: string) {
           </div>
         </Card>
 
-        <Card :title="t('community.dashboard.cardAuditTitle')" class="cursor-pointer" @click="go('/admin/audit')">
+        <Card v-if="isSuperAdmin" :title="t('community.dashboard.cardAuditTitle')" class="cursor-pointer" @click="go('/admin/audit')">
           <p class="text-sm text-slate-600 dark:text-slate-300">
             {{ t('community.dashboard.cardAuditDesc') }}
           </p>

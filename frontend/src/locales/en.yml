@@ -242,13 +242,14 @@ menu:
   globalDashboard: Global Dashboard
   backup: Export & Backup
   communityRequests: Request Review
+  communityRequestHistory: Request History
   communityVolunteers: Volunteer Applications
   communityMonitor: Service Monitoring
   communityAnnouncements: Announcements
   communityInviteCodes: Community Invite Codes
   communityBanners: Community Banners
   communityScopedUsers: Community Users
-  communityAudit: Community Audit Log
+  communityAudit: Community Log
   userResident: Resident Workspace
   userVolunteer: Volunteer Workspace
   user-announcements: Community Announcements
@@ -260,7 +261,7 @@ menu:
   service-my-evaluations: Resident Feedback
   admin-users: Users & Roles
   admin-config: System Configuration
-  admin-audit: Audit Log
+  admin-audit: System Log
   admin-global-dashboard: Global Data & Matching
   admin-dashboard: Admin Workspace
   admin-backup: Export & Backup
@@ -657,6 +658,29 @@ community:
     rejectModalTitle: Reject request
     rejectPlaceholder: Enter rejection reason (required)
     confirmReject: Confirm reject
+  requestHistory:
+    title: Request history
+    subtitle: Review processed requests and revisit in-progress records.
+    tip: Completed requests are shown first by default.
+    statusPlaceholder: History status
+    communityPlaceholder: Community
+    loadFailed: Failed to load request history
+    statusPublished: Published
+    statusClaimed: Claimed
+    statusCompleted: Completed
+    statusRejected: Rejected
+    colCommunity: Community
+    colLatestProgress: Latest step
+    drawerSubtitle: Request flow and history
+    labelCommunity: Community
+    labelAuditor: Auditor
+    progressTitle: Progress steps
+    nodeCreated: Submitted
+    nodeAudited: Audited
+    nodePublished: Published
+    nodeClaimed: Claimed
+    nodeCompleted: Completed
+    emptyDescription: No description
   announcements:
     title: Announcements (community admin)
     subtitle: Publish notices, policies, and alerts for residents and volunteers.

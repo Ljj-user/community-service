@@ -172,6 +172,10 @@ export function alertEventList(params: { status?: number, page?: number, size?: 
   return alertApi.get<BackendResult<PageResult<AlertEvent>>>(`list${qs(params)}`)
 }
 
+export function alertEventDetail(id: number) {
+  return alertApi.get<BackendResult<AlertEvent>>(`${id}`)
+}
+
 export function handleAlertEvent(id: number, handleResult: string) {
   return alertApi.post<BackendResult<null>>(`${id}/handle`, { handleResult })
 }

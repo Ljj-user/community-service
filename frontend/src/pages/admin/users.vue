@@ -27,11 +27,14 @@ import {
   Prohibited20Regular,
 } from '@vicons/fluent'
 import { h } from 'vue'
+import { storeToRefs } from 'pinia'
 const route = useRoute()
 const { t, locale } = useI18n()
 
 const message = useMessage()
 const exporting = ref(false)
+const accountStore = useAccountStore()
+const { user } = storeToRefs(accountStore)
 
 const loading = ref(false)
 
@@ -65,11 +68,19 @@ const form = reactive({
   status: 1,
 })
 
-const roleOptions = computed(() => [
-  { label: t('community.users.roleSuper'), value: 1 },
-  { label: t('community.users.roleCommunity'), value: 2 },
-  { label: t('community.users.roleUser'), value: 3 },
-])
+const isSuperAdmin = computed(() => user.value?.role === 1)
+const isCommunityAdmin = computed(() => user.value?.role === 2)
+
+const roleOptions = computed(() => {
+  if (isCommunityAdmin.value)
+    return [{ label: t('community.users.roleUser'), value: 3 }]
+
+  return [
+    { label: t('community.users.roleSuper'), value: 1 },
+    { label: t('community.users.roleCommunity'), value: 2 },
+    { label: t('community.users.roleUser'), value: 3 },
+  ]
+})
 
 const identityOptions = computed(() => [
   { label: t('community.users.identityResident'), value: 1 },
@@ -109,6 +120,11 @@ function identityText(identityType: number) {
 
 function statusText(status: number) {
   return status === 1 ? t('community.users.statusOn') : t('community.users.statusOff')
+}
+
+function canManageRow(row: AdminUserVO) {
+  if (isSuperAdmin.value) return true
+  return row.role === 3
 }
 
 async function fetchList() {
@@ -165,10 +181,16 @@ function openCreate() {
   form.email = ''
   form.address = ''
   form.status = 1
+  if (isCommunityAdmin.value)
+    form.role = 3
   showModal.value = true
 }
 
 function openEdit(row: AdminUserVO) {
+  if (!canManageRow(row)) {
+    message.warning(t('common.403Error'))
+    return
+  }
   modalMode.value = 'edit'
   form.id = row.id
   form.username = row.username
@@ -232,6 +254,10 @@ async function submit() {
 }
 
 async function executeDelete(row: AdminUserVO): Promise<boolean> {
+  if (!canManageRow(row)) {
+    message.warning(t('common.403Error'))
+    return false
+  }
   const res = await adminUserDelete(row.id)
   if (res.code !== 200) {
     message.error(res.message || t('community.users.deleteFailed'))
@@ -243,6 +269,10 @@ async function executeDelete(row: AdminUserVO): Promise<boolean> {
 }
 
 async function toggleStatus(row: AdminUserVO) {
+  if (!canManageRow(row)) {
+    message.warning(t('common.403Error'))
+    return
+  }
   const next = row.status === 1 ? 0 : 1
   const res = await adminUserSetStatus(row.id, next as 0 | 1)
   if (res.code !== 200) {
@@ -309,6 +339,9 @@ const columns = computed<DataTableColumns<AdminUserVO>>(() => {
       key: 'actions',
       width: 300,
       render: (row) => {
+        if (!canManageRow(row))
+          return h('span', { class: 'text-xs text-slate-400' }, t('common.403Error'))
+
         return h('div', { class: 'flex flex-wrap items-center gap-2' }, [
           h(
             NButton,
@@ -405,7 +438,7 @@ watch(
       <n-button type="primary" @click="openCreate">
         {{ t('community.users.addUser') }}
       </n-button>
-      <n-button :loading="exporting" @click="exportUsersData">
+      <n-button v-if="isSuperAdmin" :loading="exporting" @click="exportUsersData">
         导出数据
       </n-button>
     </div>
@@ -415,7 +448,7 @@ watch(
         <n-input v-model:value="query.username" :placeholder="t('community.users.searchUser')" clearable />
         <n-select v-model:value="query.role" :options="roleOptions" :placeholder="t('community.users.role')" clearable />
         <n-select v-model:value="query.status" :options="statusOptions" :placeholder="t('community.users.status')" clearable />
-        <n-select v-model:value="query.communityId" :options="communityOptions" placeholder="所属社区" clearable filterable />
+        <n-select v-if="isSuperAdmin" v-model:value="query.communityId" :options="communityOptions" placeholder="所属社区" clearable filterable />
         <div class="flex gap-2">
           <n-button type="primary" :loading="loading" @click="() => { query.page = 1; fetchList() }">
             {{ t('community.users.query') }}
@@ -456,7 +489,7 @@ watch(
           </n-form-item-gi>
 
           <n-form-item-gi :span="12" path="role" :label="t('community.users.colRole')">
-            <n-select v-model:value="form.role" :options="roleOptions" />
+            <n-select v-model:value="form.role" :options="roleOptions" :disabled="isCommunityAdmin" />
           </n-form-item-gi>
           <n-form-item-gi :span="12" path="identityType" :label="t('community.users.userIdentity')" v-if="form.role === 3">
             <n-select v-model:value="form.identityType" :options="identityOptions" />

@@ -13,6 +13,7 @@ import type { InboxNotification } from '~/models/inboxNotification'
 
 const store = useNotificationStore()
 const layoutStore = useLayoutStore()
+const accountStore = useAccountStore()
 const { businessList, announcementList, unreadTotal, isLoading, unreadBusiness, unreadAnnouncement } = storeToRefs(store)
 const { t } = useI18n()
 const router = useRouter()
@@ -78,12 +79,36 @@ async function onItemClick(item: InboxNotification) {
     /* 仍允许跳转 */
   }
 
-  if (item.refType === 'ANNOUNCEMENT') {
-    router.push({ path: '/user/announcements', query: item.refId ? { id: String(item.refId) } : {} })
-  } else {
-    router.push({ path: '/request/my' })
-  }
+  await router.push(resolveRouteForItem(item))
   showPanel.value = false
+}
+
+function resolveRouteForItem(item: InboxNotification) {
+  if (item.refType === 'ANNOUNCEMENT') {
+    return {
+      path: '/user/announcements',
+      query: item.refId ? { id: String(item.refId) } : {},
+    }
+  }
+
+  if (item.refType === 'ANOMALY_ALERT' || item.refType === 'CARE_ALERT') {
+    return {
+      path: '/community/alerts',
+      query: item.refId ? { id: String(item.refId) } : {},
+    }
+  }
+
+  if (item.refType === 'SERVICE_CLAIM' && accountStore.user?.role !== 3) {
+    return {
+      path: '/community/monitor',
+      query: item.refId ? { requestId: String(item.refId) } : {},
+    }
+  }
+
+  return {
+    path: '/request/my',
+    query: item.refId ? { id: String(item.refId) } : {},
+  }
 }
 
 async function markCurrentTabRead() {

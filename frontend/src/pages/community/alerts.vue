@@ -12,6 +12,7 @@ import type { DataTableColumns } from 'naive-ui'
 import { NButton, NPopconfirm, NTag } from 'naive-ui'
 import { h, resolveComponent } from 'vue'
 import {
+  alertEventDetail,
   alertEventList,
   handleAlertEvent,
   type AlertEvent,
@@ -19,6 +20,8 @@ import {
 import CenteredPreviewModal from '~/components/shared/CenteredPreviewModal.vue'
 
 const message = useMessage()
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const rows = ref<AlertEvent[]>([])
 const total = ref(0)
@@ -76,6 +79,7 @@ async function load() {
     if (res.code !== 200) throw new Error(res.message || '加载失败')
     rows.value = res.data.records || []
     total.value = res.data.total || 0
+    await openDetailByRouteQuery()
   } catch (e: any) {
     message.error(e?.message || '加载失败')
   } finally {
@@ -96,6 +100,28 @@ async function closeAlert(row: AlertEvent) {
 function openDetail(row: AlertEvent) {
   current.value = row
   showPreview.value = true
+}
+
+async function openDetailByRouteQuery() {
+  const rawId = route.query.id
+  const id = Number(Array.isArray(rawId) ? rawId[0] : rawId)
+  if (!id) return
+
+  const existing = rows.value.find(row => row.id === id)
+  if (existing) {
+    openDetail(existing)
+  } else {
+    try {
+      const res = await alertEventDetail(id)
+      if (res.code === 200 && res.data) {
+        openDetail(res.data)
+      }
+    } catch {
+      message.warning('未找到对应预警记录')
+    }
+  }
+
+  router.replace({ path: route.path, query: { ...route.query, id: undefined } })
 }
 
 const columns: DataTableColumns<AlertEvent> = [

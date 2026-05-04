@@ -46,7 +46,7 @@ public class AdminAlertController {
                        a.community_id AS communityId,
                        a.target_user_id AS targetUserId,
                        a.alert_code AS title,
-                       CONCAT(a.trigger_rule, IF(a.suggestion_action IS NULL OR a.suggestion_action='', '', CONCAT('；', a.suggestion_action))) AS description,
+                       CONCAT(a.trigger_rule, IF(a.suggestion_action IS NULL OR a.suggestion_action='', '', CONCAT('；建议动作：', a.suggestion_action))) AS description,
                        a.status,
                        a.handler_user_id AS handlerUserId,
                        a.handle_result AS handleResult,
@@ -77,13 +77,52 @@ public class AdminAlertController {
                 SET status=2, handler_user_id=?, handled_at=NOW(3), handle_result=?
                 WHERE id=? AND (? IS NULL OR community_id=?)
                 """, op.userId, result, id, op.scopeCommunityId(), op.scopeCommunityId());
-        if (updated <= 0) throw new RuntimeException("预警不存在或无权限");
+        if (updated <= 0) {
+            throw new RuntimeException("预警不存在或无权限处理");
+        }
         return Result.success("处理完成", null);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('COMMUNITY_ADMIN', 'SUPER_ADMIN')")
+    public Result<Map<String, Object>> detail(@PathVariable("id") Long id) {
+        Operator op = currentUser();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT a.id,
+                       a.alert_code AS ruleCode,
+                       a.alert_code AS alertType,
+                       a.severity AS alertLevel,
+                       a.community_id AS communityId,
+                       a.target_user_id AS targetUserId,
+                       a.alert_code AS title,
+                       CONCAT(a.trigger_rule, IF(a.suggestion_action IS NULL OR a.suggestion_action='', '', CONCAT('；建议动作：', a.suggestion_action))) AS description,
+                       a.status,
+                       a.handler_user_id AS handlerUserId,
+                       a.handle_result AS handleResult,
+                       a.occurred_at AS occurredAt,
+                       a.handled_at AS handledAt,
+                       r.name AS communityName,
+                       u.real_name AS targetUserName,
+                       h.real_name AS handlerName
+                FROM anomaly_alert_event a
+                LEFT JOIN sys_region r ON r.id=a.community_id
+                LEFT JOIN sys_user u ON u.id=a.target_user_id
+                LEFT JOIN sys_user h ON h.id=a.handler_user_id
+                WHERE a.id=?
+                  AND (? IS NULL OR a.community_id=?)
+                LIMIT 1
+                """, id, op.scopeCommunityId(), op.scopeCommunityId());
+        if (rows.isEmpty()) {
+            return Result.error("预警记录不存在");
+        }
+        return Result.success(rows.get(0));
     }
 
     private Operator currentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl userDetails)) throw new RuntimeException("未登录");
+        if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl userDetails)) {
+            throw new RuntimeException("用户未登录");
+        }
         Operator op = new Operator();
         op.userId = userDetails.getUser().getId();
         op.role = userDetails.getUser().getRole();
@@ -95,6 +134,7 @@ public class AdminAlertController {
         Long userId;
         Byte role;
         Long communityId;
+
         Long scopeCommunityId() {
             return Constants.ROLE_COMMUNITY_ADMIN.equals(role) ? communityId : null;
         }

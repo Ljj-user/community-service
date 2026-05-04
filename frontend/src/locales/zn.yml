@@ -232,13 +232,14 @@ menu:
   globalDashboard: 全局数据看板
   backup: 数据导出与备份
   communityRequests: 需求审核
+  communityRequestHistory: 历史需求
   communityVolunteers: 志愿者管理
   communityMonitor: 服务过程监控
   communityAnnouncements: 信息发布与公告
   communityInviteCodes: 社区邀请码
   communityBanners: 社区轮播图
   communityScopedUsers: 辖区用户管理
-  communityAudit: 辖区审计日志
+  communityAudit: 辖区日志
   userResident: 居民工作台
   userVolunteer: 志愿者工作台
   user-announcements: 社区公告
@@ -250,7 +251,7 @@ menu:
   service-my-evaluations: 居民评价与反馈
   admin-users: 用户与角色管理
   admin-config: 系统配置管理
-  admin-audit: 审核日志与审计
+  admin-audit: 系统日志
   admin-global-dashboard: 全局数据看板
   admin-dashboard: 管理员工作台
   admin-backup: 数据导出与备份
@@ -674,6 +675,29 @@ community:
     rejectModalTitle: 驳回需求
     rejectPlaceholder: 请填写驳回原因（必填）
     confirmReject: 确认驳回
+  requestHistory:
+    title: 历史需求记录
+    subtitle: 查已经处理过的需求，也能回看处理中记录。
+    tip: 默认先看已完成记录，需要时再切状态。
+    statusPlaceholder: 历史状态
+    communityPlaceholder: 所属社区
+    loadFailed: 历史记录加载失败
+    statusPublished: 已发布
+    statusClaimed: 已认领
+    statusCompleted: 已完成
+    statusRejected: 已驳回
+    colCommunity: 所属社区
+    colLatestProgress: 最近节点
+    drawerSubtitle: 需求流转与历史详情
+    labelCommunity: 所属社区
+    labelAuditor: 审核人
+    progressTitle: 流转节点
+    nodeCreated: 提交时间
+    nodeAudited: 审核时间
+    nodePublished: 发布时间
+    nodeClaimed: 认领时间
+    nodeCompleted: 完成时间
+    emptyDescription: 暂无描述
   announcements:
     title: 信息发布与公告（社区管理员）
     subtitle: 发布社区活动通知、政策宣导以及紧急提醒，提升居民与志愿者的信息触达效率。

@@ -161,7 +161,7 @@ public class SecurityConfig {
                         // 轮播图管理（社区管理员/系统管理员）
                         .requestMatchers("/admin/banner/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
                         // 审计日志仅系统管理员可见
-                        .requestMatchers("/admin/audit/**").hasRole("SUPER_ADMIN")
+                        .requestMatchers("/admin/audit/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")
 
                         // 社区管理员：审核需求、管理志愿者、数据看板
                         .requestMatchers("/community/**", "/dashboard/**").hasAnyRole("COMMUNITY_ADMIN", "SUPER_ADMIN")

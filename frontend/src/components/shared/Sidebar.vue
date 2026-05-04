@@ -85,6 +85,13 @@ function buildBusinessGroup(): SidebarMenuOption {
         icon: ErrorIcon,
       },
       {
+        label: '历史需求',
+        route: '/community/request-history',
+        key: 'communityRequestHistory',
+        icon: DataIcon,
+        activeIcon: DataIconActive,
+      },
+      {
         label: '服务过程监控',
         route: '/community/monitor',
         key: 'communityMonitor',
@@ -159,7 +166,7 @@ function buildGovernanceGroup(withAudit: boolean): SidebarMenuOption {
   }
 }
 
-function buildSystemGroup(includeUsers: boolean): SidebarMenuOption {
+function buildSystemGroup(includeUsers: boolean, includeAudit = false): SidebarMenuOption {
   const children: SidebarMenuOption[] = []
   if (includeUsers) {
     children.push({
@@ -176,6 +183,14 @@ function buildSystemGroup(includeUsers: boolean): SidebarMenuOption {
       key: 'community-users',
       icon: CustomersIcon,
       activeIcon: CustomersIconActive,
+    })
+  }
+  if (includeAudit) {
+    children.push({
+      label: t('menu.admin-audit'),
+      route: '/admin/audit',
+      key: 'admin-audit',
+      icon: ErrorIcon,
     })
   }
   children.push(
@@ -220,7 +235,7 @@ const superAdminMenuOptions = computed<SidebarMenuOption[]>(() => {
     homeBoardItem.value,
     buildBusinessGroup(),
     buildGovernanceGroup(false),
-    buildSystemGroup(true),
+    buildSystemGroup(true, true),
     buildSettingsSubmenu(),
   ]
 })
@@ -231,7 +246,13 @@ const communityAdminMenuOptions = computed<SidebarMenuOption[]>(() => {
     homeBoardItem.value,
     buildBusinessGroup(),
     buildGovernanceGroup(true),
-    buildSystemGroup(false),
+    {
+      label: t('menu.communityScopedUsers'),
+      route: '/admin/users',
+      key: 'community-users',
+      icon: CustomersIcon,
+      activeIcon: CustomersIconActive,
+    },
     buildSettingsSubmenu(),
   ]
 })
